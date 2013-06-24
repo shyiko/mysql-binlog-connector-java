@@ -15,6 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog.io;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.BitSet;
@@ -25,6 +26,7 @@ import java.util.BitSet;
 public class ByteArrayInputStream extends InputStream {
 
     private InputStream inputStream;
+    private Integer peek;
 
     public ByteArrayInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -157,11 +159,22 @@ public class ByteArrayInputStream extends InputStream {
         return inputStream.available(); //todo: may result in unexpected behavior in case of socket stream
     }
 
+    public int peek() throws IOException {
+        this.peek = inputStream.read();
+        return peek;
+    }
+
     @Override
     public int read() throws IOException {
-        int result = inputStream.read();
+        int result;
+        if (peek == null) {
+            result = inputStream.read();
+        } else {
+            result = peek;
+            peek = null;
+        }
         if (result == -1) {
-            throw new IOException("eof-of-stream"); // todo: proper handling
+            throw new EOFException();
         }
         return result;
     }

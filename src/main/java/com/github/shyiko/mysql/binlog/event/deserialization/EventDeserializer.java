@@ -76,7 +76,13 @@ public class EventDeserializer {
                         setMayContainExtraInformation(true));
     }
 
+    /**
+     * @return deserialized event or null in case of end-of-stream
+     */
     public Event nextEvent(ByteArrayInputStream inputStream) throws IOException {
+        if (inputStream.peek() == -1) {
+            return null;
+        }
         // todo: maintain header length from FormatDescriptionEvent
         EventHeader eventHeader = eventHeaderDeserializer.deserialize(inputStream);
 /*
