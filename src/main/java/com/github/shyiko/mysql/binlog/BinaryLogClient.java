@@ -19,6 +19,7 @@ import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventListener;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
+import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.protocol.ErrorPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
@@ -37,6 +38,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
+ * MySQL replication stream client.
+ *
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class BinaryLogClient {
@@ -60,10 +63,21 @@ public class BinaryLogClient {
     private PacketChannel channel;
     private volatile boolean connected;
 
+    /**
+     * Alias for BinaryLogClient(username, port, &lt;no schema&gt; , username, password).
+     * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
+     */
     public BinaryLogClient(String hostname, int port, String username, String password) {
         this(hostname, port, null, username, password);
     }
 
+    /**
+     * @param hostname mysql server hostname
+     * @param port mysql server port
+     * @param schema database
+     * @param username login
+     * @param password password
+     */
     public BinaryLogClient(String hostname, int port, String schema, String username, String password) {
         this.hostname = hostname;
         this.port = port;
@@ -88,10 +102,20 @@ public class BinaryLogClient {
         this.binlogPosition = binlogPosition;
     }
 
+    /**
+     * @param eventDeserializer custom event deserializer
+     */
     public void setEventDeserializer(EventDeserializer eventDeserializer) {
+        if (eventDeserializer == null) {
+            throw new IllegalArgumentException("Event deserializer cannot be NULL");
+        }
         this.eventDeserializer = eventDeserializer;
     }
 
+    /**
+     * Connect to the replication stream. Note this method blocks until disconnected.
+     * @throws AuthenticationException in case of failed authentication
+     */
     public void connect() throws IOException {
         channel = new PacketChannel(hostname, port);
         connected = true;
@@ -103,7 +127,7 @@ public class BinaryLogClient {
         byte[] authenticationResult = channel.read();
         if (authenticationResult[0] == (byte) 0xFF /* error */) {
             byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
-            throw new IOException(new ErrorPacket(bytes).getErrorMessage());
+            throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
         }
         long serverId = fetchServerId();
         if (binlogFilename == null) {
@@ -200,12 +224,19 @@ public class BinaryLogClient {
         return resultSet.toArray(new ResultSetRowPacket[resultSet.size()]);
     }
 
+    /**
+     * Register event listener. Note that multiple event listeners will be called in order they
+     * where registered.
+     */
     public void registerEventListener(EventListener eventListener) {
         synchronized (eventListeners) {
             eventListeners.add(eventListener);
         }
     }
 
+    /**
+     * Unregister all event listener of specific type.
+     */
     public void unregisterEventListener(Class<? extends EventListener> listenerClass) {
         synchronized (eventListeners) {
             Iterator<EventListener> iterator = eventListeners.iterator();
@@ -215,6 +246,15 @@ public class BinaryLogClient {
                     iterator.remove();
                 }
             }
+        }
+    }
+
+    /**
+     * Unregister single event listener.
+     */
+    public void unregisterEventListener(EventListener eventListener) {
+        synchronized (eventListeners) {
+            eventListeners.remove(eventListener);
         }
     }
 
@@ -232,12 +272,19 @@ public class BinaryLogClient {
         }
     }
 
+    /**
+     * Register lifecycle listener. Note that multiple lifecycle listeners will be called in order they
+     * where registered.
+     */
     public void registerLifecycleListener(LifecycleListener eventListener) {
         synchronized (lifecycleListeners) {
             lifecycleListeners.add(eventListener);
         }
     }
 
+    /**
+     * Unregister all lifecycle listener of specific type.
+     */
     public synchronized void unregisterLifecycleListener(Class<? extends LifecycleListener> listenerClass) {
         synchronized (lifecycleListeners) {
             Iterator<LifecycleListener> iterator = lifecycleListeners.iterator();
@@ -250,6 +297,20 @@ public class BinaryLogClient {
         }
     }
 
+    /**
+     * Unregister single lifecycle listener.
+     */
+    public synchronized void unregisterLifecycleListener(LifecycleListener eventListener) {
+        synchronized (lifecycleListeners) {
+            lifecycleListeners.remove(eventListener);
+        }
+    }
+
+    /**
+     * Disconnect from the replication stream.
+     * Note that this does not cause binlogFilename/binlogPosition to be cleared out.
+     * As the result following {@link #connect()} resumes client from where it left off.
+     */
     public void disconnect() throws IOException {
         try {
             connected = false;

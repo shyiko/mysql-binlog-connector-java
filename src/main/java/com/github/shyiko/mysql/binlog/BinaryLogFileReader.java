@@ -27,6 +27,8 @@ import java.io.IOException;
 import java.util.Arrays;
 
 /**
+ * MySQL binary log file reader.
+ *
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class BinaryLogFileReader implements Closeable {
