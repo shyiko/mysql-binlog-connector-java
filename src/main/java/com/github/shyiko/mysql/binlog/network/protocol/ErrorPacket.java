@@ -29,7 +29,6 @@ public class ErrorPacket implements Packet {
 
     public ErrorPacket(byte[] bytes) throws IOException {
         ByteArrayInputStream buffer = new ByteArrayInputStream(bytes);
-        buffer.skip(1); // marker
         this.errorCode = buffer.readInteger(2);
         buffer.skip(6); // 1 byte for slash and 5 for sql state
         this.errorMessage = buffer.readString(buffer.available());

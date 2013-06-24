@@ -28,6 +28,8 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogComm
 import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 
 import java.io.IOException;
+import java.net.SocketException;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -57,6 +59,7 @@ public class BinaryLogClient {
 
     private PacketChannel channel;
 
+    private volatile boolean connected;
     private CountDownLatch latch = new CountDownLatch(1);
 
     public BinaryLogClient(String hostname, int port, String username, String password) {
@@ -89,6 +92,7 @@ public class BinaryLogClient {
 
     public void connect() throws IOException {
         channel = new PacketChannel(hostname, port);
+        connected = true;
         GreetingPacket greetingPacket = new GreetingPacket(channel.read());
         AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
                 greetingPacket.getScramble());
@@ -96,7 +100,8 @@ public class BinaryLogClient {
         channel.write(authenticateCommand);
         byte[] authenticationResult = channel.read();
         if (authenticationResult[0] == (byte) 0xFF /* error */) {
-             throw new IOException(new ErrorPacket(authenticationResult).getErrorMessage());
+            byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
+            throw new IOException(new ErrorPacket(bytes).getErrorMessage());
         }
         long serverId = fetchServerId();
         if (binlogFilename == null) {
@@ -134,12 +139,29 @@ public class BinaryLogClient {
     private void listenForEventPackets() throws IOException {
         latch.countDown();
         ByteArrayInputStream inputStream = channel.getInputStream();
-        while (channel.isOpen()) {
-            int packetLength = inputStream.readInteger(3);
-            inputStream.skip(2); // 1 byte for sequence and 1 for marker
-            ByteArrayInputStream eventByteArray = new ByteArrayInputStream(inputStream.read(packetLength - 1));
-            Event event = eventDeserializer.nextEvent(eventByteArray);
-            notifyEventListeners(event);
+        try {
+            while (true) {
+                try {
+                    inputStream.peek();
+                } catch (SocketException e) {
+                    if (!connected) {
+                        break;
+                    }
+                    throw e;
+                }
+                int packetLength = inputStream.readInteger(3);
+                inputStream.skip(1); // 1 byte for sequence
+                int marker = inputStream.read();
+                byte[] bytes = inputStream.read(packetLength - 1);
+                if (marker == 0xFF) {
+                    ErrorPacket errorPacket = new ErrorPacket(bytes);
+                    throw new IOException(errorPacket.getErrorCode() + " - " + errorPacket.getErrorMessage());
+                }
+                Event event = eventDeserializer.nextEvent(new ByteArrayInputStream(bytes));
+                notifyEventListeners(event);
+            }
+        } finally {
+            disconnect();
         }
     }
 
@@ -179,7 +201,7 @@ public class BinaryLogClient {
     }
 
     public void disconnect() throws IOException {
-        // todo: execute quit command before closing a socket
+        connected = false;
         if (channel != null) {
             channel.close();
         }
