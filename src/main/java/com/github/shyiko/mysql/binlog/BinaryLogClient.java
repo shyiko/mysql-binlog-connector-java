@@ -16,7 +16,6 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventListener;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
@@ -345,6 +344,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
             }
         }
+    }
+
+    /**
+     * {@link BinaryLogClient}'s event listener.
+     */
+    public interface EventListener {
+
+        void onEvent(Event event);
     }
 
     /**
