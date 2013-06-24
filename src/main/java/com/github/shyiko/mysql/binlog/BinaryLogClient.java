@@ -119,39 +119,47 @@ public class BinaryLogClient {
      */
     public void connect() throws IOException {
         try {
-            channel = new PacketChannel(hostname, port);
-            if (channel.getInputStream().peek() == -1) {
-                throw new EOFException();
+            try {
+                channel = new PacketChannel(hostname, port);
+                if (channel.getInputStream().peek() == -1) {
+                    throw new EOFException();
+                }
+            } catch (IOException e) {
+                throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
+                        ". Please check whether it's running.", e);
             }
+            GreetingPacket greetingPacket = new GreetingPacket(channel.read());
+            AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
+                    greetingPacket.getScramble());
+            authenticateCommand.setCollation(greetingPacket.getServerCollation());
+            channel.write(authenticateCommand);
+            byte[] authenticationResult = channel.read();
+            if (authenticationResult[0] == (byte) 0xFF /* error */) {
+                byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
+                throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
+            }
+            long serverId = fetchServerId();
+            if (binlogFilename == null) {
+                fetchBinlogFilenameAndPosition();
+            }
+            channel.write(new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition));
         } catch (IOException e) {
             if (channel != null) {
                 channel.close();
             }
-            throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
-                    ". Please check whether it's running.", e);
+            throw e;
         }
         connected = true;
-        GreetingPacket greetingPacket = new GreetingPacket(channel.read());
-        AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
-                greetingPacket.getScramble());
-        authenticateCommand.setCollation(greetingPacket.getServerCollation());
-        channel.write(authenticateCommand);
-        byte[] authenticationResult = channel.read();
-        if (authenticationResult[0] == (byte) 0xFF /* error */) {
-            byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
-            throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
-        }
-        long serverId = fetchServerId();
-        if (binlogFilename == null) {
-            fetchBinlogFilenameAndPosition();
-        }
         synchronized (lifecycleListeners) {
             for (LifecycleListener lifecycleListener : lifecycleListeners) {
                 lifecycleListener.onConnect(this);
             }
         }
-        channel.write(new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition));
         listenForEventPackets();
+    }
+
+    public boolean isConnected() {
+        return connected;
     }
 
     private long fetchServerId() throws IOException {
