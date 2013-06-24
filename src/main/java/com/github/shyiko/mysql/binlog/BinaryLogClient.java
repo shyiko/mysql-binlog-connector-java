@@ -88,6 +88,10 @@ public class BinaryLogClient {
         this.binlogPosition = binlogPosition;
     }
 
+    public void setEventDeserializer(EventDeserializer eventDeserializer) {
+        this.eventDeserializer = eventDeserializer;
+    }
+
     public void connect() throws IOException {
         channel = new PacketChannel(hostname, port);
         connected = true;
