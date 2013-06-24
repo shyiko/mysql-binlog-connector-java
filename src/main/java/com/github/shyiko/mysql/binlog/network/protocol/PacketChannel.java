@@ -64,7 +64,7 @@ public class PacketChannel implements Channel {
         outputStream.write(body, 0, body.length);
     }
 
-    public void flush() throws Exception {
+    public void flush() throws IOException {
         outputStream.flush();
     }
 
