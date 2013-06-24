@@ -28,6 +28,7 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateComma
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.SocketException;
 import java.util.Arrays;
@@ -117,7 +118,15 @@ public class BinaryLogClient {
      * @throws AuthenticationException in case of failed authentication
      */
     public void connect() throws IOException {
-        channel = new PacketChannel(hostname, port);
+        try {
+            channel = new PacketChannel(hostname, port);
+            if (channel.getInputStream().peek() == -1) {
+                throw new EOFException();
+            }
+        } catch (IOException e) {
+            throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
+                    ". Please check whether it's running.", e);
+        }
         connected = true;
         GreetingPacket greetingPacket = new GreetingPacket(channel.read());
         AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
