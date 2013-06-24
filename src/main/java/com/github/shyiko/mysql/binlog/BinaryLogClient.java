@@ -124,6 +124,9 @@ public class BinaryLogClient {
                 throw new EOFException();
             }
         } catch (IOException e) {
+            if (channel != null) {
+                channel.close();
+            }
             throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
                     ". Please check whether it's running.", e);
         }
