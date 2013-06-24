@@ -15,22 +15,10 @@
  */
 package com.github.shyiko.mysql.binlog.io;
 
-import java.util.BitSet;
-
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public final class ByteArrays {
-
-    public static BitSet toBitSet(byte[] bytes) {
-        BitSet result = new BitSet();
-        for (int i = 0, end = bytes.length * 8; i < end; i++) {
-            if ((bytes[bytes.length - i / 8 - 1] & (1 << (i % 8))) > 0) {
-                result.set(i);
-            }
-        }
-        return result;
-    }
 
     public static byte[] reverse(byte[] bytes) {
         for (int i = 0, length = bytes.length >> 2; i <= length; i++) {
