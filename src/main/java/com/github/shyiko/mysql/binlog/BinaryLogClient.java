@@ -33,8 +33,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -55,12 +53,12 @@ public class BinaryLogClient {
     private volatile long binlogPosition;
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
-    private List<EventListener> eventListeners = new LinkedList<EventListener>();
+
+    private final List<EventListener> eventListeners = new LinkedList<EventListener>();
+    private final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
 
     private PacketChannel channel;
-
     private volatile boolean connected;
-    private CountDownLatch latch = new CountDownLatch(1);
 
     public BinaryLogClient(String hostname, int port, String username, String password) {
         this(hostname, port, null, username, password);
@@ -107,12 +105,13 @@ public class BinaryLogClient {
         if (binlogFilename == null) {
             fetchBinlogFilenameAndPosition();
         }
+        synchronized (lifecycleListeners) {
+            for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                lifecycleListener.onConnect(this);
+            }
+        }
         channel.write(new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition));
         listenForEventPackets();
-    }
-
-    public void await(long timeout, TimeUnit timeUnit) throws InterruptedException {
-        latch.await(timeout, timeUnit);
     }
 
     private long fetchServerId() throws IOException {
@@ -137,12 +136,13 @@ public class BinaryLogClient {
     }
 
     private void listenForEventPackets() throws IOException {
-        latch.countDown();
         ByteArrayInputStream inputStream = channel.getInputStream();
         try {
             while (true) {
                 try {
-                    inputStream.peek();
+                    if (inputStream.peek() == -1) {
+                        break;
+                    }
                 } catch (SocketException e) {
                     if (!connected) {
                         break;
@@ -157,11 +157,27 @@ public class BinaryLogClient {
                     ErrorPacket errorPacket = new ErrorPacket(bytes);
                     throw new IOException(errorPacket.getErrorCode() + " - " + errorPacket.getErrorMessage());
                 }
-                Event event = eventDeserializer.nextEvent(new ByteArrayInputStream(bytes));
+                Event event;
+                try {
+                    event = eventDeserializer.nextEvent(new ByteArrayInputStream(bytes));
+                } catch (Exception e) {
+                    synchronized (lifecycleListeners) {
+                        for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                            lifecycleListener.onEventDeserializationFailure(this, e);
+                        }
+                    }
+                    continue;
+                }
                 notifyEventListeners(event);
             }
         } finally {
-            disconnect();
+            if (connected) {
+                disconnect();
+            } else {
+                if (channel.isOpen()) {
+                    channel.close();
+                }
+            }
         }
     }
 
@@ -174,37 +190,79 @@ public class BinaryLogClient {
         return resultSet.toArray(new ResultSetRowPacket[resultSet.size()]);
     }
 
-    public synchronized void registerEventListener(EventListener eventListener) {
-        eventListeners.add(eventListener);
+    public void registerEventListener(EventListener eventListener) {
+        synchronized (eventListeners) {
+            eventListeners.add(eventListener);
+        }
     }
 
-    public synchronized void unregisterEventListener(Class<? extends EventListener> listenerClass) {
-        Iterator<EventListener> iterator = eventListeners.iterator();
-        while (iterator.hasNext()) {
-            EventListener replicationEventListener = iterator.next();
-            if (listenerClass.isInstance(replicationEventListener)) {
-                iterator.remove();
+    public void unregisterEventListener(Class<? extends EventListener> listenerClass) {
+        synchronized (eventListeners) {
+            Iterator<EventListener> iterator = eventListeners.iterator();
+            while (iterator.hasNext()) {
+                EventListener eventListener = iterator.next();
+                if (listenerClass.isInstance(eventListener)) {
+                    iterator.remove();
+                }
             }
         }
     }
 
-    private synchronized void notifyEventListeners(Event event) {
-        for (EventListener eventListener : eventListeners) {
-            try {
-                eventListener.onEvent(event);
-            } catch (Exception e) {
-                if (logger.isLoggable(Level.WARNING)) {
-                    logger.log(Level.WARNING, eventListener + " choked on " + event, e);
+    private void notifyEventListeners(Event event) {
+        synchronized (eventListeners) {
+            for (EventListener eventListener : eventListeners) {
+                try {
+                    eventListener.onEvent(event);
+                } catch (Exception e) {
+                    if (logger.isLoggable(Level.WARNING)) {
+                        logger.log(Level.WARNING, eventListener + " choked on " + event, e);
+                    }
+                }
+            }
+        }
+    }
+
+    public void registerLifecycleListener(LifecycleListener eventListener) {
+        synchronized (lifecycleListeners) {
+            lifecycleListeners.add(eventListener);
+        }
+    }
+
+    public synchronized void unregisterLifecycleListener(Class<? extends LifecycleListener> listenerClass) {
+        synchronized (lifecycleListeners) {
+            Iterator<LifecycleListener> iterator = lifecycleListeners.iterator();
+            while (iterator.hasNext()) {
+                LifecycleListener lifecycleListener = iterator.next();
+                if (listenerClass.isInstance(lifecycleListener)) {
+                    iterator.remove();
                 }
             }
         }
     }
 
     public void disconnect() throws IOException {
-        connected = false;
-        if (channel != null) {
-            channel.close();
+        try {
+            connected = false;
+            if (channel != null) {
+                channel.close();
+            }
+        } finally {
+            synchronized (lifecycleListeners) {
+                for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                    lifecycleListener.onDisconnect(this);
+                }
+            }
         }
+    }
+
+    /**
+     * {@link BinaryLogClient}'s lifecycle listener.
+     */
+    public interface LifecycleListener {
+
+        void onConnect(BinaryLogClient client);
+        void onEventDeserializationFailure(BinaryLogClient client, Exception ex);
+        void onDisconnect(BinaryLogClient client);
     }
 
 }
