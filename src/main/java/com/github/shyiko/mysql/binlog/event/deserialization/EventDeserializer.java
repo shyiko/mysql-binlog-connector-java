@@ -59,11 +59,21 @@ public class EventDeserializer {
         eventDataDeserializers.put(EventType.QUERY, new QueryEventDataDeserializer());
         eventDataDeserializers.put(EventType.TABLE_MAP, new TableMapEventDataDeserializer());
         eventDataDeserializers.put(EventType.XID, new XidEventDataDeserializer());
-/*
-        eventDataDeserializers.put(EventType.WRITE_ROWS, new WriteRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.UPDATE_ROWS, new UpdateRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.DELETE_ROWS, new DeleteRowsEventDataDeserializer(tableMapEventByTableId));
-*/
+        eventDataDeserializers.put(EventType.WRITE_ROWS,
+                new WriteRowsEventDataDeserializer(tableMapEventByTableId));
+        eventDataDeserializers.put(EventType.UPDATE_ROWS,
+                new UpdateRowsEventDataDeserializer(tableMapEventByTableId));
+        eventDataDeserializers.put(EventType.DELETE_ROWS,
+                new DeleteRowsEventDataDeserializer(tableMapEventByTableId));
+        eventDataDeserializers.put(EventType.EXT_WRITE_ROWS,
+                new WriteRowsEventDataDeserializer(tableMapEventByTableId).
+                        setMayContainExtraInformation(true));
+        eventDataDeserializers.put(EventType.EXT_UPDATE_ROWS,
+                new UpdateRowsEventDataDeserializer(tableMapEventByTableId).
+                        setMayContainExtraInformation(true));
+        eventDataDeserializers.put(EventType.EXT_DELETE_ROWS,
+                new DeleteRowsEventDataDeserializer(tableMapEventByTableId).
+                        setMayContainExtraInformation(true));
     }
 
     public Event nextEvent(ByteArrayInputStream inputStream) throws IOException {

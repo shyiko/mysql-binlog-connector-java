@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog.event;
 
 /**
+ * see mysql/sql/log_event.h
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public enum EventType {
@@ -40,13 +41,24 @@ public enum EventType {
     BEGIN_LOAD_QUERY,
     EXECUTE_LOAD_QUERY,
     TABLE_MAP,
+    // "rows" 5.1.0 - 5.1.15
     PRE_GA_WRITE_ROWS,
     PRE_GA_UPDATE_ROWS,
     PRE_GA_DELETE_ROWS,
+    // "rows" 5.1.16 - mysql-trunk
     WRITE_ROWS,
     UPDATE_ROWS,
     DELETE_ROWS,
     INCIDENT,
-    HEARTBEAT_LOG
+    HEARTBEAT,
+    IGNORABLE,
+    ROWS_QUERY,
+    // "rows" 5.1.18+
+    EXT_WRITE_ROWS,
+    EXT_UPDATE_ROWS,
+    EXT_DELETE_ROWS,
+    GTID,
+    ANONYMOUS_GTID,
+    PREVIOUS_GTIDS
 
 }
