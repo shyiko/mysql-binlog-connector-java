@@ -24,6 +24,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 
 /**
@@ -43,15 +44,23 @@ public class BinaryLogFileReader implements Closeable {
     }
 
     public BinaryLogFileReader(File file, EventDeserializer eventDeserializer) throws IOException {
-        inputStream = new ByteArrayInputStream(new BufferedInputStream(new FileInputStream(file)));
+        this(new BufferedInputStream(new FileInputStream(file)), eventDeserializer);
+    }
+
+    public BinaryLogFileReader(InputStream inputStream) throws IOException {
+        this(inputStream, new EventDeserializer());
+    }
+
+    public BinaryLogFileReader(InputStream inputStream, EventDeserializer eventDeserializer) throws IOException {
+        this.inputStream = new ByteArrayInputStream(inputStream);
         try {
-            byte[] magicHeader = inputStream.read(MAGIC_HEADER.length);
+            byte[] magicHeader = this.inputStream.read(MAGIC_HEADER.length);
             if (!Arrays.equals(magicHeader, MAGIC_HEADER)) {
-                throw new IOException(file + " is not a valid binary log file");
+                throw new IOException("Not a valid binary log");
             }
         } catch (IOException e) {
             try {
-                inputStream.close();
+                this.inputStream.close();
             } catch (IOException ex) {
                 // ignore
             }
