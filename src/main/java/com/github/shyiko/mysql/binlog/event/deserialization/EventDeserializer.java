@@ -35,6 +35,8 @@ public class EventDeserializer {
     private final EventDataDeserializer defaultEventDataDeserializer;
     private final Map<EventType, EventDataDeserializer> eventDataDeserializers;
 
+    private int checksumLength;
+
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     public EventDeserializer(
@@ -76,6 +78,10 @@ public class EventDeserializer {
                         setMayContainExtraInformation(true));
     }
 
+    public void setChecksumType(ChecksumType checksumType) {
+        this.checksumLength = checksumType.getLength();
+    }
+
     /**
      * @return deserialized event or null in case of end-of-stream
      */
@@ -90,8 +96,18 @@ public class EventDeserializer {
 */
         EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
         // todo: pass original inputStream in
-        EventData eventData = eventDataDeserializer.deserialize(
-                new ByteArrayInputStream(inputStream.read((int) eventHeader.getEventLength() - 19)));
+        int eventBodyLength = (int) eventHeader.getEventLength() - 19 - checksumLength;
+        // todo: according to http://dev.mysql.com/worklog/task/?id=2540 FormatDescriptionEvent contains
+        // checksum algorithm descriptor. use it instead of this.setChecksumType(ChecksumType checksumType)
+
+        EventData eventData;
+        try {
+            eventData = eventDataDeserializer.deserialize(
+                new ByteArrayInputStream(inputStream.read(eventBodyLength)));
+        } catch (IOException e) {
+            throw new EventDataDeserializationException(eventHeader, e);
+        }
+
 /*
         long unreadEventData = originalPosition + (eventHeader.getEventLength() - 19) -
                 inputStream.position();

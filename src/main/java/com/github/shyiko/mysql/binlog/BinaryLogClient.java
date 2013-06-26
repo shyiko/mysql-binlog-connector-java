@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
@@ -126,7 +127,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
             } catch (IOException e) {
                 throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
-                        ". Please check whether it's running.", e);
+                        ". Please make sure it's running.", e);
             }
             GreetingPacket greetingPacket = new GreetingPacket(channel.read());
             AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
@@ -141,6 +142,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             long serverId = fetchServerId();
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
+            }
+            ChecksumType checksumType = fetchBinlogChecksum();
+            if (checksumType != ChecksumType.NONE) {
+                confirmSupportOfChecksum(checksumType);
             }
             channel.write(new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition));
         } catch (IOException e) {
@@ -163,7 +168,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private long fetchServerId() throws IOException {
-        channel.write(new QueryCommand("show variables WHERE variable_name = 'server_id'"));
+        channel.write(new QueryCommand("show variables where variable_name = 'server_id'"));
         ResultSetRowPacket[] resultSet = readResultSet();
         if (resultSet.length == 0) {
             throw new IOException("Failed to determine server_id");
@@ -181,6 +186,25 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         ResultSetRowPacket resultSetRow = resultSet[0];
         binlogFilename = resultSetRow.getValue(0);
         binlogPosition = Long.parseLong(resultSetRow.getValue(1));
+    }
+
+    private ChecksumType fetchBinlogChecksum() throws IOException {
+        channel.write(new QueryCommand("show global variables like 'binlog_checksum'"));
+        ResultSetRowPacket[] resultSet = readResultSet();
+        if (resultSet.length == 0) {
+            return ChecksumType.NONE;
+        }
+        return ChecksumType.valueOf(resultSet[0].getValue(1).toUpperCase());
+    }
+
+    private void confirmSupportOfChecksum(ChecksumType checksumType) throws IOException {
+        channel.write(new QueryCommand("set @master_binlog_checksum= @@global.binlog_checksum"));
+        byte[] statementResult = channel.read();
+        if (statementResult[0] == (byte) 0xFF /* error */) {
+            byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
+            throw new IOException(new ErrorPacket(bytes).getErrorMessage());
+        }
+        eventDeserializer.setChecksumType(checksumType);
     }
 
     private void listenForEventPackets() throws IOException {

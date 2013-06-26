@@ -15,7 +15,6 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
-import com.github.shyiko.mysql.binlog.event.ColumnType;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
