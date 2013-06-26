@@ -72,6 +72,8 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
 
     @Override
     public void reset() {
+        lastEventHeader.set(null);
+        timestampOfLastEvent.set(0);
         totalNumberOfEventsSeen.set(0);
         numberOfSkippedEvents.set(0);
         numberOfDisconnects.set(0);
@@ -87,6 +89,9 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     @Override
     public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
         numberOfSkippedEvents.getAndIncrement();
+        lastEventHeader.set(null);
+        timestampOfLastEvent.set(System.currentTimeMillis());
+        totalNumberOfEventsSeen.getAndIncrement();
     }
 
     @Override
