@@ -95,7 +95,7 @@ public class ByteArrayInputStream extends InputStream {
     public BitSet readBitSet(int length, boolean bigEndian) throws IOException {
         // according to MySQL internals the amount of storage required for N columns is INT((N+7)/8) bytes
         byte[] bytes = read((length + 7) >> 3);
-        bytes = bigEndian ? bytes : ByteArrays.reverse(bytes);
+        bytes = bigEndian ? bytes : reverse(bytes);
         BitSet result = new BitSet();
         for (int i = 0; i < length; i++) {
             if ((bytes[i >> 3] & (1 << (i % 8))) != 0) {
@@ -103,6 +103,16 @@ public class ByteArrayInputStream extends InputStream {
             }
         }
         return result;
+    }
+
+    private byte[] reverse(byte[] bytes) {
+        for (int i = 0, length = bytes.length >> 2; i <= length; i++) {
+            int j = bytes.length - 1 - i;
+            byte t = bytes[i];
+            bytes[i] = bytes[j];
+            bytes[j] = t;
+        }
+        return bytes;
     }
 
     /**

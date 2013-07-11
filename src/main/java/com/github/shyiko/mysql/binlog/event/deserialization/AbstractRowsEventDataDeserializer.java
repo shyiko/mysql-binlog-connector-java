@@ -18,7 +18,6 @@ package com.github.shyiko.mysql.binlog.event.deserialization;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-import com.github.shyiko.mysql.binlog.io.ByteArrays;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -210,23 +209,32 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         int ipDigitsX = x - ipDigits * DIG_PER_DEC;
         int ipSize = (ipDigits << 2) + DIG_TO_BYTES[ipDigitsX];
         int offset = DIG_TO_BYTES[ipDigitsX];
-        BigDecimal ip = offset > 0 ? BigDecimal.valueOf(ByteArrays.toInteger(value, 0, offset)) : BigDecimal.ZERO;
+        BigDecimal ip = offset > 0 ? BigDecimal.valueOf(bigEndianInteger(value, 0, offset)) : BigDecimal.ZERO;
         for (; offset < ipSize; offset += 4) {
-            int i = ByteArrays.toInteger(value, offset, 4);
+            int i = bigEndianInteger(value, offset, 4);
             ip = ip.movePointRight(DIG_PER_DEC).add(BigDecimal.valueOf(i));
         }
         int shift = 0;
         BigDecimal fp = BigDecimal.ZERO;
         for (; shift + DIG_PER_DEC <= scale; shift += DIG_PER_DEC, offset += 4) {
-            int i = ByteArrays.toInteger(value, offset, 4);
+            int i = bigEndianInteger(value, offset, 4);
             fp = fp.add(BigDecimal.valueOf(i).movePointLeft(shift + DIG_PER_DEC));
         }
         if (shift < scale) {
-            int i = ByteArrays.toInteger(value, offset, DIG_TO_BYTES[scale - shift]);
+            int i = bigEndianInteger(value, offset, DIG_TO_BYTES[scale - shift]);
             fp = fp.add(BigDecimal.valueOf(i).movePointLeft(scale));
         }
         BigDecimal result = ip.add(fp);
         return positive ? result : result.negate();
+    }
+
+    private static int bigEndianInteger(byte[] bytes, int offset, int length) {
+        int result = 0;
+        for (int i = offset; i < (offset + length); i++) {
+            byte b = bytes[i];
+            result = (result << 8) | (b >= 0 ? (int) b : (b + 256));
+        }
+        return result;
     }
 
 }

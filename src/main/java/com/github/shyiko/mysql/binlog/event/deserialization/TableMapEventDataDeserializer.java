@@ -17,7 +17,6 @@ package com.github.shyiko.mysql.binlog.event.deserialization;
 
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-import com.github.shyiko.mysql.binlog.io.ByteArrays;
 
 import java.io.IOException;
 
@@ -62,13 +61,22 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
                 case SET:
                 case ENUM:
                 case STRING:
-                    metadata[i] = ByteArrays.toInteger(inputStream.read(2)); // big-endian
+                    metadata[i] = bigEndianInteger(inputStream.read(2), 0, 2);
                     break;
                 default:
                     metadata[i] = 0;
             }
         }
         return metadata;
+    }
+
+    private static int bigEndianInteger(byte[] bytes, int offset, int length) {
+        int result = 0;
+        for (int i = offset; i < (offset + length); i++) {
+            byte b = bytes[i];
+            result = (result << 8) | (b >= 0 ? (int) b : (b + 256));
+        }
+        return result;
     }
 
 }
