@@ -1,6 +1,17 @@
 # mysql-binlog-connector-java
 
-MySQL 5.1.18+ Binary Log connector.
+MySQL Binary Log connector.
+
+Initially project was started as a fork of [open-replicator](https://code.google.com/p/open-replicator), but ended up in a complete rewrite. Key differences (features):
+
+- automatic binlog filename/position resolution
+- resumable disconnect
+- plugable failover strategies
+- JMX exposure (optionally with statistics)
+- availability in Maven Central (on hold, until everything is thoroughly tested)
+- comprehensive test coverage (in progress)
+- no third-party dependencies
+- binlog_checksum support (for MySQL 5.6.2+ users)
 
 ## Usage
 
