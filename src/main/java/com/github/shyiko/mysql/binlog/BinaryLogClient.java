@@ -36,6 +36,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -64,6 +69,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private PacketChannel channel;
     private volatile boolean connected;
+
+    private ThreadFactory threadFactory;
 
     /**
      * Alias for BinaryLogClient(username, port, &lt;no schema&gt; , username, password).
@@ -114,6 +121,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.eventDeserializer = eventDeserializer;
     }
 
+    public void setThreadFactory(ThreadFactory threadFactory) {
+        this.threadFactory = threadFactory;
+    }
+
     /**
      * Connect to the replication stream. Note this method blocks until disconnected.
      * @throws AuthenticationException in case of failed authentication
@@ -161,6 +172,39 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             }
         }
         listenForEventPackets();
+    }
+
+    public void connect(long timeout, TimeUnit timeUnit) throws IOException, TimeoutException, InterruptedException {
+        final CountDownLatch countDownLatch = new CountDownLatch(1);
+        AbstractLifecycleListener connectListener = new AbstractLifecycleListener() {
+            @Override
+            public void onConnect(BinaryLogClient client) {
+                countDownLatch.countDown();
+            }
+        };
+        registerLifecycleListener(connectListener);
+        final AtomicReference<IOException> exceptionReference = new AtomicReference<IOException>();
+        Runnable runnable = new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    connect();
+                } catch (IOException e) {
+                    exceptionReference.set(e);
+                }
+            }
+        };
+        Thread thread = threadFactory == null ? new Thread(runnable): threadFactory.newThread(runnable);
+        thread.start();
+        boolean started = countDownLatch.await(timeout, timeUnit);
+        unregisterLifecycleListener(connectListener);
+        if (exceptionReference.get() != null) {
+            throw exceptionReference.get();
+        }
+        if (!started) {
+            throw new TimeoutException("BinaryLogClient was unable to connect in " + timeUnit.toMillis(timeout) + "ms");
+        }
     }
 
     public boolean isConnected() {
@@ -404,6 +448,15 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
          * Called upon disconnect (regardless of the reason).
          */
         void onDisconnect(BinaryLogClient client);
+    }
+
+    public static abstract class AbstractLifecycleListener implements LifecycleListener {
+
+        public void onConnect(BinaryLogClient client) {}
+        public void onCommunicationFailure(BinaryLogClient client, Exception ex) {}
+        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {}
+        public void onDisconnect(BinaryLogClient client) {}
+
     }
 
 }
