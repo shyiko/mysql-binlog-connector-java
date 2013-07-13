@@ -59,6 +59,24 @@ public enum EventType {
     EXT_DELETE_ROWS,
     GTID,
     ANONYMOUS_GTID,
-    PREVIOUS_GTIDS
+    PREVIOUS_GTIDS;
+
+    public static boolean isWrite(EventType eventType) {
+        return eventType == PRE_GA_WRITE_ROWS ||
+               eventType == WRITE_ROWS ||
+               eventType == EXT_WRITE_ROWS;
+    }
+
+    public static boolean isUpdate(EventType eventType) {
+        return eventType == PRE_GA_UPDATE_ROWS ||
+               eventType == UPDATE_ROWS ||
+               eventType == EXT_UPDATE_ROWS;
+    }
+
+    public static boolean isDelete(EventType eventType) {
+        return eventType == PRE_GA_DELETE_ROWS ||
+               eventType == DELETE_ROWS ||
+               eventType == EXT_DELETE_ROWS;
+    }
 
 }
