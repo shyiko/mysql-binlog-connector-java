@@ -54,7 +54,7 @@ public class AuthenticateCommand implements Command {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         int clientCapabilities = this.clientCapabilities;
         if (clientCapabilities == 0) {
-            clientCapabilities = ClientCapabilities.LONG_FLAG /* todo: is it really needed? */ |
+            clientCapabilities = ClientCapabilities.LONG_FLAG |
                     ClientCapabilities.PROTOCOL_41 | ClientCapabilities.SECURE_CONNECTION;
             if (schema != null) {
                 clientCapabilities |= ClientCapabilities.CONNECT_WITH_DB;
@@ -67,8 +67,9 @@ public class AuthenticateCommand implements Command {
             buffer.write(0);
         }
         buffer.writeZeroTerminatedString(username);
-        buffer.writeInteger(20, 1); // SHA-1 length todo: passwordHash.length
-        buffer.write(passwordCompatibleWithMySQL411(password, salt));
+        byte[] passwordSHA1 = passwordCompatibleWithMySQL411(password, salt);
+        buffer.writeInteger(passwordSHA1.length, 1);
+        buffer.write(passwordSHA1);
         if (schema != null) {
             buffer.writeZeroTerminatedString(schema);
         }

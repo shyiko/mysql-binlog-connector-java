@@ -166,7 +166,7 @@ public class ByteArrayInputStream extends InputStream {
 
     @Override
     public int available() throws IOException {
-        return inputStream.available(); //todo: may result in unexpected behavior in case of socket stream
+        return inputStream.available(); // todo: may result in unexpected behavior in case of socket stream
     }
 
     public int peek() throws IOException {

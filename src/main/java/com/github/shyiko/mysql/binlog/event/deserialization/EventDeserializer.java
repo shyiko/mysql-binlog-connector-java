@@ -95,19 +95,18 @@ public class EventDeserializer {
         long originalPosition = inputStream.position();
 */
         EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
-        // todo: pass original inputStream in
         int eventBodyLength = (int) eventHeader.getDataLength() - checksumLength;
         // todo: according to http://dev.mysql.com/worklog/task/?id=2540 FormatDescriptionEvent contains
         // checksum algorithm descriptor. use it instead of this.setChecksumType(ChecksumType checksumType)
 
         EventData eventData;
         try {
+            // todo: pass original input stream in
             eventData = eventDataDeserializer.deserialize(
                 new ByteArrayInputStream(inputStream.read(eventBodyLength)));
         } catch (IOException e) {
             throw new EventDataDeserializationException(eventHeader, e);
         }
-
 /*
         long unreadEventData = originalPosition + (eventHeader.getEventLength() - 19) -
                 inputStream.position();
