@@ -78,6 +78,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private boolean keepAlive = true;
     private long keepAliveInterval = TimeUnit.MINUTES.toMillis(1);
+    private long keepAliveConnectTimeout = TimeUnit.SECONDS.toMillis(3);
     private volatile boolean keepAliveThreadRunning;
 
     /**
@@ -125,6 +126,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     public void setKeepAliveInterval(long keepAliveInterval) {
         this.keepAliveInterval = keepAliveInterval;
+    }
+
+    public void setKeepAliveConnectTimeout(long keepAliveConnectTimeout) {
+        this.keepAliveConnectTimeout = keepAliveConnectTimeout;
     }
 
     /**
@@ -219,7 +224,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                             }
                             try {
                                 disconnect();
-                                connect(3, TimeUnit.SECONDS); // todo(shyiko): one size does not fit all
+                                connect(keepAliveConnectTimeout, TimeUnit.MILLISECONDS);
                             } catch (Exception ce) {
                                 if (logger.isLoggable(Level.WARNING)) {
                                     logger.warning("Failed to restore connection to " + hostname + ":" + port +
