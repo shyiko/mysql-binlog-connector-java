@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventType;
 
 import java.util.HashMap;
@@ -28,12 +29,30 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class CountDownEventListener implements BinaryLogClient.EventListener {
 
-    private final Map<EventType, AtomicInteger> counters = new HashMap<EventType, AtomicInteger>();
+    private final Map<EventType, AtomicInteger> countersByType = new HashMap<EventType, AtomicInteger>();
+    private final Map<Class<? extends EventData>, AtomicInteger> countersByDataClass =
+            new HashMap<Class<? extends EventData>, AtomicInteger>();
 
     @Override
     public void onEvent(Event event) {
-        EventType eventType = event.getHeader().getEventType();
-        AtomicInteger counter = getCounter(eventType);
+        incrementCounter(getCounter(countersByType, event.getHeader().getEventType()));
+        EventData data = event.getData();
+        if (data != null) {
+            incrementCounter(getCounter(countersByDataClass, data.getClass()));
+        }
+    }
+
+    private <K> AtomicInteger getCounter(Map<K, AtomicInteger> counterMap, K key) {
+        synchronized (counterMap) {
+            AtomicInteger counter = counterMap.get(key);
+            if (counter == null) {
+                counterMap.put(key, counter = new AtomicInteger());
+            }
+            return counter;
+        }
+    }
+
+    private void incrementCounter(AtomicInteger counter) {
         synchronized (counter) {
             if (counter.incrementAndGet() == 0) {
                 counter.notify();
@@ -41,38 +60,47 @@ public class CountDownEventListener implements BinaryLogClient.EventListener {
         }
     }
 
-    private synchronized AtomicInteger getCounter(EventType eventType) {
-        AtomicInteger counter = counters.get(eventType);
-        if (counter == null) {
-            counters.put(eventType, counter = new AtomicInteger());
-        }
-        return counter;
-    }
-
     public void waitFor(EventType eventType, int numberOfEvents, long timeoutInMilliseconds)
             throws TimeoutException, InterruptedException {
-        AtomicInteger counter = getCounter(eventType);
+        waitForCounterToGetZero(eventType.name(), getCounter(countersByType, eventType), numberOfEvents,
+                timeoutInMilliseconds);
+    }
+
+    public void waitFor(Class<? extends EventData> dataClass, int numberOfEvents, long timeoutInMilliseconds)
+            throws TimeoutException, InterruptedException {
+        waitForCounterToGetZero(dataClass.getSimpleName(), getCounter(countersByDataClass, dataClass),
+                numberOfEvents, timeoutInMilliseconds);
+    }
+
+    private void waitForCounterToGetZero(String counterName, AtomicInteger counter, int numberOfExpectedEvents,
+            long timeoutInMilliseconds) throws TimeoutException, InterruptedException {
         synchronized (counter) {
-            counter.set(counter.get() - numberOfEvents);
+            counter.set(counter.get() - numberOfExpectedEvents);
             if (counter.get() != 0) {
                 counter.wait(timeoutInMilliseconds);
                 if (counter.get() != 0) {
-                    throw new TimeoutException("Received " + (numberOfEvents + counter.get()) + " " + eventType +
-                            " event(s) instead of expected " + numberOfEvents);
+                    throw new TimeoutException("Received " + (numberOfExpectedEvents + counter.get()) + " " +
+                            counterName + " event(s) instead of expected " + numberOfExpectedEvents);
                 }
             }
         }
     }
 
-    public synchronized void reset() {
-        counters.clear();
+    public void reset() {
+        synchronized (countersByType) {
+            countersByType.clear();
+        }
+        synchronized (countersByDataClass) {
+            countersByDataClass.clear();
+        }
     }
 
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("CountDownEventListener");
-        sb.append("{counters=").append(counters);
+        sb.append("{countersByType=").append(countersByType);
+        sb.append(", countersByDataClass=").append(countersByDataClass);
         sb.append('}');
         return sb.toString();
     }

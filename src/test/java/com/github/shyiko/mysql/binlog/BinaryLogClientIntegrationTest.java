@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -100,7 +101,7 @@ public class BinaryLogClientIntegrationTest {
                 statement.execute("insert into bikini_bottom values('SpongeBob')");
             }
         });
-        eventListener.waitFor(EventType.WRITE_ROWS, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
         String binlogFilename = client.getBinlogFilename();
         long binlogPosition = client.getBinlogPosition();
         slave.execute(new Callback<Statement>() {
@@ -116,7 +117,7 @@ public class BinaryLogClientIntegrationTest {
 
             }
         });
-        eventListener.waitFor(EventType.WRITE_ROWS, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
         String updatedBinlogFilename = client.getBinlogFilename();
         long updatedBinlogPosition = client.getBinlogPosition();
         assertNotEquals(updatedBinlogFilename, binlogFilename);
@@ -127,7 +128,7 @@ public class BinaryLogClientIntegrationTest {
                 statement.execute("insert into bikini_bottom values('Rocky')");
             }
         });
-        eventListener.waitFor(EventType.WRITE_ROWS, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
         assertEquals(client.getBinlogFilename(), updatedBinlogFilename);
         assertNotEquals(client.getBinlogPosition(), updatedBinlogPosition);
     }
@@ -140,7 +141,7 @@ public class BinaryLogClientIntegrationTest {
                 statement.execute("insert into bikini_bottom values('SpongeBob')");
             }
         });
-        eventListener.waitFor(EventType.WRITE_ROWS, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
         try {
             client.disconnect();
             master.execute(new Callback<Statement>() {
@@ -152,7 +153,7 @@ public class BinaryLogClientIntegrationTest {
             });
             System.out.println(eventListener);
             try {
-                eventListener.waitFor(EventType.WRITE_ROWS, 2, TimeUnit.SECONDS.toMillis(1));
+                eventListener.waitFor(WriteRowsEventData.class, 2, TimeUnit.SECONDS.toMillis(1));
                 fail();
             } catch (TimeoutException e) {
                 eventListener.reset();
@@ -160,7 +161,7 @@ public class BinaryLogClientIntegrationTest {
         } finally {
             client.connect(3, TimeUnit.SECONDS);
         }
-        eventListener.waitFor(EventType.WRITE_ROWS, 2, DEFAULT_TIMEOUT);
+        eventListener.waitFor(WriteRowsEventData.class, 2, DEFAULT_TIMEOUT);
     }
 
     @Test
@@ -173,12 +174,12 @@ public class BinaryLogClientIntegrationTest {
                 statement.execute("insert into bikini_bottom values('SpongeBob')");
             }
         });
-        eventListener.waitFor(EventType.WRITE_ROWS, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
         client.disconnect();
         client.setBinlogFilename(binlogFilename);
         client.setBinlogPosition(binlogPosition);
         client.connect(3, TimeUnit.SECONDS);
-        eventListener.waitFor(EventType.WRITE_ROWS, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
     }
 
     @Test
@@ -203,7 +204,7 @@ public class BinaryLogClientIntegrationTest {
                         }
                     });
                     bindInSeparateThread(tcpReverseProxy);
-                    eventListener.waitFor(EventType.WRITE_ROWS, 1, TimeUnit.SECONDS.toMillis(3));
+                    eventListener.waitFor(WriteRowsEventData.class, 1, TimeUnit.SECONDS.toMillis(3));
                 } finally {
                     clientOverProxy.disconnect();
                 }
