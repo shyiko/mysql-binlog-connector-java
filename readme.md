@@ -2,16 +2,16 @@
 
 MySQL Binary Log connector.
 
-Initially project was started as a fork of [open-replicator](https://code.google.com/p/open-replicator), but ended up in a complete rewrite. Key differences (features):
+Initially project was started as a fork of [open-replicator](https://code.google.com/p/open-replicator), but ended up as a complete rewrite. Key differences (features):
 
 - automatic binlog filename/position resolution
-- resumable disconnect
+- resumable disconnects
 - plugable failover strategies
 - JMX exposure (optionally with statistics)
-- availability in Maven Central (on hold, until everything is thoroughly tested)
-- comprehensive test coverage (in progress)
+- availability in Maven Central (deferred until everything is thoroughly tested)
 - no third-party dependencies
 - binlog_checksum support (for MySQL 5.6.2+ users)
+- test suite over different versions of MySQL releases
 
 ## Usage
 
