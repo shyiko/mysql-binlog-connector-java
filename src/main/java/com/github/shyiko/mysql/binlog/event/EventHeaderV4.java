@@ -16,14 +16,17 @@
 package com.github.shyiko.mysql.binlog.event;
 
 /**
+ * Used in MySQL 5.0+.
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class EventHeaderV4 implements EventHeader {
 
+    // v1 (MySQL 3.23)
     private long timestamp;
     private EventType eventType;
     private long serverId;
     private long eventLength;
+    // v3 (MySQL 4.0.2-4.1)
     private long nextPosition;
     private int flags;
 
@@ -54,7 +57,6 @@ public class EventHeaderV4 implements EventHeader {
         this.serverId = serverId;
     }
 
-    @Override
     public long getEventLength() {
         return eventLength;
     }
@@ -84,13 +86,24 @@ public class EventHeaderV4 implements EventHeader {
     }
 
     @Override
+    public long getHeaderLength() {
+        return 19;
+    }
+
+    @Override
+    public long getDataLength() {
+        return getEventLength() - getHeaderLength();
+    }
+
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("EventHeaderV4");
         sb.append("{timestamp=").append(timestamp);
         sb.append(", eventType=").append(eventType);
         sb.append(", serverId=").append(serverId);
-        sb.append(", position=").append(getPosition());
+        sb.append(", headerLength=").append(getHeaderLength());
+        sb.append(", dataLength=").append(getDataLength());
         sb.append(", nextPosition=").append(nextPosition);
         sb.append(", flags=").append(flags);
         sb.append('}');

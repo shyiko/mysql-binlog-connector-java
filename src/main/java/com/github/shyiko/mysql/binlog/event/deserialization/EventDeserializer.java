@@ -96,7 +96,7 @@ public class EventDeserializer {
 */
         EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
         // todo: pass original inputStream in
-        int eventBodyLength = (int) eventHeader.getEventLength() - 19 - checksumLength;
+        int eventBodyLength = (int) eventHeader.getDataLength() - checksumLength;
         // todo: according to http://dev.mysql.com/worklog/task/?id=2540 FormatDescriptionEvent contains
         // checksum algorithm descriptor. use it instead of this.setChecksumType(ChecksumType checksumType)
 

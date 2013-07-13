@@ -41,6 +41,7 @@
             <property name="authorFormat"
                       value='^&lt;a href=\"mailto:.+@[^@]+[.][^@]{2,}\"&gt;([a-zA-Z]+ ?){2,4}&lt;/a&gt;$'/>
             <!-- <a href="mailto:email address">full name</a> -->
+            <property name="scope" value="package"/>
         </module>
 
         <!-- naming conventions checks -->
