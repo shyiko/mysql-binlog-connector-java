@@ -20,6 +20,7 @@ import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -58,14 +59,15 @@ public class UpdateRowsEventDataDeserializer extends AbstractRowsEventDataDeseri
         return eventData;
     }
 
-    private List<Map.Entry<Object[], Object[]>> deserializeRows(UpdateRowsEventData eventData,
+    private List<Map.Entry<Serializable[], Serializable[]>> deserializeRows(UpdateRowsEventData eventData,
             ByteArrayInputStream inputStream) throws IOException {
         long tableId = eventData.getTableId();
         BitSet includedColumnsBeforeUpdate = eventData.getIncludedColumnsBeforeUpdate(),
                includedColumns = eventData.getIncludedColumns();
-        List<Map.Entry<Object[], Object[]>> rows = new ArrayList<Map.Entry<Object[], Object[]>>();
+        List<Map.Entry<Serializable[], Serializable[]>> rows =
+                new ArrayList<Map.Entry<Serializable[], Serializable[]>>();
         while (inputStream.available() > 0) {
-            rows.add(new AbstractMap.SimpleEntry<Object[], Object[]>(
+            rows.add(new AbstractMap.SimpleEntry<Serializable[], Serializable[]>(
                     deserializeRow(tableId, includedColumnsBeforeUpdate, inputStream),
                     deserializeRow(tableId, includedColumns, inputStream)
             ));

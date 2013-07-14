@@ -15,6 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog.event;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
@@ -26,7 +27,7 @@ public class WriteRowsEventData implements EventData {
 
     private long tableId;
     private BitSet includedColumns;
-    private List<Object[]> rows;
+    private List<Serializable[]> rows;
 
     public long getTableId() {
         return tableId;
@@ -44,11 +45,11 @@ public class WriteRowsEventData implements EventData {
         this.includedColumns = includedColumns;
     }
 
-    public List<Object[]> getRows() {
+    public List<Serializable[]> getRows() {
         return rows;
     }
 
-    public void setRows(List<Object[]> rows) {
+    public void setRows(List<Serializable[]> rows) {
         this.rows = rows;
     }
 

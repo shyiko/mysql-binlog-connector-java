@@ -20,6 +20,7 @@ import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.BitSet;
 import java.util.Calendar;
@@ -43,13 +44,13 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         this.tableMapEventByTableId = tableMapEventByTableId;
     }
 
-    protected Object[] deserializeRow(long tableId, BitSet includedColumns, ByteArrayInputStream inputStream)
+    protected Serializable[] deserializeRow(long tableId, BitSet includedColumns, ByteArrayInputStream inputStream)
             throws IOException {
         TableMapEventData tableMapEvent = tableMapEventByTableId.get(tableId);
         byte[] types = tableMapEvent.getColumnTypes();
         int[] metadata = tableMapEvent.getColumnMetadata();
         BitSet nullColumns = inputStream.readBitSet(types.length, true);
-        Object[] result = new Object[numberOfBitsSet(includedColumns)];
+        Serializable[] result = new Serializable[numberOfBitsSet(includedColumns)];
         for (int i = 0, numberOfSkippedColumns = 0; i < types.length; i++) {
             int typeCode = types[i] & 0xFF, meta = metadata[i], length = 0;
             if (typeCode == ColumnType.STRING.getCode() && meta > 256) {
@@ -79,7 +80,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return result;
     }
 
-    private Object deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
+    private Serializable deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
             throws IOException {
         switch (type) {
             case TINY:

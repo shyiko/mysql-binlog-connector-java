@@ -15,6 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog.event;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
@@ -28,7 +29,7 @@ public class UpdateRowsEventData implements EventData {
     private long tableId;
     private BitSet includedColumnsBeforeUpdate;
     private BitSet includedColumns;
-    private List<Map.Entry<Object[], Object[]>> rows;
+    private List<Map.Entry<Serializable[], Serializable[]>> rows;
 
     public long getTableId() {
         return tableId;
@@ -54,11 +55,11 @@ public class UpdateRowsEventData implements EventData {
         this.includedColumns = includedColumns;
     }
 
-    public List<Map.Entry<Object[], Object[]>> getRows() {
+    public List<Map.Entry<Serializable[], Serializable[]>> getRows() {
         return rows;
     }
 
-    public void setRows(List<Map.Entry<Object[], Object[]>> rows) {
+    public void setRows(List<Map.Entry<Serializable[], Serializable[]>> rows) {
         this.rows = rows;
     }
 
@@ -70,7 +71,7 @@ public class UpdateRowsEventData implements EventData {
         sb.append(", includedColumnsBeforeUpdate=").append(includedColumnsBeforeUpdate);
         sb.append(", includedColumns=").append(includedColumns);
         sb.append(", rows=[");
-        for (Map.Entry<Object[], Object[]> row : rows) {
+        for (Map.Entry<Serializable[], Serializable[]> row : rows) {
             sb.append("\n    ").
                     append("{before=").append(Arrays.toString(row.getKey())).
                     append(", after=").append(Arrays.toString(row.getValue())).
