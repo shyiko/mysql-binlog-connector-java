@@ -15,6 +15,31 @@ Initially project was started as a fork of [open-replicator](https://code.google
 
 ## Usage
 
+The latest development version always available through Sonatype Snapshots repository (see example below).
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.github.shyiko</groupId>
+        <artifactId>mysql-binlog-connector-java</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+</dependencies>
+
+<repositories>
+    <repository>
+    <id>sonatype-snapshots</id>
+    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    <snapshots>
+        <enabled>true</enabled>
+    </snapshots>
+    <releases>
+        <enabled>false</enabled>
+    </releases>
+    </repository>
+</repositories>
+```
+
 ### Reading Binary Log file
 
     File binlogFile = ...
@@ -38,6 +63,10 @@ Initially project was started as a fork of [open-replicator](https://code.google
         }
     });
     client.connect();
+
+## Documentation
+
+For the insight into the internals of MySQL look [here](https://dev.mysql.com/doc/internals/en/index.html). [MySQL Client/Server Protocol](http://dev.mysql.com/doc/internals/en/client-server-protocol.html) and [The Binary Log](http://dev.mysql.com/doc/internals/en/binary-log.html) sections are particularly useful as a reference documentation for the `com.**.mysql.binlog.network` and `com.**.mysql.binlog.event` packages.
 
 ## License
 
