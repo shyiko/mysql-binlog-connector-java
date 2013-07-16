@@ -1,1 +1,2 @@
 language: java
+script: "mvn -P with-sources-and-javadocs -Ddeploy=snapshot -DskipTests=true"
