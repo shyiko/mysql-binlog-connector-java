@@ -1,4 +1,4 @@
-# mysql-binlog-connector-java
+# mysql-binlog-connector-java [![Build Status](https://travis-ci.org/shyiko/mysql-binlog-connector-java.png?branch=master)](https://travis-ci.org/shyiko/mysql-binlog-connector-java)
 
 MySQL Binary Log connector.
 
