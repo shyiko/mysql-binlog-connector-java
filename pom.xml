@@ -249,7 +249,7 @@
                             </execution>
                             <execution>
                                 <id>jacoco-site</id>
-                                <phase>integration-test</phase>
+                                <phase>post-integration-test</phase>
                                 <goals>
                                     <goal>report</goal>
                                 </goals>
