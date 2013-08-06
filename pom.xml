@@ -206,8 +206,11 @@
                         mvn clean install
 
                         # run unit + integration tests, validate codebase using checkstyle
-                        mvn verify
+                        mvn -P coverage clean verify
                         # use -Dvagrant.integration.box= to switch between MySQL sandboxes
+
+                        # submit coverage report to coveralls
+                        mvn -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
 
                         # deploy snapshots into nexus
                         mvn -P with-sources-and-javadocs -Ddeploy=snapshot
@@ -255,6 +258,11 @@
                                 </goals>
                             </execution>
                         </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.eluder.coveralls</groupId>
+                        <artifactId>coveralls-maven-plugin</artifactId>
+                        <version>2.0.0</version>
                     </plugin>
                 </plugins>
             </build>
