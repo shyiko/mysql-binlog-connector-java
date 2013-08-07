@@ -32,7 +32,7 @@ public class BinaryLogClientMXBeanTest {
     @Test
     public void testRegistration() throws Exception {
         MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
-        BinaryLogClient binaryLogClient = new BinaryLogClient("localhost", 3306, "mysql", "root");
+        BinaryLogClient binaryLogClient = new BinaryLogClient("localhost", 3306, "root", "mysql");
         ObjectName objectName = new ObjectName("mysql.binlog:type=BinaryLogClient");
         mBeanServer.registerMBean(binaryLogClient, objectName);
         try {

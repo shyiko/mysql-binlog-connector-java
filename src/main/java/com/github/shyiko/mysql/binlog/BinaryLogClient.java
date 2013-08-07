@@ -37,6 +37,7 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -394,6 +395,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return resultSet.toArray(new ResultSetRowPacket[resultSet.size()]);
     }
 
+    public List<EventListener> getEventListeners() {
+        return Collections.unmodifiableList(eventListeners);
+    }
+
     /**
      * Register event listener. Note that multiple event listeners will be called in order they
      * where registered.
@@ -442,13 +447,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    public List<LifecycleListener> getLifecycleListeners() {
+        return Collections.unmodifiableList(lifecycleListeners);
+    }
+
     /**
      * Register lifecycle listener. Note that multiple lifecycle listeners will be called in order they
      * where registered.
      */
-    public void registerLifecycleListener(LifecycleListener eventListener) {
+    public void registerLifecycleListener(LifecycleListener lifecycleListener) {
         synchronized (lifecycleListeners) {
-            lifecycleListeners.add(eventListener);
+            lifecycleListeners.add(lifecycleListener);
         }
     }
 

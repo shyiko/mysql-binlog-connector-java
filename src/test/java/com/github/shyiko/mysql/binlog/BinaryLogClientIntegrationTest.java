@@ -15,7 +15,9 @@
  */
 package com.github.shyiko.mysql.binlog;
 
+import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -24,10 +26,13 @@ import org.testng.annotations.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -94,6 +99,50 @@ public class BinaryLogClientIntegrationTest {
     }
 
     @Test
+    public void testWriteUpdateDeleteEvents() throws Exception {
+        CapturingEventListener capturingEventListener = new CapturingEventListener();
+        client.registerEventListener(capturingEventListener);
+        try {
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("insert into bikini_bottom values('SpongeBob')");
+                }
+            });
+            eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+            List<Serializable[]> writtenRows =
+                capturingEventListener.getEvents(WriteRowsEventData.class).get(0).getRows();
+            assertEquals(writtenRows.size(), 1);
+            assertEquals(writtenRows.get(0), new Serializable[]{"SpongeBob"});
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("update bikini_bottom set name = 'Patrick' where name = 'SpongeBob'");
+                }
+            });
+            eventListener.waitFor(UpdateRowsEventData.class, 1, DEFAULT_TIMEOUT);
+            List<Map.Entry<Serializable[], Serializable[]>> updatedRows =
+                capturingEventListener.getEvents(UpdateRowsEventData.class).get(0).getRows();
+            assertEquals(updatedRows.size(), 1);
+            assertEquals(updatedRows.get(0).getKey(), new Serializable[]{"SpongeBob"});
+            assertEquals(updatedRows.get(0).getValue(), new Serializable[]{"Patrick"});
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("delete from bikini_bottom where name = 'Patrick'");
+                }
+            });
+            eventListener.waitFor(DeleteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+            List<Serializable[]> deletedRows =
+                capturingEventListener.getEvents(DeleteRowsEventData.class).get(0).getRows();
+            assertEquals(deletedRows.size(), 1);
+            assertEquals(deletedRows.get(0), new Serializable[]{"Patrick"});
+        } finally {
+            client.unregisterEventListener(capturingEventListener);
+        }
+    }
+
+    @Test
     public void testTrackingOfLastKnownBinlogFilenameAndPosition() throws Exception {
         master.execute(new Callback<Statement>() {
             @Override
@@ -151,7 +200,6 @@ public class BinaryLogClientIntegrationTest {
                     statement.execute("insert into bikini_bottom values('Rocky')");
                 }
             });
-            System.out.println(eventListener);
             try {
                 eventListener.waitFor(WriteRowsEventData.class, 2, TimeUnit.SECONDS.toMillis(1));
                 fail();
