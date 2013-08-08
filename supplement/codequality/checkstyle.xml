@@ -134,6 +134,14 @@
         <!-- com.github.shyiko:checkstyle-nonstandard -->
         <module name="com.github.shyiko.checkstyle.nonstandard.NumberOfConsecutiveBlankLinesCheck"/>
 
+        <module name="FileContentsHolder"/>
+
+    </module>
+
+    <module name="SuppressWithNearbyCommentFilter">
+        <property name="commentFormat" value="checkstyle, please ignore (\w+) for the next line"/>
+        <property name="checkFormat" value="$1"/>
+        <property name="influenceFormat" value="1"/>
     </module>
 
 </module>
