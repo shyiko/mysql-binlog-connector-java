@@ -27,10 +27,13 @@ import org.testng.annotations.Test;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -140,6 +143,105 @@ public class BinaryLogClientIntegrationTest {
         } finally {
             client.unregisterEventListener(capturingEventListener);
         }
+    }
+
+    @Test
+    public void testDeserializationOfDifferentColumnTypes() throws Exception {
+        // numeric types
+/*
+        BitSet expectedBitSet = new BitSet(1);
+        expectedBitSet.set(1);
+        assertEquals(writeAndCaptureRow("bit", "1"), new Serializable[]{expectedBitSet});
+        assertEquals(writeAndCaptureRow("tinyint", "-128"), new Serializable[]{});
+*/
+        assertEquals(writeAndCaptureRow("bool", "1"), new Serializable[]{1});
+/*
+        assertEquals(writeAndCaptureRow("smallint", "-32768"), new Serializable[]{-32768});
+        assertEquals(writeAndCaptureRow("mediumint", "-8388608"), new Serializable[]{-8388608});
+*/
+        assertEquals(writeAndCaptureRow("int", "-2147483648"), new Serializable[]{-2147483648});
+/*
+        assertEquals(writeAndCaptureRow("bigint", "-9223372036854775808"), new Serializable[]{-9223372036854775808L});
+*/
+        assertEquals(writeAndCaptureRow("decimal(2,1)", "2.12"),
+            new Serializable[]{new BigDecimal(2.1, new MathContext(2))});
+        assertEquals(writeAndCaptureRow("float", "0.3"), new Serializable[]{0.3f});
+/*
+        assertEquals(writeAndCaptureRow("double", "8.9"), new Serializable[]{8.9});
+*/
+        // date & time types
+        assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
+            new java.sql.Date(generateTime(1989, 3, 21, 0, 0, 0, 0))});
+/*
+        assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000004'"), new Serializable[]{
+            new Date(generateTime(1989, 3, 21, 1, 2, 3, 4))});
+        assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000004'"), new Serializable[]{
+            new Timestamp(generateTime(1989, 3, 21, 1, 2, 3, 4))});
+        assertEquals(writeAndCaptureRow("time", "'1:2:3.000004'"), new Serializable[]{
+            new Time(generateTime(1970, 1, 1, 1, 2, 3, 4))});
+*/
+        assertEquals(writeAndCaptureRow("year", "'69'"), new Serializable[]{2069});
+        // string types
+        assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q"});
+        assertEquals(writeAndCaptureRow("varchar(255)", "'we'"), new Serializable[]{"we"});
+        assertEquals(writeAndCaptureRow("binary", "'r'"), new Serializable[]{"r"});
+        assertEquals(writeAndCaptureRow("varbinary(255)", "'ty'"), new Serializable[]{"ty"});
+        assertEquals(writeAndCaptureRow("tinyblob", "'ui'"), new Serializable[]{"ui".getBytes()});
+        assertEquals(writeAndCaptureRow("tinytext", "'op'"), new Serializable[]{"op".getBytes()});
+        assertEquals(writeAndCaptureRow("blob", "'as'"), new Serializable[]{"as".getBytes()});
+        assertEquals(writeAndCaptureRow("text", "'df'"), new Serializable[]{"df".getBytes()});
+        assertEquals(writeAndCaptureRow("mediumblob", "'gh'"), new Serializable[]{"gh".getBytes()});
+        assertEquals(writeAndCaptureRow("mediumtext", "'jk'"), new Serializable[]{"jk".getBytes()});
+        assertEquals(writeAndCaptureRow("longblob", "'lz'"), new Serializable[]{"lz".getBytes()});
+        assertEquals(writeAndCaptureRow("longtext", "'xc'"), new Serializable[]{"xc".getBytes()});
+        assertEquals(writeAndCaptureRow("enum('a','b','c')", "'b'"), new Serializable[]{2});
+        assertEquals(writeAndCaptureRow("set('a','b','c')", "'a,c'"), new Serializable[]{5L});
+    }
+
+    // checkstyle, please ignore ParameterNumber for the next line
+    private long generateTime(int year, int month, int day, int hour, int minute, int second, int millisecond) {
+        Calendar instance = Calendar.getInstance();
+        instance.set(Calendar.YEAR, year);
+        instance.set(Calendar.MONTH, month - 1);
+        instance.set(Calendar.DAY_OF_MONTH, day);
+        instance.set(Calendar.HOUR_OF_DAY, hour);
+        instance.set(Calendar.MINUTE, minute);
+        instance.set(Calendar.SECOND, second);
+        instance.set(Calendar.MILLISECOND, millisecond);
+        return instance.getTimeInMillis();
+    }
+
+    private Serializable[] writeAndCaptureRow(final String columnDefinition, final String... values)
+            throws Exception {
+        CapturingEventListener capturingEventListener = new CapturingEventListener();
+        client.registerEventListener(capturingEventListener);
+        try {
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("drop table if exists data_type_hell");
+                    statement.execute("create table data_type_hell (column_ " + columnDefinition + ")");
+                    StringBuilder insertQueryBuilder = new StringBuilder("insert into data_type_hell values(");
+                    for (String value : values) {
+                        insertQueryBuilder.append(value).append(", ");
+                    }
+                    int insertQueryLength = insertQueryBuilder.length();
+                    insertQueryBuilder.replace(insertQueryLength - 2, insertQueryLength, ")");
+                    statement.execute(insertQueryBuilder.toString());
+                }
+            });
+            eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        } finally {
+            client.unregisterEventListener(capturingEventListener);
+        }
+        List<Serializable[]> writtenRows =
+            capturingEventListener.getEvents(WriteRowsEventData.class).get(0).getRows();
+        Serializable[] result = new Serializable[writtenRows.size()];
+        int index = 0;
+        for (Serializable[] writtenRow : writtenRows) {
+            result[index++] = writtenRow[0];
+        }
+        return result;
     }
 
     @Test
