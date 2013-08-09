@@ -172,12 +172,13 @@ public class BinaryLogClientIntegrationTest {
             new Serializable[]{0L, 1L, -1L});
         assertEquals(writeAndCaptureRow("bigint", "-9223372036854775808", "-1", "0", "1", "9223372036854775807"),
             new Serializable[]{-9223372036854775808L, -1L, 0L, 1L, 9223372036854775807L});
-        assertEquals(writeAndCaptureRow("decimal(2,1)", "2.12"),
-            new Serializable[]{new BigDecimal(2.1, new MathContext(2))});
-        assertEquals(writeAndCaptureRow("float", "0.3"), new Serializable[]{0.3f});
-/*
-        assertEquals(writeAndCaptureRow("double", "8.9"), new Serializable[]{8.9});
-*/
+        MathContext mc = new MathContext(2);
+        assertEquals(writeAndCaptureRow("decimal(2,1)", "-2.12", "0", "2.12"),
+            new Serializable[]{new BigDecimal(-2.1, mc), new BigDecimal(0).setScale(1), new BigDecimal(2.1, mc)});
+        assertEquals(writeAndCaptureRow("float", "-0.3", "0", "0.3"),
+            new Serializable[]{-0.3F, 0.0F, 0.3F});
+        assertEquals(writeAndCaptureRow("double", "-8.9", "0", "8.9"),
+            new Serializable[]{-8.9, 0.0, 8.9});
         // date & time types
         assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
             new java.sql.Date(generateTime(1989, 3, 21, 0, 0, 0, 0))});
