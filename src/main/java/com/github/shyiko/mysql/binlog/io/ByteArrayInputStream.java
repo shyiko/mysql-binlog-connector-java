@@ -53,7 +53,7 @@ public class ByteArrayInputStream extends InputStream {
     public long readLong(int length) throws IOException {
         long result = 0;
         for (int i = 0; i < length; ++i) {
-            result |= (this.read() << (i << 3));
+            result |= (((long) this.read()) << (i << 3));
         }
         return result;
     }
