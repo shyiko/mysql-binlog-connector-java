@@ -84,11 +84,11 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             throws IOException {
         switch (type) {
             case TINY:
-                return inputStream.readInteger(1);
+                return (int) ((byte) inputStream.readInteger(1));
             case SHORT:
-                return inputStream.readInteger(2);
+                return (int) ((short) inputStream.readInteger(2));
             case INT24:
-                return inputStream.readInteger(3);
+                return (inputStream.readInteger(3) << 8) >> 8;
             case LONG:
                 return inputStream.readInteger(4);
             case LONGLONG:

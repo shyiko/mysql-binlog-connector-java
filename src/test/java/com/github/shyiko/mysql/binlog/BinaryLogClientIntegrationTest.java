@@ -33,6 +33,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.BitSet;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
@@ -148,21 +149,29 @@ public class BinaryLogClientIntegrationTest {
     @Test
     public void testDeserializationOfDifferentColumnTypes() throws Exception {
         // numeric types
-/*
-        BitSet expectedBitSet = new BitSet(1);
-        expectedBitSet.set(1);
-        assertEquals(writeAndCaptureRow("bit", "1"), new Serializable[]{expectedBitSet});
-        assertEquals(writeAndCaptureRow("tinyint", "-128"), new Serializable[]{});
-*/
+        assertEquals(writeAndCaptureRow("bit(3)", "0", "1", "2", "3"),
+            new Serializable[]{bitSet(), bitSet(0), bitSet(1), bitSet(0, 1)});
+        assertEquals(writeAndCaptureRow("tinyint unsigned", "0", "1", "255"),
+            new Serializable[]{0, 1, -1});
+        assertEquals(writeAndCaptureRow("tinyint", "-128", "-1", "0", "1", "127"),
+            new Serializable[]{-128, -1, 0, 1, 127});
         assertEquals(writeAndCaptureRow("bool", "1"), new Serializable[]{1});
-/*
-        assertEquals(writeAndCaptureRow("smallint", "-32768"), new Serializable[]{-32768});
-        assertEquals(writeAndCaptureRow("mediumint", "-8388608"), new Serializable[]{-8388608});
-*/
-        assertEquals(writeAndCaptureRow("int", "-2147483648"), new Serializable[]{-2147483648});
-/*
-        assertEquals(writeAndCaptureRow("bigint", "-9223372036854775808"), new Serializable[]{-9223372036854775808L});
-*/
+        assertEquals(writeAndCaptureRow("smallint unsigned", "0", "1", "65535"),
+            new Serializable[]{0, 1, -1});
+        assertEquals(writeAndCaptureRow("smallint", "-32768", "-1", "0", "1", "32767"),
+            new Serializable[]{-32768, -1, 0, 1, 32767});
+        assertEquals(writeAndCaptureRow("mediumint unsigned", "0", "1", "16777215"),
+            new Serializable[]{0, 1, -1});
+        assertEquals(writeAndCaptureRow("mediumint", "-8388608", "-1", "0", "1", "8388607"),
+            new Serializable[]{-8388608, -1, 0, 1, 8388607});
+        assertEquals(writeAndCaptureRow("int unsigned", "0", "1", "4294967295"),
+            new Serializable[]{0, 1, -1});
+        assertEquals(writeAndCaptureRow("int", "-2147483648", "-1", "0", "1", "2147483647"),
+            new Serializable[]{-2147483648, -1, 0, 1, 2147483647});
+        assertEquals(writeAndCaptureRow("bigint unsigned", "0", "1", "18446744073709551615"),
+            new Serializable[]{0L, 1L, -1L});
+        assertEquals(writeAndCaptureRow("bigint", "-9223372036854775808", "-1", "0", "1", "9223372036854775807"),
+            new Serializable[]{-9223372036854775808L, -1L, 0L, 1L, 9223372036854775807L});
         assertEquals(writeAndCaptureRow("decimal(2,1)", "2.12"),
             new Serializable[]{new BigDecimal(2.1, new MathContext(2))});
         assertEquals(writeAndCaptureRow("float", "0.3"), new Serializable[]{0.3f});
@@ -198,6 +207,14 @@ public class BinaryLogClientIntegrationTest {
         assertEquals(writeAndCaptureRow("set('a','b','c')", "'a,c'"), new Serializable[]{5L});
     }
 
+    private BitSet bitSet(int... bitsToSetTrue) {
+        BitSet result = new BitSet(bitsToSetTrue.length);
+        for (int bit : bitsToSetTrue) {
+            result.set(bit);
+        }
+        return result;
+    }
+
     // checkstyle, please ignore ParameterNumber for the next line
     private long generateTime(int year, int month, int day, int hour, int minute, int second, int millisecond) {
         Calendar instance = Calendar.getInstance();
@@ -221,12 +238,12 @@ public class BinaryLogClientIntegrationTest {
                 public void execute(Statement statement) throws SQLException {
                     statement.execute("drop table if exists data_type_hell");
                     statement.execute("create table data_type_hell (column_ " + columnDefinition + ")");
-                    StringBuilder insertQueryBuilder = new StringBuilder("insert into data_type_hell values(");
+                    StringBuilder insertQueryBuilder = new StringBuilder("insert into data_type_hell values");
                     for (String value : values) {
-                        insertQueryBuilder.append(value).append(", ");
+                        insertQueryBuilder.append("(").append(value).append("), ");
                     }
                     int insertQueryLength = insertQueryBuilder.length();
-                    insertQueryBuilder.replace(insertQueryLength - 2, insertQueryLength, ")");
+                    insertQueryBuilder.replace(insertQueryLength - 2, insertQueryLength, "");
                     statement.execute(insertQueryBuilder.toString());
                 }
             });
