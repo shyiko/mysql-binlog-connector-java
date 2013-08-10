@@ -21,7 +21,7 @@ import java.util.Map;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public enum  ColumnType {
+public enum ColumnType {
 
     DECIMAL(0),
     TINY(1),
@@ -40,6 +40,11 @@ public enum  ColumnType {
     NEWDATE(14),
     VARCHAR(15),
     BIT(16),
+    // (TIMESTAMP|DATETIME|TIME)_V2 data types appeared in MySQL 5.6.4
+    // @see http://dev.mysql.com/doc/internals/en/date-and-time-data-type-representation.html
+    TIMESTAMP_V2(17),
+    DATETIME_V2(18),
+    TIME_V2(19),
     NEWDECIMAL(246),
     ENUM(247),
     SET(248),

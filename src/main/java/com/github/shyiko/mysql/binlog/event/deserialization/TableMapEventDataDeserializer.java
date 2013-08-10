@@ -63,6 +63,11 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
                 case STRING:
                     metadata[i] = bigEndianInteger(inputStream.read(2), 0, 2);
                     break;
+                case TIME_V2:
+                case DATETIME_V2:
+                case TIMESTAMP_V2:
+                    metadata[i] = inputStream.readInteger(1); // fsp (@see {@link ColumnType})
+                    break;
                 default:
                     metadata[i] = 0;
             }

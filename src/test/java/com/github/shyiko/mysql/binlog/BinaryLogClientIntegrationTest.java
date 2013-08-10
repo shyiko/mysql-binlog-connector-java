@@ -38,6 +38,7 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
@@ -182,14 +183,12 @@ public class BinaryLogClientIntegrationTest {
         // date & time types
         assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
             new java.sql.Date(generateTime(1989, 3, 21, 0, 0, 0, 0))});
-/*
-        assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000004'"), new Serializable[]{
-            new Date(generateTime(1989, 3, 21, 1, 2, 3, 4))});
-        assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000004'"), new Serializable[]{
-            new Timestamp(generateTime(1989, 3, 21, 1, 2, 3, 4))});
-        assertEquals(writeAndCaptureRow("time", "'1:2:3.000004'"), new Serializable[]{
-            new Time(generateTime(1970, 1, 1, 1, 2, 3, 4))});
-*/
+        assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000000'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 0))});
+        assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000000'"), new Serializable[]{
+            new java.sql.Timestamp(generateTime(1989, 3, 18, 1, 2, 3, 0))});
+        assertEquals(writeAndCaptureRow("time", "'1:2:3.000000'"), new Serializable[]{
+            new java.sql.Time(generateTime(1970, 1, 1, 1, 2, 3, 0))});
         assertEquals(writeAndCaptureRow("year", "'69'"), new Serializable[]{2069});
         // string types
         assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q"});
@@ -402,7 +401,9 @@ public class BinaryLogClientIntegrationTest {
     @AfterClass(alwaysRun = true)
     public void tearDown() throws Exception {
         try {
-            client.disconnect();
+            if (client != null) {
+                client.disconnect();
+            }
         } finally {
             if (master != null) {
                 master.execute(new Callback<Statement>() {
@@ -433,6 +434,18 @@ public class BinaryLogClientIntegrationTest {
             Class.forName("com.mysql.jdbc.Driver");
             this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port,
                     username, password);
+            execute(new Callback<Statement>() {
+
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    // fixing connection timezone to the "client's one"
+                    TimeZone currentTimeZone = TimeZone.getDefault();
+                    int offset = currentTimeZone.getRawOffset() + currentTimeZone.getDSTSavings();
+                    String timeZoneAsAString = String.format("%s%02d:%02d", offset >= 0 ? "+" : "-", offset / 3600000,
+                        (offset / 60000) % 60);
+                    statement.execute("SET time_zone = '" + timeZoneAsAString + "'");
+                }
+            });
         }
 
         public void execute(Callback<Statement> callback) throws SQLException {

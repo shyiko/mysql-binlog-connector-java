@@ -22,6 +22,8 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Map;
@@ -83,6 +85,9 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private Serializable deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
             throws IOException {
         switch (type) {
+            case BIT:
+                int bitSetLength = (meta >> 8) * 8 + (meta & 0xFF);
+                return inputStream.readBitSet(bitSetLength, false);
             case TINY:
                 return (int) ((byte) inputStream.readInteger(1));
             case SHORT:
@@ -97,51 +102,47 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
                 return Float.intBitsToFloat(inputStream.readInteger(4));
             case DOUBLE:
                 return Double.longBitsToDouble(inputStream.readLong(8));
+            case NEWDECIMAL:
+                int precision = meta & 0xFF, scale = meta >> 8,
+                    decimalLength = determineDecimalLength(precision, scale);
+                return toDecimal(precision, scale, inputStream.read(decimalLength));
+            case DATE:
+                return deserializeDate(inputStream);
+            case TIME:
+                return deserializeTime(inputStream);
+            case TIME_V2:
+                return deserializeTimeV2(meta, inputStream);
+            case TIMESTAMP:
+                return deserializeTimestamp(inputStream);
+            case TIMESTAMP_V2:
+                return deserializeTimestampV2(meta, inputStream);
+            case DATETIME:
+                return deserializeDatetime(inputStream);
+            case DATETIME_V2:
+                return deserializeDatetimeV2(meta, inputStream);
             case YEAR:
                 return 1900 + inputStream.readInteger(1);
-            case DATE:
-                return toDate(inputStream.readInteger(3));
-            case TIME:
-                return toTime(inputStream.readInteger(3));
-            case TIMESTAMP:
-                return toTimestamp(inputStream.readLong(4));
-            case DATETIME:
-                return toDateTime(inputStream.readLong(8));
-            case ENUM:
-                return inputStream.readInteger(length);
-            case SET:
-                return inputStream.readLong(length);
             case STRING:
                 int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
                 return inputStream.readString(stringLength);
-            case BIT:
-                int bitSetLength = (meta >> 8) * 8 + (meta & 0xFF);
-                return inputStream.readBitSet(bitSetLength, false);
-            case NEWDECIMAL:
-                int precision = meta & 0xFF, scale = meta >> 8,
-                        decimalLength = determineDecimalLength(precision, scale);
-                return toDecimal(precision, scale, inputStream.read(decimalLength));
-            case BLOB:
-                int blobLength = inputStream.readInteger(meta);
-                return inputStream.read(blobLength);
             case VARCHAR:
             case VAR_STRING:
                 int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
                 return inputStream.readString(varcharLength);
+            case BLOB:
+                int blobLength = inputStream.readInteger(meta);
+                return inputStream.read(blobLength);
+            case ENUM:
+                return inputStream.readInteger(length);
+            case SET:
+                return inputStream.readLong(length);
             default:
                 throw new IOException("Unsupported type " + type);
         }
     }
 
-    private static int numberOfBitsSet(BitSet bitSet) {
-        int result = 0;
-        for (int i = bitSet.nextSetBit(0); i >= 0; i = bitSet.nextSetBit(i + 1)) {
-            result++;
-        }
-        return result;
-    }
-
-    private static java.sql.Date toDate(int value) {
+    private java.sql.Date deserializeDate(ByteArrayInputStream inputStream) throws IOException {
+        int value = inputStream.readInteger(3);
         int day = value % 32;
         value >>>= 5;
         int month = value % 16;
@@ -154,7 +155,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return new java.sql.Date(cal.getTimeInMillis());
     }
 
-    private static java.sql.Time toTime(int value) {
+    private static java.sql.Time deserializeTime(ByteArrayInputStream inputStream) throws IOException {
+        int value = inputStream.readInteger(3);
         int[] split = split(value, 100, 3);
         Calendar c = Calendar.getInstance();
         c.clear();
@@ -164,15 +166,123 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return new java.sql.Time(c.getTimeInMillis());
     }
 
-    private static java.sql.Timestamp toTimestamp(long value) {
+    private Time deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+        /*
+            in big endian:
+
+            1 bit sign (1= non-negative, 0= negative)
+            1 bit unused (reserved for future extensions)
+            10 bits hour (0-838)
+            6 bits minute (0-59)
+            6 bits second (0-59)
+            = (3 bytes in total)
+            +
+            fractional-seconds storage (size depends on meta)
+        */
+        long time = bigEndianLong(inputStream.read(3), 0, 3);
+        Calendar c = Calendar.getInstance();
+        c.clear();
+        c.set(Calendar.HOUR_OF_DAY, extractBits(time, 2, 10, 24));
+        c.set(Calendar.MINUTE, extractBits(time, 12, 6, 24));
+        c.set(Calendar.SECOND, extractBits(time, 18, 6, 24));
+        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
+        return new Time(c.getTimeInMillis());
+    }
+
+    private java.sql.Timestamp deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
+        long value = inputStream.readLong(4);
         return new java.sql.Timestamp(value * 1000L);
     }
 
-    private static java.util.Date toDateTime(long value) {
+    private Timestamp deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+        // big endian
+        long timestamp = bigEndianLong(inputStream.read(4), 0, 4);
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(timestamp * 1000);
+        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
+        return new Timestamp(c.getTimeInMillis());
+    }
+
+    private java.util.Date deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
+        long value = inputStream.readLong(8);
         int[] split = split(value, 100, 6);
         Calendar c = Calendar.getInstance();
-        c.set(split[5], split[4] - 1, split[3], split[2], split[1], split[0]);
+        c.set(Calendar.YEAR, split[5]);
+        c.set(Calendar.MONTH, split[4] - 1);
+        c.set(Calendar.DAY_OF_MONTH, split[3]);
+        c.set(Calendar.HOUR_OF_DAY, split[2]);
+        c.set(Calendar.MINUTE, split[1]);
+        c.set(Calendar.SECOND, split[0]);
+        c.set(Calendar.MILLISECOND, 0);
         return c.getTime();
+    }
+
+    private java.util.Date deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+        /*
+            in big endian:
+
+            1 bit sign (1= non-negative, 0= negative)
+            17 bits year*13+month (year 0-9999, month 0-12)
+            5 bits day (0-31)
+            5 bits hour (0-23)
+            6 bits minute (0-59)
+            6 bits second (0-59)
+            = (5 bytes in total)
+            +
+            fractional-seconds storage (size depends on meta)
+        */
+        long datetime = bigEndianLong(inputStream.read(5), 0, 5);
+        int yearMonth = extractBits(datetime, 1, 17, 40);
+        Calendar c = Calendar.getInstance();
+        c.set(Calendar.YEAR, yearMonth / 13);
+        c.set(Calendar.MONTH, yearMonth % 13 - 1);
+        c.set(Calendar.DAY_OF_MONTH, extractBits(datetime, 18, 5, 40));
+        c.set(Calendar.HOUR_OF_DAY, extractBits(datetime, 23, 5, 40));
+        c.set(Calendar.MINUTE, extractBits(datetime, 28, 6, 40));
+        c.set(Calendar.SECOND, extractBits(datetime, 34, 6, 40));
+        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
+        return c.getTime();
+    }
+
+    private int getFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int fractionalSecondsStorageSize = getFractionalSecondsStorageSize(meta);
+        if (fractionalSecondsStorageSize > 0) {
+            long fractionalSeconds = bigEndianLong(inputStream.read(meta), 0, meta);
+            if (meta % 2 == 1) {
+                fractionalSeconds /= 10;
+            }
+            return (int) (fractionalSeconds / 1000);
+        }
+        return 0;
+    }
+
+    private static int getFractionalSecondsStorageSize(int fsp) {
+        switch (fsp) {
+            case 1:
+            case 2:
+                return 1;
+            case 3:
+            case 4:
+                return 2;
+            case 5:
+            case 6:
+                return 3;
+            default:
+                return 0;
+        }
+    }
+
+    private static int extractBits(long value, int bitOffset, int numberOfBits, int payloadSize) {
+        long result = value >> payloadSize - (bitOffset + numberOfBits);
+        return (int) (result & ((1 << numberOfBits) - 1));
+    }
+
+    private static int numberOfBitsSet(BitSet bitSet) {
+        int result = 0;
+        for (int i = bitSet.nextSetBit(0); i >= 0; i = bitSet.nextSetBit(i + 1)) {
+            result++;
+        }
+        return result;
     }
 
     private static int[] split(long value, int divider, int length) {
@@ -231,6 +341,15 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     private static int bigEndianInteger(byte[] bytes, int offset, int length) {
         int result = 0;
+        for (int i = offset; i < (offset + length); i++) {
+            byte b = bytes[i];
+            result = (result << 8) | (b >= 0 ? (int) b : (b + 256));
+        }
+        return result;
+    }
+
+    private static long bigEndianLong(byte[] bytes, int offset, int length) {
+        long result = 0;
         for (int i = offset; i < (offset + length); i++) {
             byte b = bytes[i];
             result = (result << 8) | (b >= 0 ? (int) b : (b + 256));
