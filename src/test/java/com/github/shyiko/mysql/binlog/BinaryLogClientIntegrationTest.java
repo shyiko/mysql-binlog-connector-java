@@ -20,6 +20,7 @@ import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
+import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import org.mockito.InOrder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -427,6 +428,16 @@ public class BinaryLogClientIntegrationTest {
         } finally {
             tcpReverseProxy.unbind();
         }
+    }
+
+    @Test(expectedExceptions = IllegalStateException.class)
+    public void testExceptionIsThrownWhenTryingToConnectAlreadyConnectedClient() throws Exception {
+        client.connect();
+    }
+
+    @Test(expectedExceptions = AuthenticationException.class)
+    public void testExceptionIsThrownWhenProvidedWithWrongCredentials() throws Exception {
+        new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password + "^_^").connect();
     }
 
     private void bindInSeparateThread(final TCPReverseProxy tcpReverseProxy) throws InterruptedException {
