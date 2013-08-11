@@ -52,7 +52,7 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     @Override
     public long getSecondsSinceLastEvent() {
         long timestamp = timestampOfLastEvent.get();
-        return timestamp == 0 ? 0 : (System.currentTimeMillis() - timestamp) / 1000;
+        return timestamp == 0 ? 0 : (getCurrentTimeMillis() - timestamp) / 1000;
     }
 
     @Override
@@ -82,7 +82,7 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     @Override
     public void onEvent(Event event) {
         lastEventHeader.set(event.getHeader());
-        timestampOfLastEvent.set(System.currentTimeMillis());
+        timestampOfLastEvent.set(getCurrentTimeMillis());
         totalNumberOfEventsSeen.getAndIncrement();
     }
 
@@ -90,7 +90,7 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
         numberOfSkippedEvents.getAndIncrement();
         lastEventHeader.set(null);
-        timestampOfLastEvent.set(System.currentTimeMillis());
+        timestampOfLastEvent.set(getCurrentTimeMillis());
         totalNumberOfEventsSeen.getAndIncrement();
     }
 
@@ -105,6 +105,10 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
 
     @Override
     public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
+    }
+
+    protected long getCurrentTimeMillis() {
+        return System.currentTimeMillis();
     }
 
 }

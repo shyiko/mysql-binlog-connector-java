@@ -18,21 +18,19 @@ package com.github.shyiko.mysql.binlog.jmx;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.testng.PowerMockTestCase;
 import org.testng.annotations.Test;
 
-import static org.powermock.api.mockito.PowerMockito.mockStatic;
-import static org.powermock.api.mockito.PowerMockito.verifyStatic;
-import static org.powermock.api.mockito.PowerMockito.when;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.Queue;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-@PrepareForTest(BinaryLogClientStatistics.class)
-public class BinaryLogClientStatisticsTest extends PowerMockTestCase {
+public class BinaryLogClientStatisticsTest {
 
     @Test
     public void testInitialState() throws Exception {
@@ -46,7 +44,15 @@ public class BinaryLogClientStatisticsTest extends PowerMockTestCase {
 
     @Test
     public void testOnEvent() throws Exception {
-        BinaryLogClientStatistics statistics = new BinaryLogClientStatistics();
+        BinaryLogClientStatistics statistics = new BinaryLogClientStatistics() {
+
+            private Queue<Long> responseQueue = new LinkedList<Long>(Arrays.<Long>asList(1L, 1010L));
+
+            @Override
+            protected long getCurrentTimeMillis() {
+                return responseQueue.remove();
+            }
+        };
         assertNull(statistics.getLastEvent());
         assertEquals(statistics.getSecondsSinceLastEvent(), 0L);
         assertEquals(statistics.getTotalNumberOfEventsSeen(), 0L);
@@ -54,11 +60,7 @@ public class BinaryLogClientStatisticsTest extends PowerMockTestCase {
         assertEquals(statistics.getNumberOfDisconnects(), 0L);
         statistics.onEvent(generateEvent(EventType.FORMAT_DESCRIPTION, 104, 1));
         assertEquals(statistics.getLastEvent(), "FORMAT_DESCRIPTION/0 from server 1");
-        long futureTime = System.currentTimeMillis() + 1010;
-        mockStatic(System.class);
-        when(System.currentTimeMillis()).thenReturn(futureTime);
         assertEquals(statistics.getSecondsSinceLastEvent(), 1);
-        verifyStatic();
         assertEquals(statistics.getTotalNumberOfEventsSeen(), 1);
         assertEquals(statistics.getNumberOfSkippedEvents(), 0);
     }
