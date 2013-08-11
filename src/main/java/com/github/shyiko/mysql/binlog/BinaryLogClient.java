@@ -224,7 +224,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                                 logger.info("Trying to restore lost connection to " + hostname + ":" + port);
                             }
                             try {
-                                disconnect();
+                                if (connected) {
+                                    disconnect();
+                                }
                                 connect(keepAliveConnectTimeout, TimeUnit.MILLISECONDS);
                             } catch (Exception ce) {
                                 if (logger.isLoggable(Level.WARNING)) {

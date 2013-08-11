@@ -17,9 +17,12 @@ package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
+import org.mockito.InOrder;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -44,6 +47,13 @@ import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.only;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.fail;
@@ -100,6 +110,7 @@ public class BinaryLogClientIntegrationTest {
                 statement.execute("create table bikini_bottom (name varchar(255) primary key)");
             }
         });
+        eventListener.waitFor(EventType.QUERY, 2, DEFAULT_TIMEOUT);
         eventListener.reset();
     }
 
@@ -262,6 +273,34 @@ public class BinaryLogClientIntegrationTest {
     }
 
     @Test
+    public void testUnsupportedColumnTypeDoesNotCauseClientToFail() throws Exception {
+        BinaryLogClient.LifecycleListener lifecycleListenerMock = mock(BinaryLogClient.LifecycleListener.class);
+        client.registerLifecycleListener(lifecycleListenerMock);
+        try {
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("create table geometry_table (location geometry)");
+                    statement.execute("insert into geometry_table values(GeomFromText('POINT(40.717957 -73.736501)'))");
+                    statement.execute("drop table geometry_table");
+                }
+            });
+            eventListener.waitFor(QueryEventData.class, 3, DEFAULT_TIMEOUT); // create + BEGIN of insert + drop
+            eventListener.waitFor(WriteRowsEventData.class, 0, DEFAULT_TIMEOUT);
+            verify(lifecycleListenerMock, only()).onEventDeserializationFailure(eq(client), any(Exception.class));
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("insert into bikini_bottom values('SpongeBob')");
+                }
+            });
+            eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        } finally {
+            client.unregisterLifecycleListener(lifecycleListenerMock);
+        }
+    }
+
+    @Test
     public void testTrackingOfLastKnownBinlogFilenameAndPosition() throws Exception {
         master.execute(new Callback<Statement>() {
             @Override
@@ -363,6 +402,9 @@ public class BinaryLogClientIntegrationTest {
                 try {
                     clientOverProxy.connect(3, TimeUnit.SECONDS);
                     eventListener.waitFor(EventType.FORMAT_DESCRIPTION, 1, DEFAULT_TIMEOUT);
+                    BinaryLogClient.LifecycleListener lifecycleListenerMock =
+                        mock(BinaryLogClient.LifecycleListener.class);
+                    clientOverProxy.registerLifecycleListener(lifecycleListenerMock);
                     tcpReverseProxy.unbind();
                     master.execute(new Callback<Statement>() {
                         @Override
@@ -372,6 +414,10 @@ public class BinaryLogClientIntegrationTest {
                     });
                     bindInSeparateThread(tcpReverseProxy);
                     eventListener.waitFor(WriteRowsEventData.class, 1, TimeUnit.SECONDS.toMillis(3));
+                    InOrder inOrder = inOrder(lifecycleListenerMock);
+                    inOrder.verify(lifecycleListenerMock).onDisconnect(eq(clientOverProxy));
+                    inOrder.verify(lifecycleListenerMock).onConnect(eq(clientOverProxy));
+                    verifyNoMoreInteractions(lifecycleListenerMock);
                 } finally {
                     clientOverProxy.disconnect();
                 }
@@ -396,6 +442,11 @@ public class BinaryLogClientIntegrationTest {
             }
         }).start();
         tcpReverseProxy.await(3, TimeUnit.SECONDS);
+    }
+
+    @AfterMethod
+    public void afterEachTest() throws Exception {
+        eventListener.reset();
     }
 
     @AfterClass(alwaysRun = true)
