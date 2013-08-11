@@ -56,37 +56,11 @@ public class ByteArrayOutputStream extends OutputStream {
     }
 
     /**
-     * @see ByteArrayInputStream#readLengthEncodedString()
-     */
-    public void writeLengthEncodedString(String value) throws IOException {
-        writePackedLong(value.getBytes().length);
-        writeString(value);
-    }
-
-    /**
      * @see ByteArrayInputStream#readZeroTerminatedString()
      */
     public void writeZeroTerminatedString(String value) throws IOException {
         write(value.getBytes());
         write(0);
-    }
-
-    /**
-     * @see ByteArrayInputStream#readPackedNumber()
-     */
-    public void writePackedLong(long value) throws IOException {
-        if (value < 251L) {
-            writeLong(value, 1);
-        } else if (value < 65536L) {
-            writeLong(252, 1);
-            writeLong(value, 2);
-        } else if (value < 16777216L) {
-            writeLong(253, 1);
-            writeLong(value, 3);
-        } else {
-            writeLong(254, 1);
-            writeLong(value, 8);
-        }
     }
 
     @Override

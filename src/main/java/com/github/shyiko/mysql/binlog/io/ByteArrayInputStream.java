@@ -118,17 +118,6 @@ public class ByteArrayInputStream extends InputStream {
     /**
      * @see #readPackedNumber()
      */
-    public long readPackedLong() throws IOException {
-        Number number = readPackedNumber();
-        if (number == null) {
-            throw new IOException("Unexpected NULL where long should have been");
-        }
-        return number.longValue();
-    }
-
-    /**
-     * @see #readPackedNumber()
-     */
     public int readPackedInteger() throws IOException {
         Number number = readPackedNumber();
         if (number == null) {
