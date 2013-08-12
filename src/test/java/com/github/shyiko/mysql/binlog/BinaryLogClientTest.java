@@ -18,6 +18,9 @@ package com.github.shyiko.mysql.binlog;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientStatistics;
 import org.testng.annotations.Test;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -56,4 +59,15 @@ public class BinaryLogClientTest {
         binaryLogClient.unregisterLifecycleListener(BinaryLogClientStatistics.class);
         assertEquals(binaryLogClient.getLifecycleListeners().size(), 1);
     }
+
+    @Test(expectedExceptions = TimeoutException.class)
+    public void testConnectionTimeout() throws Exception {
+        new BinaryLogClient("_localhost_", 3306, "root", "mysql").connect(0, TimeUnit.MILLISECONDS);
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void testNullEventDeserializerIsNotAllowed() throws Exception {
+        new BinaryLogClient("localhost", 3306, "root", "mysql").setEventDeserializer(null);
+    }
+
 }

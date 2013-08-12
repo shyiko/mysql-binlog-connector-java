@@ -44,7 +44,7 @@ public class BinaryLogFileReader implements Closeable {
     }
 
     public BinaryLogFileReader(File file, EventDeserializer eventDeserializer) throws IOException {
-        this(new BufferedInputStream(new FileInputStream(file)), eventDeserializer);
+        this(file != null ? new BufferedInputStream(new FileInputStream(file)) : null, eventDeserializer);
     }
 
     public BinaryLogFileReader(InputStream inputStream) throws IOException {
@@ -52,6 +52,12 @@ public class BinaryLogFileReader implements Closeable {
     }
 
     public BinaryLogFileReader(InputStream inputStream, EventDeserializer eventDeserializer) throws IOException {
+        if (inputStream == null) {
+            throw new IllegalArgumentException("Input stream cannot be NULL");
+        }
+        if (eventDeserializer == null) {
+            throw new IllegalArgumentException("Event deserializer cannot be NULL");
+        }
         this.inputStream = new ByteArrayInputStream(inputStream);
         try {
             byte[] magicHeader = this.inputStream.read(MAGIC_HEADER.length);

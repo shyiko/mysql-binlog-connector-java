@@ -17,7 +17,9 @@ package com.github.shyiko.mysql.binlog;
 
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.zip.GZIPInputStream;
 
 import static org.testng.Assert.assertEquals;
@@ -40,6 +42,16 @@ public class BinaryLogFileReaderIntegrationTest {
         } finally {
             reader.close();
         }
+    }
+
+    @Test(expectedExceptions = IOException.class, expectedExceptionsMessageRegExp = "Not a valid binary log")
+    public void testMagicHeaderCheck() throws Exception {
+        new BinaryLogFileReader(new File("src/test/resources/mysql-bin.sakila.gz"));
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void testNullEventDeserializerIsNotAllowed() throws Exception {
+        new BinaryLogFileReader(new File("src/test/resources/mysql-bin.sakila.gz"), null);
     }
 
 }

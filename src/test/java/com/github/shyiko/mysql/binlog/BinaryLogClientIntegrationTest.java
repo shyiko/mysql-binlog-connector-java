@@ -56,7 +56,9 @@ import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 /**
@@ -87,6 +89,7 @@ public class BinaryLogClientIntegrationTest {
                 Integer.parseInt(bundle.getString(prefix + "slave.port")),
                 bundle.getString(prefix + "slave.username"), bundle.getString(prefix + "slave.password"));
         client = new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password);
+        client.setKeepAlive(false);
         client.registerEventListener(new TraceEventListener());
         client.registerEventListener(eventListener = new CountDownEventListener());
         client.registerLifecycleListener(new TraceLifecycleListener());
@@ -398,15 +401,19 @@ public class BinaryLogClientIntegrationTest {
                 client.disconnect();
                 final BinaryLogClient clientOverProxy = new BinaryLogClient(slave.hostname, tcpReverseProxy.getPort(),
                         slave.username, slave.password);
-                clientOverProxy.setKeepAliveInterval(TimeUnit.SECONDS.toMillis(1));
+                clientOverProxy.setKeepAliveInterval(TimeUnit.MILLISECONDS.toMillis(100));
+                clientOverProxy.setKeepAliveConnectTimeout(TimeUnit.SECONDS.toMillis(2));
                 clientOverProxy.registerEventListener(eventListener);
                 try {
                     clientOverProxy.connect(3, TimeUnit.SECONDS);
                     eventListener.waitFor(EventType.FORMAT_DESCRIPTION, 1, DEFAULT_TIMEOUT);
+                    assertTrue(clientOverProxy.isKeepAliveThreadRunning());
                     BinaryLogClient.LifecycleListener lifecycleListenerMock =
                         mock(BinaryLogClient.LifecycleListener.class);
                     clientOverProxy.registerLifecycleListener(lifecycleListenerMock);
+                    TimeUnit.MILLISECONDS.sleep(300); // giving keep-alive-thread a chance to run few iterations
                     tcpReverseProxy.unbind();
+                    TimeUnit.MILLISECONDS.sleep(300);
                     master.execute(new Callback<Statement>() {
                         @Override
                         public void execute(Statement statement) throws SQLException {
@@ -414,7 +421,7 @@ public class BinaryLogClientIntegrationTest {
                         }
                     });
                     bindInSeparateThread(tcpReverseProxy);
-                    eventListener.waitFor(WriteRowsEventData.class, 1, TimeUnit.SECONDS.toMillis(3));
+                    eventListener.waitFor(WriteRowsEventData.class, 1, TimeUnit.SECONDS.toMillis(4));
                     InOrder inOrder = inOrder(lifecycleListenerMock);
                     inOrder.verify(lifecycleListenerMock).onDisconnect(eq(clientOverProxy));
                     inOrder.verify(lifecycleListenerMock).onConnect(eq(clientOverProxy));
@@ -422,6 +429,7 @@ public class BinaryLogClientIntegrationTest {
                 } finally {
                     clientOverProxy.disconnect();
                 }
+                assertFalse(clientOverProxy.isKeepAliveThreadRunning());
             } finally {
                 client.connect(3, TimeUnit.SECONDS);
             }
@@ -432,12 +440,20 @@ public class BinaryLogClientIntegrationTest {
 
     @Test(expectedExceptions = IllegalStateException.class)
     public void testExceptionIsThrownWhenTryingToConnectAlreadyConnectedClient() throws Exception {
+        assertTrue(client.isConnected());
         client.connect();
     }
 
-    @Test(expectedExceptions = AuthenticationException.class)
+    @Test
     public void testExceptionIsThrownWhenProvidedWithWrongCredentials() throws Exception {
-        new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password + "^_^").connect();
+        BinaryLogClient binaryLogClient =
+            new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password + "^_^");
+        try {
+            binaryLogClient.connect();
+            fail("Wrong password should have resulted in AuthenticationException being thrown");
+        } catch (AuthenticationException e) {
+            assertFalse(binaryLogClient.isConnected());
+        }
     }
 
     private void bindInSeparateThread(final TCPReverseProxy tcpReverseProxy) throws InterruptedException {
