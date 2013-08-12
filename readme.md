@@ -64,6 +64,12 @@ The latest development version always available through Sonatype Snapshots repos
     });
     client.connect();
 
+## Implementation notes
+
+- data of numeric types (tinyint, etc) always returned signed(!) regardless of whether column definition includes "unsigned" keyword or not
+- data of *text/*blob types always returned as a byte array
+- timestamp is timezone-sensitive
+
 ## Documentation
 
 For the insight into the internals of MySQL look [here](https://dev.mysql.com/doc/internals/en/index.html). [MySQL Client/Server Protocol](http://dev.mysql.com/doc/internals/en/client-server-protocol.html) and [The Binary Log](http://dev.mysql.com/doc/internals/en/binary-log.html) sections are particularly useful as a reference documentation for the `com.**.mysql.binlog.network` and `com.**.mysql.binlog.event` packages.
