@@ -193,7 +193,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             }
             channel.write(new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition));
         } catch (IOException e) {
-            if (channel != null) {
+            if (channel != null && channel.isOpen()) {
                 channel.close();
             }
             throw e;
@@ -555,7 +555,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void disconnectChannel() throws IOException {
         try {
             connected = false;
-            if (channel != null) {
+            if (channel != null && channel.isOpen()) {
                 channel.close();
             }
         } finally {

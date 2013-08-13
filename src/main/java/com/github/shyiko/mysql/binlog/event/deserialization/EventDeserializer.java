@@ -78,6 +78,10 @@ public class EventDeserializer {
                         setMayContainExtraInformation(true));
     }
 
+    public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
+        eventDataDeserializers.put(eventType, eventDataDeserializer);
+    }
+
     public void setChecksumType(ChecksumType checksumType) {
         this.checksumLength = checksumType.getLength();
     }

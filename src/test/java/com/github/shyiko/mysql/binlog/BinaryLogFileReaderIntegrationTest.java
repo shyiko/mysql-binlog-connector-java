@@ -15,6 +15,12 @@
  */
 package com.github.shyiko.mysql.binlog;
 
+import com.github.shyiko.mysql.binlog.event.ByteArrayEventData;
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.deserialization.ByteArrayEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.NullEventDataDeserializer;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -23,6 +29,9 @@ import java.io.IOException;
 import java.util.zip.GZIPInputStream;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
@@ -52,6 +61,33 @@ public class BinaryLogFileReaderIntegrationTest {
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testNullEventDeserializerIsNotAllowed() throws Exception {
         new BinaryLogFileReader(new File("src/test/resources/mysql-bin.sakila.gz"), null);
+    }
+
+    @Test
+    public void testDeserializationSuppressionByEventType() throws Exception {
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        eventDeserializer.setEventDataDeserializer(EventType.XID, new NullEventDataDeserializer());
+        eventDeserializer.setEventDataDeserializer(EventType.QUERY, new ByteArrayEventDataDeserializer());
+        BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
+            new FileInputStream("src/test/resources/mysql-bin.sakila.gz")), eventDeserializer);
+        try {
+            boolean n = true, b = true;
+            for (Event event; (event = reader.readEvent()) != null && (n || b); ) {
+                EventType eventType = event.getHeader().getEventType();
+                if (eventType == EventType.XID) {
+                    assertNull(event.getData());
+                    n = false;
+                } else
+                if (eventType == EventType.QUERY) {
+                    assertTrue(event.getData() instanceof ByteArrayEventData);
+                    assertTrue(event.getData().toString().length() < 80); // making sure byte array isn't shown
+                    b = false;
+                }
+            }
+            assertFalse(n || b);
+        } finally {
+            reader.close();
+        }
     }
 
 }

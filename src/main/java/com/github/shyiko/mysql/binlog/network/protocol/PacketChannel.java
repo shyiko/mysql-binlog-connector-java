@@ -64,10 +64,6 @@ public class PacketChannel implements Channel {
         outputStream.write(body, 0, body.length);
     }
 
-    public void flush() throws IOException {
-        outputStream.flush();
-    }
-
     @Override
     public boolean isOpen() {
         return !socket.isClosed();

@@ -203,6 +203,13 @@
                         mvn -P coverage clean verify
                         # use -Dvagrant.integration.box= to switch between MySQL sandboxes
 
+                        # for aggregated coverage over different mysql releases use
+                        mvn clean
+                        mvn -P coverage verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.5.27-sandbox-prepackaged
+                        mvn -P coverage verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.6.12-sandbox-prepackaged
+
                         # submit coverage report to coveralls
                         mvn -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
 
@@ -232,10 +239,14 @@
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>0.5.5.201112152213</version>
+                        <version>0.6.3.201306030806</version>
                         <configuration>
                             <destFile>${basedir}/target/coverage-reports/jacoco-unit.exec</destFile>
                             <dataFile>${basedir}/target/coverage-reports/jacoco-unit.exec</dataFile>
+                            <append>true</append>
+                            <excludes>
+                                <exclude>**/ClientCapabilities.*</exclude>
+                            </excludes>
                         </configuration>
                         <executions>
                             <execution>
