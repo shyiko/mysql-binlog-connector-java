@@ -2,7 +2,7 @@
 
 MySQL Binary Log connector.
 
-Initially project was started as a fork of [open-replicator](https://code.google.com/p/open-replicator), but ended up as a complete rewrite. Key differences (features):
+Initially project was started as a fork of [open-replicator](https://code.google.com/p/open-replicator), but ended up as a complete rewrite. Key differences/features:
 
 - automatic binlog filename/position resolution
 - resumable disconnects
@@ -73,6 +73,12 @@ The latest development version always available through Sonatype Snapshots repos
 ## Documentation
 
 For the insight into the internals of MySQL look [here](https://dev.mysql.com/doc/internals/en/index.html). [MySQL Client/Server Protocol](http://dev.mysql.com/doc/internals/en/client-server-protocol.html) and [The Binary Log](http://dev.mysql.com/doc/internals/en/binary-log.html) sections are particularly useful as a reference documentation for the `com.**.mysql.binlog.network` and `com.**.mysql.binlog.event` packages.
+
+## Development
+
+    git clone https://github.com/shyiko/mysql-binlog-connector-java.git
+    cd mysql-binlog-connector-java
+    mvn # shows how to build, test, etc. project
 
 ## License
 
