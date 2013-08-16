@@ -91,7 +91,23 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private final Lock shutdownLock = new ReentrantLock();
 
     /**
-     * Alias for BinaryLogClient(username, port, &lt;no schema&gt; , username, password).
+     * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
+     * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
+     */
+    public BinaryLogClient(String username, String password) {
+        this("localhost", 3306, null, username, password);
+    }
+
+    /**
+     * Alias for BinaryLogClient("localhost", 3306, schema, username, password).
+     * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
+     */
+    public BinaryLogClient(String schema, String username, String password) {
+        this("localhost", 3306, schema, username, password);
+    }
+
+    /**
+     * Alias for BinaryLogClient(hostname, port, &lt;no schema&gt; = null, username, password).
      * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
      */
     public BinaryLogClient(String hostname, int port, String username, String password) {
@@ -101,8 +117,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     /**
      * @param hostname mysql server hostname
      * @param port mysql server port
-     * @param schema database
-     * @param username login
+     * @param schema database name. Can be null, in which case client will receive replication events.
+     * regardless of the schema.
+     * @param username login name
      * @param password password
      */
     public BinaryLogClient(String hostname, int port, String schema, String username, String password) {
@@ -129,14 +146,24 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.binlogPosition = binlogPosition;
     }
 
+    /**
+     * @param keepAlive true if "keep alive" thread should be automatically started (recommended and true by default),
+     * false otherwise.
+     */
     public void setKeepAlive(boolean keepAlive) {
         this.keepAlive = keepAlive;
     }
 
+    /**
+     * @param keepAliveInterval "keep alive" interval in milliseconds.
+     */
     public void setKeepAliveInterval(long keepAliveInterval) {
         this.keepAliveInterval = keepAliveInterval;
     }
 
+    /**
+     * @param keepAliveConnectTimeout "keep alive" connect interval in milliseconds.
+     */
     public void setKeepAliveConnectTimeout(long keepAliveConnectTimeout) {
         this.keepAliveConnectTimeout = keepAliveConnectTimeout;
     }
@@ -151,13 +178,18 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.eventDeserializer = eventDeserializer;
     }
 
+    /**
+     * @param threadFactory custom thread factory to use for "connect in separate thread". If not provided, thread
+     * will be created using simple "new Thread()".
+     */
     public void setThreadFactory(ThreadFactory threadFactory) {
         this.threadFactory = threadFactory;
     }
 
     /**
-     * Connect to the replication stream. Note this method blocks until disconnected.
+     * Connect to the replication stream. Note that this method blocks until disconnected.
      * @throws AuthenticationException in case of failed authentication
+     * @throws IOException if anything goes wrong while trying to connect
      */
     public void connect() throws IOException {
         if (connected) {
@@ -272,6 +304,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return keepAliveThreadExecutor != null && !keepAliveThreadExecutor.isShutdown();
     }
 
+    /**
+     * Connect to the replication stream in a separate thread.
+     * @param timeout connect timeout
+     * @param timeUnit timeout unit
+     * @throws AuthenticationException in case of failed authentication
+     * @throws IOException if anything goes wrong while trying to connect
+     * @throws TimeoutException if client wasn't able to connect in the requested period of time
+     */
     public void connect(long timeout, TimeUnit timeUnit) throws IOException, TimeoutException {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
         AbstractLifecycleListener connectListener = new AbstractLifecycleListener() {
@@ -312,6 +352,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    /**
+     * @return true if client is connected, false otherwise
+     */
     public boolean isConnected() {
         return connected;
     }
@@ -426,6 +469,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return resultSet.toArray(new ResultSetRowPacket[resultSet.size()]);
     }
 
+    /**
+     * @return registered event listeners
+     */
     public List<EventListener> getEventListeners() {
         return Collections.unmodifiableList(eventListeners);
     }
@@ -478,6 +524,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    /**
+     * @return registered lifecycle listeners
+     */
     public List<LifecycleListener> getLifecycleListeners() {
         return Collections.unmodifiableList(lifecycleListeners);
     }
