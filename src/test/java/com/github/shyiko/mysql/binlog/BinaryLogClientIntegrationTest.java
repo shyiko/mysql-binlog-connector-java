@@ -471,6 +471,44 @@ public class BinaryLogClientIntegrationTest {
         tcpReverseProxy.await(3, TimeUnit.SECONDS);
     }
 
+    @Test(expectedExceptions = AuthenticationException.class)
+    public void testAuthenticationFailsWhenNonExistingSchemaProvided() throws Exception {
+        new BinaryLogClient(slave.hostname, slave.port, "mbcj_test_non_existing", slave.username, slave.password).
+            connect(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS);
+    }
+
+    @Test
+    public void testSpecifiedSchemaDoesNotResultInEventFiltering() throws Exception {
+        master.execute(new Callback<Statement>() {
+            @Override
+            public void execute(Statement statement) throws SQLException {
+                statement.execute("drop database if exists mbcj_test_isolated");
+                statement.execute("create database mbcj_test_isolated");
+                statement.execute("drop table if exists mbcj_test_isolated.bikini_bottom");
+                statement.execute("create table mbcj_test_isolated.bikini_bottom (name varchar(255) primary key)");
+            }
+        });
+        eventListener.waitFor(QueryEventData.class, 4, DEFAULT_TIMEOUT);
+        BinaryLogClient isolatedClient =
+            new BinaryLogClient(slave.hostname, slave.port, "mbcj_test_isolated", slave.username, slave.password);
+        try {
+            CountDownEventListener isolatedEventListener = new CountDownEventListener();
+            isolatedClient.registerEventListener(isolatedEventListener);
+            isolatedClient.connect(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS);
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("insert into mbcj_test_isolated.bikini_bottom values('Patrick')");
+                    statement.execute("insert into mbcj_test.bikini_bottom values('Rocky')");
+                }
+            });
+            eventListener.waitFor(WriteRowsEventData.class, 2, DEFAULT_TIMEOUT);
+            isolatedEventListener.waitFor(WriteRowsEventData.class, 2, DEFAULT_TIMEOUT);
+        } finally {
+            isolatedClient.disconnect();
+        }
+    }
+
     @AfterMethod
     public void afterEachTest() throws Exception {
         eventListener.reset();

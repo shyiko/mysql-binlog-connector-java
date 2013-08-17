@@ -117,8 +117,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     /**
      * @param hostname mysql server hostname
      * @param port mysql server port
-     * @param schema database name. Can be null, in which case client will receive replication events.
-     * regardless of the schema.
+     * @param schema database name, nullable. Note that this parameter has nothing to do with event filtering. It's
+     * used only during the authentication.
      * @param username login name
      * @param password password
      */
@@ -330,6 +330,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     connect();
                 } catch (IOException e) {
                     exceptionReference.set(e);
+                    countDownLatch.countDown(); // making sure we don't end up waiting whole "timeout"
                 }
             }
         };
