@@ -42,27 +42,46 @@ The latest development version always available through Sonatype Snapshots repos
 
 ### Reading Binary Log file
 
-    File binlogFile = ...
-    BinaryLogFileReader reader = new BinaryLogFileReader(binlogFile);
-    try {
-        for (Event event; (event = reader.readEvent()) != null; ) {
-            ...
-        }
-    } finally {
-        reader.close();
+```java
+File binlogFile = ...
+BinaryLogFileReader reader = new BinaryLogFileReader(binlogFile);
+try {
+    for (Event event; (event = reader.readEvent()) != null; ) {
+        ...
     }
+} finally {
+    reader.close();
+}
+```
 
 ### Tapping into MySQL replication stream
 
-    BinaryLogClient client = new BinaryLogClient("hostname", 3306, "username", "password")
-    client.registerEventListener(new EventListener() {
+```java
+BinaryLogClient client = new BinaryLogClient("hostname", 3306, "username", "password");
+client.registerEventListener(new EventListener() {
 
-        @Override
-        public void onEvent(Event event) {
-            ...
-        }
-    });
-    client.connect();
+    @Override
+    public void onEvent(Event event) {
+        ...
+    }
+});
+client.connect();
+```
+
+### Making client available through JMX
+
+```java
+MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+
+BinaryLogClient binaryLogClient = ...
+ObjectName objectName = new ObjectName("mysql.binlog:type=BinaryLogClient");
+mBeanServer.registerMBean(binaryLogClient, objectName);
+
+// following bean accumulates various BinaryLogClient stats (e.g. number of disconnects, skipped events)
+BinaryLogClientStatistics stats = new BinaryLogClientStatistics(binaryLogClient);
+ObjectName statsObjectName = new ObjectName("mysql.binlog:type=BinaryLogClientStatistics");
+mBeanServer.registerMBean(stats, statsObjectName);
+```
 
 ## Implementation notes
 
@@ -76,9 +95,11 @@ For the insight into the internals of MySQL look [here](https://dev.mysql.com/do
 
 ## Development
 
-    git clone https://github.com/shyiko/mysql-binlog-connector-java.git
-    cd mysql-binlog-connector-java
-    mvn # shows how to build, test, etc. project
+```sh
+git clone https://github.com/shyiko/mysql-binlog-connector-java.git
+cd mysql-binlog-connector-java
+mvn # shows how to build, test, etc. project
+```
 
 ## License
 
