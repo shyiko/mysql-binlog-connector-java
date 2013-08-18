@@ -271,7 +271,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                                 if (isConnected()) {
                                     disconnectChannel();
                                 }
-                                connect(keepAliveConnectTimeout, TimeUnit.MILLISECONDS);
+                                connect(keepAliveConnectTimeout);
                             } catch (Exception ce) {
                                 if (logger.isLoggable(Level.WARNING)) {
                                     logger.warning("Failed to restore connection to " + hostname + ":" + port +
@@ -306,13 +306,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     /**
      * Connect to the replication stream in a separate thread.
-     * @param timeout connect timeout
-     * @param timeUnit timeout unit
+     * @param timeoutInMilliseconds timeout in milliseconds
      * @throws AuthenticationException in case of failed authentication
      * @throws IOException if anything goes wrong while trying to connect
      * @throws TimeoutException if client wasn't able to connect in the requested period of time
      */
-    public void connect(long timeout, TimeUnit timeUnit) throws IOException, TimeoutException {
+    public void connect(long timeoutInMilliseconds) throws IOException, TimeoutException {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
         AbstractLifecycleListener connectListener = new AbstractLifecycleListener() {
             @Override
@@ -338,7 +337,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         thread.start();
         boolean started = false;
         try {
-            started = countDownLatch.await(timeout, timeUnit);
+            started = countDownLatch.await(timeoutInMilliseconds, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             if (logger.isLoggable(Level.WARNING)) {
                 logger.log(Level.WARNING, e.getMessage());
@@ -349,7 +348,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw exceptionReference.get();
         }
         if (!started) {
-            throw new TimeoutException("BinaryLogClient was unable to connect in " + timeUnit.toMillis(timeout) + "ms");
+            throw new TimeoutException("BinaryLogClient was unable to connect in " + timeoutInMilliseconds + "ms");
         }
     }
 

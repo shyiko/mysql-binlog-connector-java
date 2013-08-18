@@ -18,7 +18,6 @@ package com.github.shyiko.mysql.binlog;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientStatistics;
 import org.testng.annotations.Test;
 
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.testng.Assert.assertEquals;
@@ -62,7 +61,7 @@ public class BinaryLogClientTest {
 
     @Test(expectedExceptions = TimeoutException.class)
     public void testConnectionTimeout() throws Exception {
-        new BinaryLogClient("_localhost_", 3306, "root", "mysql").connect(0, TimeUnit.MILLISECONDS);
+        new BinaryLogClient("_localhost_", 3306, "root", "mysql").connect(0);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)

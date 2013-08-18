@@ -93,7 +93,7 @@ public class BinaryLogClientIntegrationTest {
         client.registerEventListener(new TraceEventListener());
         client.registerEventListener(eventListener = new CountDownEventListener());
         client.registerLifecycleListener(new TraceLifecycleListener());
-        client.connect(3, TimeUnit.SECONDS);
+        client.connect(DEFAULT_TIMEOUT);
         master.execute(new Callback<Statement>() {
             @Override
             public void execute(Statement statement) throws SQLException {
@@ -369,7 +369,7 @@ public class BinaryLogClientIntegrationTest {
                 eventListener.reset();
             }
         } finally {
-            client.connect(3, TimeUnit.SECONDS);
+            client.connect(DEFAULT_TIMEOUT);
         }
         eventListener.waitFor(WriteRowsEventData.class, 2, DEFAULT_TIMEOUT);
     }
@@ -388,7 +388,7 @@ public class BinaryLogClientIntegrationTest {
         client.disconnect();
         client.setBinlogFilename(binlogFilename);
         client.setBinlogPosition(binlogPosition);
-        client.connect(3, TimeUnit.SECONDS);
+        client.connect(DEFAULT_TIMEOUT);
         eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
     }
 
@@ -405,7 +405,7 @@ public class BinaryLogClientIntegrationTest {
                 clientOverProxy.setKeepAliveConnectTimeout(TimeUnit.SECONDS.toMillis(2));
                 clientOverProxy.registerEventListener(eventListener);
                 try {
-                    clientOverProxy.connect(3, TimeUnit.SECONDS);
+                    clientOverProxy.connect(DEFAULT_TIMEOUT);
                     eventListener.waitFor(EventType.FORMAT_DESCRIPTION, 1, DEFAULT_TIMEOUT);
                     assertTrue(clientOverProxy.isKeepAliveThreadRunning());
                     BinaryLogClient.LifecycleListener lifecycleListenerMock =
@@ -431,7 +431,7 @@ public class BinaryLogClientIntegrationTest {
                 }
                 assertFalse(clientOverProxy.isKeepAliveThreadRunning());
             } finally {
-                client.connect(3, TimeUnit.SECONDS);
+                client.connect(DEFAULT_TIMEOUT);
             }
         } finally {
             tcpReverseProxy.unbind();
@@ -474,7 +474,7 @@ public class BinaryLogClientIntegrationTest {
     @Test(expectedExceptions = AuthenticationException.class)
     public void testAuthenticationFailsWhenNonExistingSchemaProvided() throws Exception {
         new BinaryLogClient(slave.hostname, slave.port, "mbcj_test_non_existing", slave.username, slave.password).
-            connect(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS);
+            connect(DEFAULT_TIMEOUT);
     }
 
     @Test
@@ -494,7 +494,7 @@ public class BinaryLogClientIntegrationTest {
         try {
             CountDownEventListener isolatedEventListener = new CountDownEventListener();
             isolatedClient.registerEventListener(isolatedEventListener);
-            isolatedClient.connect(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS);
+            isolatedClient.connect(DEFAULT_TIMEOUT);
             master.execute(new Callback<Statement>() {
                 @Override
                 public void execute(Statement statement) throws SQLException {

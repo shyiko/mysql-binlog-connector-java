@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog.jmx;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
@@ -26,7 +27,7 @@ public interface BinaryLogClientMXBean {
     void setBinlogFilename(String binlogFilename);
     long getBinlogPosition();
     void setBinlogPosition(long binlogPosition);
-    void connect() throws IOException;
+    void connect(long timeoutInMilliseconds) throws IOException, TimeoutException;
     boolean isConnected();
     void disconnect() throws IOException;
 
