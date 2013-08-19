@@ -101,6 +101,10 @@ cd mysql-binlog-connector-java
 mvn # shows how to build, test, etc. project
 ```
 
+## Used by
+
+* [rook](https://github.com/shyiko/rook) - Change Data Capture (CDC) toolkit for keeping system layers in sync with the database.
+
 ## License
 
 [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
