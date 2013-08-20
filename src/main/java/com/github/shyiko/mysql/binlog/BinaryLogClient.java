@@ -130,18 +130,31 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.password = password;
     }
 
+    /**
+     * @return binary log filename, nullable. Note that this value is automatically tracked by the client and thus
+     * is subject to change (in response to {@link EventType#ROTATE}, for example).
+     */
     public String getBinlogFilename() {
         return binlogFilename;
     }
 
+    /**
+     * @param binlogFilename binary log filename (null indicates automatic resolution).
+     */
     public void setBinlogFilename(String binlogFilename) {
         this.binlogFilename = binlogFilename;
     }
 
+    /**
+     * @return binary log position of the next event. Note that this value changes with each incoming event.
+     */
     public long getBinlogPosition() {
         return binlogPosition;
     }
 
+    /**
+     * @param binlogPosition binary log position
+     */
     public void setBinlogPosition(long binlogPosition) {
         this.binlogPosition = binlogPosition;
     }
