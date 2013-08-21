@@ -15,15 +15,16 @@
  */
 package com.github.shyiko.mysql.binlog.event;
 
+import java.io.Serializable;
+
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public interface EventHeader {
+public interface EventHeader extends Serializable {
 
     long getTimestamp();
     EventType getEventType();
     long getServerId();
     long getHeaderLength();
     long getDataLength();
-
 }

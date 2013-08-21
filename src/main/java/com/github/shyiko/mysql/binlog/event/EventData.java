@@ -15,8 +15,10 @@
  */
 package com.github.shyiko.mysql.binlog.event;
 
+import java.io.Serializable;
+
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public interface EventData {
+public interface EventData extends Serializable {
 }
