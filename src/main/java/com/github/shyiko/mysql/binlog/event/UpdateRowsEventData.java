@@ -29,6 +29,9 @@ public class UpdateRowsEventData implements EventData {
     private long tableId;
     private BitSet includedColumnsBeforeUpdate;
     private BitSet includedColumns;
+    /**
+     * @see com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer
+     */
     private List<Map.Entry<Serializable[], Serializable[]>> rows;
 
     public long getTableId() {

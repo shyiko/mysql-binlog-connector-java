@@ -30,7 +30,27 @@ import java.util.Map;
 
 /**
  * Whole class is basically a mix of <a href="https://code.google.com/p/open-replicator">open-replicator</a>'s
- * AbstractRowEventParser and MySQLUtils.
+ * AbstractRowEventParser and MySQLUtils. Main purpose here is to ease rows deserialization.<p>
+ *
+ * Current {@link ColumnType} to java type mapping is following:
+ * <pre>
+ * Integer: {@link ColumnType#TINY}, {@link ColumnType#SHORT}, {@link ColumnType#LONG}, {@link ColumnType#INT24},
+ * {@link ColumnType#YEAR}, {@link ColumnType#ENUM}, {@link ColumnType#SET},
+ * Long: {@link ColumnType#LONGLONG},
+ * Float: {@link ColumnType#FLOAT},
+ * Double: {@link ColumnType#DOUBLE},
+ * String: {@link ColumnType#VARCHAR}, {@link ColumnType#VAR_STRING}, {@link ColumnType#STRING},
+ * java.util.BitSet: {@link ColumnType#BIT},
+ * java.util.Date: {@link ColumnType#DATETIME}, {@link ColumnType#DATETIME_V2},
+ * java.math.BigDecimal: {@link ColumnType#NEWDECIMAL},
+ * java.sql.Timestamp: {@link ColumnType#TIMESTAMP}, {@link ColumnType#TIMESTAMP_V2},
+ * java.sql.Date: {@link ColumnType#DATE},
+ * java.sql.Time: {@link ColumnType#TIME}, {@link ColumnType#TIME_V2},
+ * byte[]: {@link ColumnType#BLOB},
+ * Unsupported: {@link ColumnType#NULL}, {@link ColumnType#DECIMAL}, {@link ColumnType#NEWDATE},
+ * {@link ColumnType#TINY_BLOB}, {@link ColumnType#MEDIUM_BLOB}, {@link ColumnType#LONG_BLOB},
+ * {@link ColumnType#GEOMETRY}
+ * </pre>
  *
  * @param <T> event data this deserializer is responsible for
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
@@ -166,7 +186,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return new java.sql.Time(c.getTimeInMillis());
     }
 
-    private Time deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+    private java.sql.Time deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         /*
             in big endian:
 
@@ -194,7 +214,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return new java.sql.Timestamp(value * 1000L);
     }
 
-    private Timestamp deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+    private java.sql.Timestamp deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         // big endian
         long timestamp = bigEndianLong(inputStream.read(4), 0, 4);
         Calendar c = Calendar.getInstance();
