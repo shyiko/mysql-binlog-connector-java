@@ -22,8 +22,6 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.sql.Time;
-import java.sql.Timestamp;
 import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Map;
@@ -47,10 +45,9 @@ import java.util.Map;
  * java.sql.Date: {@link ColumnType#DATE},
  * java.sql.Time: {@link ColumnType#TIME}, {@link ColumnType#TIME_V2},
  * byte[]: {@link ColumnType#BLOB},
- * Unsupported: {@link ColumnType#NULL}, {@link ColumnType#DECIMAL}, {@link ColumnType#NEWDATE},
- * {@link ColumnType#TINY_BLOB}, {@link ColumnType#MEDIUM_BLOB}, {@link ColumnType#LONG_BLOB},
- * {@link ColumnType#GEOMETRY}
  * </pre>
+ *
+ * At the moment {@link ColumnType#GEOMETRY} is unsupported.
  *
  * @param <T> event data this deserializer is responsible for
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
@@ -206,7 +203,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         c.set(Calendar.MINUTE, extractBits(time, 12, 6, 24));
         c.set(Calendar.SECOND, extractBits(time, 18, 6, 24));
         c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
-        return new Time(c.getTimeInMillis());
+        return new java.sql.Time(c.getTimeInMillis());
     }
 
     private java.sql.Timestamp deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
@@ -220,7 +217,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         Calendar c = Calendar.getInstance();
         c.setTimeInMillis(timestamp * 1000);
         c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
-        return new Timestamp(c.getTimeInMillis());
+        return new java.sql.Timestamp(c.getTimeInMillis());
     }
 
     private java.util.Date deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
