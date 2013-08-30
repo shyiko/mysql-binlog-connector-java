@@ -47,10 +47,7 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
             switch(ColumnType.byCode(columnTypes[i] & 0xFF)) {
                 case FLOAT:
                 case DOUBLE:
-                case TINY_BLOB:
                 case BLOB:
-                case MEDIUM_BLOB:
-                case LONG_BLOB:
                     metadata[i] = inputStream.readInteger(1);
                     break;
                 case BIT:
