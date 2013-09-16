@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
 /**
+ * @see <a href="https://dev.mysql.com/doc/refman/5.6/en/replication-options-binary-log.html#option_mysqld_binlog-checksum">MySQL --binlog-checksum option</a>
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public enum ChecksumType {
