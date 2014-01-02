@@ -68,6 +68,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private final String username;
     private final String password;
 
+    private volatile long serverId = 65535;
     private volatile String binlogFilename;
     private volatile long binlogPosition;
 
@@ -128,6 +129,23 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.schema = schema;
         this.username = username;
         this.password = password;
+    }
+
+    /**
+     * @return server id (65535 by default)
+     */
+    public long getServerId() {
+        return serverId;
+    }
+
+    /**
+     * @param serverId server id (in the range from 1 to 2^32 – 1). This value MUST be unique across whole replication
+     * group (that is, different from any other server id being used by any master or slave). Keep in mind that each
+     * binary log client (mysql-binlog-connector-java/BinaryLogClient, mysqlbinlog, etc) should be treated as a
+     * simplified slave and thus MUST also use a different server id.
+     */
+    public void setServerId(long serverId) {
+        this.serverId = serverId;
     }
 
     /**
@@ -228,7 +246,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
                 throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
             }
-            long serverId = fetchServerId();
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
             }
@@ -370,15 +387,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public boolean isConnected() {
         return connected;
-    }
-
-    private long fetchServerId() throws IOException {
-        channel.write(new QueryCommand("show variables where variable_name = 'server_id'"));
-        ResultSetRowPacket[] resultSet = readResultSet();
-        if (resultSet.length == 0) {
-            throw new IOException("Failed to determine server_id");
-        }
-        return Long.parseLong(resultSet[0].getValue(1));
     }
 
     private void fetchBinlogFilenameAndPosition() throws IOException {
