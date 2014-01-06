@@ -68,7 +68,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private final String username;
     private final String password;
 
-    private volatile long serverId = 65535;
+    private long serverId = 65535;
     private volatile String binlogFilename;
     private volatile long binlogPosition;
 
@@ -242,9 +242,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             authenticateCommand.setCollation(greetingPacket.getServerCollation());
             channel.write(authenticateCommand);
             byte[] authenticationResult = channel.read();
-            if (authenticationResult[0] == (byte) 0xFF /* error */) {
-                byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
-                throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
+            if (authenticationResult[0] != (byte) 0x00 /* ok */) {
+                if (authenticationResult[0] == (byte) 0xFF /* error */) {
+                    byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
+                    throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
+                }
+                throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
             }
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
