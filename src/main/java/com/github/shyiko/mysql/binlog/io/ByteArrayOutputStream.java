@@ -75,5 +75,16 @@ public class ByteArrayOutputStream extends OutputStream {
         }
         return new byte[0];
     }
+
+    @Override
+    public void flush() throws IOException {
+        outputStream.flush();
+    }
+
+    @Override
+    public void close() throws IOException {
+        outputStream.close();
+    }
+
 }
 

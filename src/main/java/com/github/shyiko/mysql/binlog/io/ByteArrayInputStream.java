@@ -178,4 +178,9 @@ public class ByteArrayInputStream extends InputStream {
         return result;
     }
 
+    @Override
+    public void close() throws IOException {
+        inputStream.close();
+    }
+
 }
