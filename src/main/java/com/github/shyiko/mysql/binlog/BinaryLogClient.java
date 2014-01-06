@@ -25,6 +25,7 @@ import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
+import com.github.shyiko.mysql.binlog.network.SocketFactory;
 import com.github.shyiko.mysql.binlog.network.protocol.ErrorPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
@@ -36,6 +37,8 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -76,6 +79,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private final List<EventListener> eventListeners = new LinkedList<EventListener>();
     private final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
+
+    private SocketFactory socketFactory;
 
     private PacketChannel channel;
     private volatile boolean connected;
@@ -210,6 +215,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
+     * @param socketFactory custom socket factory. If not provided, socket will be created with "new Socket()".
+     */
+    public void setSocketFactory(SocketFactory socketFactory) {
+        this.socketFactory = socketFactory;
+    }
+
+    /**
      * @param threadFactory custom thread factory to use for "connect in separate thread". If not provided, thread
      * will be created using simple "new Thread()".
      */
@@ -227,12 +239,19 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw new IllegalStateException("BinaryLogClient is already connected");
         }
         try {
+            Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
             try {
-                channel = new PacketChannel(hostname, port);
+                socket.connect(new InetSocketAddress(hostname, port));
+                channel = new PacketChannel(socket);
                 if (channel.getInputStream().peek() == -1) {
                     throw new EOFException();
                 }
             } catch (IOException e) {
+                try {
+                    socket.close();
+                } catch (IOException ex) {
+                    // at this stage we really don't care about why socket.close has failed
+                }
                 throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
                         ". Please make sure it's running.", e);
             }
