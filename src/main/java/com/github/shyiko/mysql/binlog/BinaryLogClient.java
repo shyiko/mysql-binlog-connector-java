@@ -239,19 +239,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw new IllegalStateException("BinaryLogClient is already connected");
         }
         try {
-            Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
             try {
+                Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
                 socket.connect(new InetSocketAddress(hostname, port));
                 channel = new PacketChannel(socket);
                 if (channel.getInputStream().peek() == -1) {
                     throw new EOFException();
                 }
             } catch (IOException e) {
-                try {
-                    socket.close();
-                } catch (IOException ex) {
-                    // at this stage we really don't care about why socket.close has failed
-                }
                 throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
                         ". Please make sure it's running.", e);
             }
