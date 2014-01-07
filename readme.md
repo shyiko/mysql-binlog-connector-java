@@ -56,6 +56,8 @@ try {
 
 ### Tapping into MySQL replication stream
 
+> PREREQUISITES: Whichever user you plan to use for the BinaryLogClient, he MUST have [REPLICATION SLAVE](http://dev.mysql.com/doc/refman/5.5/en/privileges-provided.html#priv_replication-slave) privilege. Unless you specify binlogFilename/binlogPosition yourself (in which case automatic resolution won't kick in), you'll need [REPLICATION CLIENT](http://dev.mysql.com/doc/refman/5.5/en/privileges-provided.html#priv_replication-client) granted as well.
+
 ```java
 BinaryLogClient client = new BinaryLogClient("hostname", 3306, "username", "password");
 client.registerEventListener(new EventListener() {
