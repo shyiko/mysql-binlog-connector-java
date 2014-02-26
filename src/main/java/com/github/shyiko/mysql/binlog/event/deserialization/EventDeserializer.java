@@ -76,6 +76,8 @@ public class EventDeserializer {
         eventDataDeserializers.put(EventType.EXT_DELETE_ROWS,
                 new DeleteRowsEventDataDeserializer(tableMapEventByTableId).
                         setMayContainExtraInformation(true));
+        eventDataDeserializers.put(EventType.ROWS_QUERY, new RowsQueryEventDataDeserializer());
+        eventDataDeserializers.put(EventType.GTID, new GtidEventDataDeserializer());
     }
 
     public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
