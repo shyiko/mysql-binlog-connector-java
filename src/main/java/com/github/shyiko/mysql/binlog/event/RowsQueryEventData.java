@@ -19,17 +19,17 @@ package com.github.shyiko.mysql.binlog.event;
  * @author <a href="mailto:pprasse@actindo.de">Patrick Prasse</a>
  */
 public class RowsQueryEventData implements EventData {
-        
+
     private String query;
 
     public String getQuery() {
         return query;
     }
-    
+
     public void setQuery(String query) {
         this.query = query;
     }
-    
+
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("RowsQueryEventData");

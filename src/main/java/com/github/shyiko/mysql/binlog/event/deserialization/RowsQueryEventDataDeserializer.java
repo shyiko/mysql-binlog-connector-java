@@ -31,5 +31,5 @@ public class RowsQueryEventDataDeserializer implements EventDataDeserializer<Row
         eventData.setQuery(inputStream.readString(len));
         return eventData;
     }
-    
+
 }
