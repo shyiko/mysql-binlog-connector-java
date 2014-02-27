@@ -88,7 +88,7 @@ mBeanServer.registerMBean(stats, statsObjectName);
 ## Implementation notes
 
 - data of numeric types (tinyint, etc) always returned signed(!) regardless of whether column definition includes "unsigned" keyword or not
-- data of *text/*blob types always returned as a byte array
+- data of \*text/\*blob types always returned as a byte array
 - timestamp is timezone-sensitive
 
 ## Documentation
