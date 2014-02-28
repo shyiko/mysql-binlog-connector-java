@@ -89,6 +89,7 @@ public class BinaryLogClientIntegrationTest {
                 Integer.parseInt(bundle.getString(prefix + "slave.port")),
                 bundle.getString(prefix + "slave.username"), bundle.getString(prefix + "slave.password"));
         client = new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password);
+        client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
         client.setKeepAlive(false);
         client.registerEventListener(new TraceEventListener());
         client.registerEventListener(eventListener = new CountDownEventListener());
