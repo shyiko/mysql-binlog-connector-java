@@ -22,6 +22,7 @@ public interface BinaryLogClientStatisticsMXBean {
 
     String getLastEvent();
     long getSecondsSinceLastEvent();
+    long getSecondsBehindMaster();
     long getTotalNumberOfEventsSeen();
     long getNumberOfSkippedEvents();
     long getNumberOfDisconnects();

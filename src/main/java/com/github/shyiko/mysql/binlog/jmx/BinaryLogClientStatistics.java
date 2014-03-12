@@ -56,6 +56,18 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     }
 
     @Override
+    public long getSecondsBehindMaster() {
+        // because lastEventHeader and timestampOfLastEvent are not guarded by the common lock
+        // we may get some "distorted" results, though shouldn't be a problem given the nature of the final value
+        long timestamp = timestampOfLastEvent.get();
+        EventHeader eventHeader = lastEventHeader.get();
+        if (timestamp == 0 || eventHeader == null) {
+            return -1;
+        }
+        return (timestamp - eventHeader.getTimestamp()) / 1000;
+    }
+
+    @Override
     public long getTotalNumberOfEventsSeen() {
         return totalNumberOfEventsSeen.get();
     }

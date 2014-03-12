@@ -37,6 +37,7 @@ public class BinaryLogClientStatisticsTest {
         BinaryLogClientStatistics statistics = new BinaryLogClientStatistics();
         assertNull(statistics.getLastEvent());
         assertEquals(statistics.getSecondsSinceLastEvent(), 0L);
+        assertEquals(statistics.getSecondsBehindMaster(), -1L);
         assertEquals(statistics.getTotalNumberOfEventsSeen(), 0L);
         assertEquals(statistics.getNumberOfSkippedEvents(), 0L);
         assertEquals(statistics.getNumberOfDisconnects(), 0L);
@@ -46,7 +47,7 @@ public class BinaryLogClientStatisticsTest {
     public void testOnEvent() throws Exception {
         BinaryLogClientStatistics statistics = new BinaryLogClientStatistics() {
 
-            private Queue<Long> responseQueue = new LinkedList<Long>(Arrays.<Long>asList(1L, 1010L));
+            private Queue<Long> responseQueue = new LinkedList<Long>(Arrays.<Long>asList(1L, 1010L, 3030L));
 
             @Override
             protected long getCurrentTimeMillis() {
@@ -58,17 +59,20 @@ public class BinaryLogClientStatisticsTest {
         assertEquals(statistics.getTotalNumberOfEventsSeen(), 0L);
         assertEquals(statistics.getNumberOfSkippedEvents(), 0L);
         assertEquals(statistics.getNumberOfDisconnects(), 0L);
-        statistics.onEvent(generateEvent(EventType.FORMAT_DESCRIPTION, 104, 1));
-        assertEquals(statistics.getLastEvent(), "FORMAT_DESCRIPTION/0 from server 1");
-        assertEquals(statistics.getSecondsSinceLastEvent(), 1);
+        statistics.onEvent(generateEvent(1L, EventType.FORMAT_DESCRIPTION, 1, 104)); // calls getCurrentTimeMillis
+        assertEquals(statistics.getLastEvent(), "FORMAT_DESCRIPTION/1 from server 1");
+        assertEquals(statistics.getSecondsSinceLastEvent(), 1); // calls getCurrentTimeMillis
+        assertEquals(statistics.getSecondsBehindMaster(), 0);
         assertEquals(statistics.getTotalNumberOfEventsSeen(), 1);
         assertEquals(statistics.getNumberOfSkippedEvents(), 0);
+        statistics.onEvent(generateEvent(1L, EventType.FORMAT_DESCRIPTION, 1, 104)); // calls getCurrentTimeMillis
+        assertEquals(statistics.getSecondsBehindMaster(), 3);
     }
 
     @Test
     public void testOnEventDeserializationFailure() throws Exception {
         BinaryLogClientStatistics statistics = new BinaryLogClientStatistics();
-        statistics.onEvent(generateEvent(EventType.FORMAT_DESCRIPTION, 104, 1));
+        statistics.onEvent(generateEvent(1L, EventType.FORMAT_DESCRIPTION, 1, 104));
         statistics.onEventDeserializationFailure(null, null);
         assertNull(statistics.getLastEvent());
         assertEquals(statistics.getTotalNumberOfEventsSeen(), 2L);
@@ -86,21 +90,23 @@ public class BinaryLogClientStatisticsTest {
     public void testReset() throws Exception {
         BinaryLogClientStatistics statistics = new BinaryLogClientStatistics();
         statistics.onEventDeserializationFailure(null, null);
-        statistics.onEvent(generateEvent(EventType.FORMAT_DESCRIPTION, 104, 1));
+        statistics.onEvent(generateEvent(1L, EventType.FORMAT_DESCRIPTION, 1, 104));
         statistics.onDisconnect(null);
         statistics.reset();
         assertNull(statistics.getLastEvent());
         assertEquals(statistics.getSecondsSinceLastEvent(), 0L);
+        assertEquals(statistics.getSecondsBehindMaster(), -1L);
         assertEquals(statistics.getTotalNumberOfEventsSeen(), 0L);
         assertEquals(statistics.getNumberOfSkippedEvents(), 0L);
         assertEquals(statistics.getNumberOfDisconnects(), 0L);
     }
 
-    private Event generateEvent(EventType type, long nextPosition, long serverId) {
+    private Event generateEvent(long timestamp, EventType type, long serverId, long nextPosition) {
         EventHeaderV4 header = new EventHeaderV4();
-        header.setEventType(EventType.FORMAT_DESCRIPTION);
-        header.setNextPosition(104);
-        header.setServerId(1);
+        header.setTimestamp(timestamp);
+        header.setEventType(type);
+        header.setServerId(serverId);
+        header.setNextPosition(nextPosition);
         return new Event(header, null);
     }
 }
