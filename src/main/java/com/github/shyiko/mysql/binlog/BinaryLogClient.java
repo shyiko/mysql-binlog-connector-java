@@ -444,14 +444,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 int packetLength = inputStream.readInteger(3);
                 inputStream.skip(1); // 1 byte for sequence
                 int marker = inputStream.read();
-                byte[] bytes = inputStream.read(packetLength - 1);
                 if (marker == 0xFF) {
-                    ErrorPacket errorPacket = new ErrorPacket(bytes);
+                    ErrorPacket errorPacket = new ErrorPacket(inputStream.read(packetLength - 1));
                     throw new IOException(errorPacket.getErrorCode() + " - " + errorPacket.getErrorMessage());
                 }
                 Event event;
                 try {
-                    event = eventDeserializer.nextEvent(new ByteArrayInputStream(bytes));
+                    event = eventDeserializer.nextEvent(inputStream);
                 } catch (Exception e) {
                     if (isConnected()) {
                         synchronized (lifecycleListeners) {

@@ -27,6 +27,7 @@ public class ByteArrayInputStream extends InputStream {
 
     private InputStream inputStream;
     private Integer peek;
+    private int blockLength = -1;
 
     public ByteArrayInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -155,11 +156,14 @@ public class ByteArrayInputStream extends InputStream {
 
     @Override
     public int available() throws IOException {
-        return inputStream.available(); // todo: may result in unexpected behavior in case of socket stream
+        if (blockLength != -1) {
+            return blockLength;
+        }
+        return inputStream.available();
     }
 
     public int peek() throws IOException {
-        this.peek = inputStream.read();
+        this.peek = readWithinBlockBoundaries();
         return peek;
     }
 
@@ -167,7 +171,7 @@ public class ByteArrayInputStream extends InputStream {
     public int read() throws IOException {
         int result;
         if (peek == null) {
-            result = inputStream.read();
+            result = readWithinBlockBoundaries();
         } else {
             result = peek;
             peek = null;
@@ -178,9 +182,30 @@ public class ByteArrayInputStream extends InputStream {
         return result;
     }
 
+    private int readWithinBlockBoundaries() throws IOException {
+        if (blockLength != -1) {
+            if (blockLength == 0) {
+                return -1;
+            }
+            blockLength--;
+        }
+        return inputStream.read();
+    }
+
     @Override
     public void close() throws IOException {
         inputStream.close();
+    }
+
+    public void enterBlock(int length) {
+        this.blockLength = length < -1 ? -1 : length;
+    }
+
+    public void skipToTheEndOfTheBlock() throws IOException {
+        if (blockLength != -1) {
+            skip(blockLength);
+            blockLength = -1;
+        }
     }
 
 }

@@ -47,8 +47,8 @@ public class EventDeserializer {
     ) {
         this.eventHeaderDeserializer = eventHeaderDeserializer;
         this.defaultEventDataDeserializer = defaultEventDataDeserializer;
-        this.eventDataDeserializers = eventDataDeserializers;
         this.tableMapEventByTableId = tableMapEventByTableId;
+        this.eventDataDeserializers = eventDataDeserializers;
     }
 
     public EventDeserializer() {
@@ -95,38 +95,34 @@ public class EventDeserializer {
         if (inputStream.peek() == -1) {
             return null;
         }
-        // todo: maintain header length from FormatDescriptionEvent
         EventHeader eventHeader = eventHeaderDeserializer.deserialize(inputStream);
-/*
-        long originalPosition = inputStream.position();
-*/
-        EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
-        int eventBodyLength = (int) eventHeader.getDataLength() - checksumLength;
-        // todo: according to http://dev.mysql.com/worklog/task/?id=2540 FormatDescriptionEvent contains
-        // checksum algorithm descriptor. use it instead of this.setChecksumType(ChecksumType checksumType)
-
-        EventData eventData;
-        try {
-            // todo: pass original input stream in
-            eventData = eventDataDeserializer.deserialize(
-                new ByteArrayInputStream(inputStream.read(eventBodyLength)));
-        } catch (IOException e) {
-            throw new EventDataDeserializationException(eventHeader, e);
-        }
-/*
-        long unreadEventData = originalPosition + (eventHeader.getEventLength() - 19) -
-                inputStream.position();
-        if (unreadEventData < 0) {
-            throw new IOException(eventDataDeserializer.getClass().getSimpleName() + " read " + (-1 * unreadEventData) +
-                    " byte(s) more than should have");
-        }
-        inputStream.skip(unreadEventData);
-*/
+        EventData eventData = deserializeEventData(inputStream, eventHeader);
         if (eventHeader.getEventType() == EventType.TABLE_MAP) {
             TableMapEventData tableMapEvent = (TableMapEventData) eventData;
             tableMapEventByTableId.put(tableMapEvent.getTableId(), tableMapEvent);
         }
         return new Event(eventHeader, eventData);
+    }
+
+    private EventData deserializeEventData(ByteArrayInputStream inputStream, EventHeader eventHeader)
+            throws EventDataDeserializationException {
+        EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
+        // todo: use checksum algorithm descriptor from FormatDescriptionEvent
+        // (as per http://dev.mysql.com/worklog/task/?id=2540)
+        int eventBodyLength = (int) eventHeader.getDataLength() - checksumLength;
+        EventData eventData;
+        try {
+            inputStream.enterBlock(eventBodyLength);
+            try {
+                eventData = eventDataDeserializer.deserialize(inputStream);
+            } finally {
+                inputStream.skipToTheEndOfTheBlock();
+                inputStream.skip(checksumLength);
+            }
+        } catch (IOException e) {
+            throw new EventDataDeserializationException(eventHeader, e);
+        }
+        return eventData;
     }
 
     private EventDataDeserializer getEventDataDeserializer(EventType eventType) {
