@@ -107,6 +107,14 @@ mvn # shows how to build, test, etc. project
 
 * [rook](https://github.com/shyiko/rook) - Change Data Capture (CDC) toolkit for keeping system layers in sync with the database.
 
+## Contributing
+
+In lieu of a formal styleguide, please take care to maintain the existing coding style.  
+Executing `mvn checkstyle:check` within project directory should not produce any errors.  
+If you are willing to install [vagrant](http://www.vagrantup.com/) (required by integration tests) it's highly recommended
+to check (with `mvn clean verify`) that there are no test failures before sending a pull request.  
+Additional tests for any new or changed functionality are also very welcomed.
+
 ## License
 
 [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
