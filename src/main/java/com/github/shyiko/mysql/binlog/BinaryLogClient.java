@@ -95,7 +95,7 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
      */
     public void connect(long timeoutInMilliseconds) throws IOException, TimeoutException {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
-        AbstractLifecycleListener connectListener = new BinaryLogClient.AbstractLifecycleListener() {
+        AbstractLifecycleListener connectListener = new AbstractLifecycleListener() {
             @Override
             public void onConnect(BinaryLogClient client) {
                 countDownLatch.countDown();
