@@ -37,10 +37,10 @@ import java.util.logging.Logger;
  */
 public class BinaryLogClient extends AbstractBinaryLogClient {
 
+    private final Logger logger = Logger.getLogger(getClass().getName());
     private final List<EventListener> eventListeners = new LinkedList<EventListener>();
     private final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
     private ThreadFactory threadFactory;
-    private final Logger logger = Logger.getLogger(getClass().getName());
 
     /**
      * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
@@ -90,12 +90,12 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
      * Connect to the replication stream in a separate thread.
      * @param timeoutInMilliseconds timeout in milliseconds
      * @throws com.github.shyiko.mysql.binlog.network.AuthenticationException in case of failed authentication
-     * @throws java.io.IOException if anything goes wrong while trying to connect
-     * @throws java.util.concurrent.TimeoutException if client wasn't able to connect in the requested period of time
+     * @throws IOException if anything goes wrong while trying to connect
+     * @throws TimeoutException if client wasn't able to connect in the requested period of time
      */
     public void connect(long timeoutInMilliseconds) throws IOException, TimeoutException {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
-        BinaryLogClient.AbstractLifecycleListener connectListener = new BinaryLogClient.AbstractLifecycleListener() {
+        AbstractLifecycleListener connectListener = new BinaryLogClient.AbstractLifecycleListener() {
             @Override
             public void onConnect(BinaryLogClient client) {
                 countDownLatch.countDown();
