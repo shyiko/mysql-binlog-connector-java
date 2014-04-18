@@ -284,7 +284,6 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
 
         /**
          * Called once client has successfully logged in but before started to receive binlog events.
-         * @param client
          */
         void onConnect(BinaryLogClient client);
 
@@ -302,7 +301,6 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
 
         /**
          * Called upon disconnect (regardless of the reason).
-         * @param client
          */
         void onDisconnect(BinaryLogClient client);
     }
@@ -328,90 +326,6 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
         public void onDisconnect(BinaryLogClient client) {
         }
 
-    }
-
-    /**
-     * A {@link LifecycleListener} that rebroadcasts events to a dynamic list of children.
-     */
-    public static class BroadcastLifecycleListener implements LifecycleListener {
-        private final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
-
-        @Override
-        public void onConnect(BinaryLogClient client) {
-            synchronized (lifecycleListeners) {
-                for (LifecycleListener listener : lifecycleListeners) {
-                    listener.onConnect(client);
-                }
-            }
-        }
-
-        @Override
-        public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
-            synchronized (lifecycleListeners) {
-                for (LifecycleListener listener : lifecycleListeners) {
-                    listener.onCommunicationFailure(client, ex);
-                }
-            }
-        }
-
-        @Override
-        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
-            synchronized (lifecycleListeners) {
-                for (LifecycleListener listener : lifecycleListeners) {
-                    listener.onEventDeserializationFailure(client, ex);
-                }
-            }
-        }
-
-        @Override
-        public void onDisconnect(BinaryLogClient client) {
-            synchronized (lifecycleListeners) {
-                for (LifecycleListener listener : lifecycleListeners) {
-                    listener.onDisconnect(client);
-                }
-            }
-        }
-
-        /**
-         * @return registered lifecycle listeners
-         */
-        public List<LifecycleListener> getLifecycleListeners() {
-            return Collections.unmodifiableList(lifecycleListeners);
-        }
-
-        /**
-         * Register lifecycle listener. Note that multiple lifecycle listeners will be called in order they
-         * where registered.
-         */
-        public void registerLifecycleListener(LifecycleListener listener) {
-            synchronized (lifecycleListeners) {
-                lifecycleListeners.add(listener);
-            }
-        }
-
-        /**
-         * Unregister all lifecycle listener of specific type.
-         */
-        public synchronized void unregisterLifecycleListener(Class<? extends LifecycleListener> listenerClass) {
-            synchronized (lifecycleListeners) {
-                Iterator<LifecycleListener> iterator = lifecycleListeners.iterator();
-                while (iterator.hasNext()) {
-                    LifecycleListener lifecycleListener = iterator.next();
-                    if (listenerClass.isInstance(lifecycleListener)) {
-                        iterator.remove();
-                    }
-                }
-            }
-        }
-
-        /**
-         * Unregister single lifecycle listener.
-         */
-        public synchronized void unregisterLifecycleListener(LifecycleListener listener) {
-            synchronized (lifecycleListeners) {
-                lifecycleListeners.remove(listener);
-            }
-        }
     }
 
 }
