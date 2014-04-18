@@ -15,6 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog.jmx;
 
+import com.github.shyiko.mysql.binlog.AbstractBinaryLogClient;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
@@ -99,7 +100,7 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     }
 
     @Override
-    public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
+    public void onEventDeserializationFailure(AbstractBinaryLogClient client, Exception ex) {
         numberOfSkippedEvents.getAndIncrement();
         lastEventHeader.set(null);
         timestampOfLastEvent.set(getCurrentTimeMillis());
@@ -107,16 +108,16 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     }
 
     @Override
-    public void onDisconnect(BinaryLogClient client) {
+    public void onDisconnect(AbstractBinaryLogClient client) {
         numberOfDisconnects.getAndIncrement();
     }
 
     @Override
-    public void onConnect(BinaryLogClient client) {
+    public void onConnect(AbstractBinaryLogClient client) {
     }
 
     @Override
-    public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
+    public void onCommunicationFailure(AbstractBinaryLogClient client, Exception ex) {
     }
 
     protected long getCurrentTimeMillis() {
