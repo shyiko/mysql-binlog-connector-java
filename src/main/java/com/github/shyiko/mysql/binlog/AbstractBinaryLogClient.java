@@ -200,7 +200,7 @@ public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition);
         }
-        getLifecycleListener().onConnect(this);
+        onConnect();
         if (keepAlive && !isKeepAliveThreadRunning()) {
             spawnKeepAliveThread();
         }
@@ -321,7 +321,7 @@ public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
                     event = eventDeserializer.nextEvent(inputStream);
                 } catch (Exception e) {
                     if (isConnected()) {
-                        getLifecycleListener().onEventDeserializationFailure(this, e);
+                        onEventDeserializationFailure(e);
                     }
                     continue;
                 }
@@ -332,7 +332,7 @@ public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
             }
         } catch (Exception e) {
             if (isConnected()) {
-                getLifecycleListener().onCommunicationFailure(this, e);
+                onCommunicationFailure(e);
             }
         } finally {
             if (isConnected()) {
@@ -369,7 +369,7 @@ public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void notifyEventListener(Event event) {
-        getEventListener().onEvent(event);
+        onEvent(event);
     }
 
     /**
@@ -415,12 +415,34 @@ public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
                 channel.close();
             }
         } finally {
-            getLifecycleListener().onDisconnect(this);
+            onDisconnect();
         }
     }
 
-    public abstract BinaryLogClient.LifecycleListener getLifecycleListener();
+    /**
+     * Invoked once for each {@link Event}, in the order they are processed.
+     */
+    protected abstract void onEvent(Event event);
 
-    public abstract BinaryLogClient.EventListener getEventListener();
+    /**
+     * Invoked when a connection is established.
+     */
+    protected abstract void onConnect();
+
+    /**
+     * It's guarantied to be called before {@link #onDisconnect()}) in case of communication failure.
+     */
+    protected abstract void onCommunicationFailure(Exception ex);
+
+    /**
+     * Called in case of failed event deserialization. Note this type of error does NOT cause client to
+     * disconnect. If you wish to stop receiving events you'll need to fire client.disconnect() manually.
+     */
+    protected abstract void onEventDeserializationFailure(Exception ex);
+
+    /**
+     * Called upon disconnect (regardless of the reason).
+     */
+    protected abstract void onDisconnect();
 
 }

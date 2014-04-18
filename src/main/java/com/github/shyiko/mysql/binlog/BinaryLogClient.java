@@ -16,43 +16,17 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventHeader;
-import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
-import com.github.shyiko.mysql.binlog.event.EventType;
-import com.github.shyiko.mysql.binlog.event.RotateEventData;
-import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
-import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
-import com.github.shyiko.mysql.binlog.network.AuthenticationException;
-import com.github.shyiko.mysql.binlog.network.SocketFactory;
-import com.github.shyiko.mysql.binlog.network.protocol.ErrorPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
-import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.PingCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 
-import java.io.EOFException;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -126,7 +100,7 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
         BinaryLogClient.AbstractLifecycleListener connectListener = new BinaryLogClient.AbstractLifecycleListener() {
             @Override
-            public void onConnect(AbstractBinaryLogClient client) {
+            public void onConnect(BinaryLogClient client) {
                 countDownLatch.countDown();
             }
         };
@@ -164,8 +138,8 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
     }
 
     @Override
-    public EventListener getEventListener() {
-        return eventListener;
+    protected void onEvent(Event event) {
+        eventListener.onEvent(event);
     }
 
     /**
@@ -197,9 +171,25 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
         eventListener.unregisterEventListener(listener);
     }
 
+
     @Override
-    public LifecycleListener getLifecycleListener() {
-        return lifecycleListener;
+    protected void onConnect() {
+        lifecycleListener.onConnect(this);
+    }
+
+    @Override
+    protected void onCommunicationFailure(Exception ex) {
+        lifecycleListener.onCommunicationFailure(this, ex);
+    }
+
+    @Override
+    protected void onEventDeserializationFailure(Exception ex) {
+        lifecycleListener.onEventDeserializationFailure(this, ex);
+    }
+
+    @Override
+    protected void onDisconnect() {
+        lifecycleListener.onDisconnect(this);
     }
 
     /**
@@ -239,9 +229,16 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
         void onEvent(Event event);
     }
 
+    /**
+     * An {@link EventListener} that rebroadcasts events to a dynamically managed list of other event listeners.
+     */
     public class BroadcastEventListener implements EventListener {
         private final List<EventListener> eventListeners = new LinkedList<EventListener>();
 
+        /**
+         * Rebroadcast the event to the child listeners.  If any of the children throws an exception, we log it and
+         * continue with the next one.
+         */
         @Override
         public void onEvent(Event event) {
             for (BinaryLogClient.EventListener eventListener : eventListeners) {
@@ -305,25 +302,27 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
 
         /**
          * Called once client has successfully logged in but before started to receive binlog events.
+         * @param client
          */
-        void onConnect(AbstractBinaryLogClient client);
+        void onConnect(BinaryLogClient client);
 
         /**
-         * It's guarantied to be called before {@link #onDisconnect(AbstractBinaryLogClient)}) in case of
+         * It's guarantied to be called before {@link #onDisconnect(BinaryLogClient)}) in case of
          * communication failure.
          */
-        void onCommunicationFailure(AbstractBinaryLogClient client, Exception ex);
+        void onCommunicationFailure(BinaryLogClient client, Exception ex);
 
         /**
          * Called in case of failed event deserialization. Note this type of error does NOT cause client to
          * disconnect. If you wish to stop receiving events you'll need to fire client.disconnect() manually.
          */
-        void onEventDeserializationFailure(AbstractBinaryLogClient client, Exception ex);
+        void onEventDeserializationFailure(BinaryLogClient client, Exception ex);
 
         /**
          * Called upon disconnect (regardless of the reason).
+         * @param client
          */
-        void onDisconnect(AbstractBinaryLogClient client);
+        void onDisconnect(BinaryLogClient client);
     }
 
     /**
@@ -332,44 +331,63 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
     public static abstract class AbstractLifecycleListener implements LifecycleListener {
 
         @Override
-        public void onConnect(AbstractBinaryLogClient client) {
+        public void onConnect(BinaryLogClient client) {
         }
 
         @Override
-        public void onCommunicationFailure(AbstractBinaryLogClient client, Exception ex) {
+        public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
         }
 
         @Override
-        public void onEventDeserializationFailure(AbstractBinaryLogClient client, Exception ex) {
+        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
         }
 
         @Override
-        public void onDisconnect(AbstractBinaryLogClient client) {
+        public void onDisconnect(BinaryLogClient client) {
         }
 
     }
 
+    /**
+     * A {@link LifecycleListener} that rebroadcasts events to a dynamic list of children.
+     */
     public static class BroadcastLifecycleListener implements LifecycleListener {
         final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
 
         @Override
-        public void onConnect(AbstractBinaryLogClient client) {
-            throw new UnsupportedOperationException("UNIMPLEMENTED"); // TODO
+        public void onConnect(BinaryLogClient client) {
+            synchronized(lifecycleListeners) {
+                for (LifecycleListener listener : lifecycleListeners) {
+                    listener.onConnect(client);
+                }
+            }
         }
 
         @Override
-        public void onCommunicationFailure(AbstractBinaryLogClient client, Exception ex) {
-            throw new UnsupportedOperationException("UNIMPLEMENTED"); // TODO
+        public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
+            synchronized(lifecycleListeners) {
+                for (LifecycleListener listener : lifecycleListeners) {
+                    listener.onCommunicationFailure(client, ex);
+                }
+            }
         }
 
         @Override
-        public void onEventDeserializationFailure(AbstractBinaryLogClient client, Exception ex) {
-            throw new UnsupportedOperationException("UNIMPLEMENTED"); // TODO
+        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
+            synchronized(lifecycleListeners) {
+                for (LifecycleListener listener : lifecycleListeners) {
+                    listener.onEventDeserializationFailure(client, ex);
+                }
+            }
         }
 
         @Override
-        public void onDisconnect(AbstractBinaryLogClient client) {
-            throw new UnsupportedOperationException("UNIMPLEMENTED"); // TODO
+        public void onDisconnect(BinaryLogClient client) {
+            synchronized(lifecycleListeners) {
+                for (LifecycleListener listener : lifecycleListeners) {
+                    listener.onDisconnect(client);
+                }
+            }
         }
 
         /**
