@@ -42,7 +42,6 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
     private ThreadFactory threadFactory;
     private final Logger logger = Logger.getLogger(getClass().getName());
 
-
     /**
      * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
      * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
@@ -86,8 +85,6 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
     public void setThreadFactory(ThreadFactory threadFactory) {
         this.threadFactory = threadFactory;
     }
-
-
 
     /**
      * Connect to the replication stream in a separate thread.
@@ -170,7 +167,6 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
     public void unregisterEventListener(EventListener listener) {
         eventListener.unregisterEventListener(listener);
     }
-
 
     @Override
     protected void onConnect() {
@@ -354,11 +350,11 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
      * A {@link LifecycleListener} that rebroadcasts events to a dynamic list of children.
      */
     public static class BroadcastLifecycleListener implements LifecycleListener {
-        final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
+        private final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
 
         @Override
         public void onConnect(BinaryLogClient client) {
-            synchronized(lifecycleListeners) {
+            synchronized (lifecycleListeners) {
                 for (LifecycleListener listener : lifecycleListeners) {
                     listener.onConnect(client);
                 }
@@ -367,7 +363,7 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
 
         @Override
         public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
-            synchronized(lifecycleListeners) {
+            synchronized (lifecycleListeners) {
                 for (LifecycleListener listener : lifecycleListeners) {
                     listener.onCommunicationFailure(client, ex);
                 }
@@ -376,7 +372,7 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
 
         @Override
         public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
-            synchronized(lifecycleListeners) {
+            synchronized (lifecycleListeners) {
                 for (LifecycleListener listener : lifecycleListeners) {
                     listener.onEventDeserializationFailure(client, ex);
                 }
@@ -385,7 +381,7 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
 
         @Override
         public void onDisconnect(BinaryLogClient client) {
-            synchronized(lifecycleListeners) {
+            synchronized (lifecycleListeners) {
                 for (LifecycleListener listener : lifecycleListeners) {
                     listener.onDisconnect(client);
                 }

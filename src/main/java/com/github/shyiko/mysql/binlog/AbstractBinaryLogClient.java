@@ -1,6 +1,25 @@
+/*
+ * Copyright 2013 Stanley Shyiko
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.github.shyiko.mysql.binlog;
 
-import com.github.shyiko.mysql.binlog.event.*;
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventHeader;
+import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
+import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
@@ -23,15 +42,19 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * @author Luis Casillas
+ * Abstract base class for MySQL replication stream client.
+ *
+ * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
     protected final String hostname;
@@ -53,7 +76,6 @@ public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
     private long keepAliveConnectTimeout = TimeUnit.SECONDS.toMillis(3);
     private volatile ThreadPoolExecutor keepAliveThreadExecutor;
     private long keepAliveThreadShutdownTimeout = TimeUnit.SECONDS.toMillis(6);
-
 
     public AbstractBinaryLogClient(String username, int port, String hostname, String password, String schema) {
         this.username = username;
@@ -265,7 +287,6 @@ public abstract class AbstractBinaryLogClient implements BinaryLogClientMXBean {
     protected boolean isKeepAliveThreadRunning() {
         return keepAliveThreadExecutor != null && !keepAliveThreadExecutor.isShutdown();
     }
-
 
     /**
      * @return true if client is connected, false otherwise
