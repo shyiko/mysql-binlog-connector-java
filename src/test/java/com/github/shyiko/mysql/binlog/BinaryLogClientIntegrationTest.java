@@ -201,6 +201,8 @@ public class BinaryLogClientIntegrationTest {
             new java.sql.Date(generateTime(1989, 3, 21, 0, 0, 0, 0))});
         assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000000'"), new Serializable[]{
             new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 0))});
+        // FIXME: '1989-03-18 01:02:03.000000' fails in the America/Los_Angeles timezone (Daylight Saving Time)
+        // '1989-05-18 01:02:03.000000' passes
         assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000000'"), new Serializable[]{
             new java.sql.Timestamp(generateTime(1989, 3, 18, 1, 2, 3, 0))});
         assertEquals(writeAndCaptureRow("time", "'1:2:3.000000'"), new Serializable[]{
