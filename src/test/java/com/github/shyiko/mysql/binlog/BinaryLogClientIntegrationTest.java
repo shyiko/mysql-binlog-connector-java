@@ -558,8 +558,10 @@ public class BinaryLogClientIntegrationTest {
                     // fixing connection timezone to the "client's one"
                     TimeZone currentTimeZone = TimeZone.getDefault();
                     int offset = currentTimeZone.getRawOffset() + currentTimeZone.getDSTSavings();
-                    String timeZoneAsAString = String.format("%s%02d:%02d", offset >= 0 ? "+" : "-", offset / 3600000,
-                        (offset / 60000) % 60);
+                    String timeZoneAsAString = String.format("%s%02d:%02d",
+                                                             offset >= 0 ? "+" : "-",
+                                                             Math.abs(offset / 3600000),
+                                                             (offset / 60000) % 60);
                     statement.execute("SET time_zone = '" + timeZoneAsAString + "'");
                 }
             });
