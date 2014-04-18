@@ -240,13 +240,15 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
          * continue with the next one.
          */
         @Override
-        public void onEvent(Event event) {
-            for (BinaryLogClient.EventListener eventListener : eventListeners) {
-                try {
-                    eventListener.onEvent(event);
-                } catch (Exception e) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.log(Level.WARNING, eventListener + " choked on " + event, e);
+        public synchronized void onEvent(Event event) {
+            synchronized (eventListeners) {
+                for (BinaryLogClient.EventListener eventListener : eventListeners) {
+                    try {
+                        eventListener.onEvent(event);
+                    } catch (Exception e) {
+                        if (logger.isLoggable(Level.WARNING)) {
+                            logger.log(Level.WARNING, eventListener + " choked on " + event, e);
+                        }
                     }
                 }
             }
