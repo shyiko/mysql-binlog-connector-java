@@ -462,7 +462,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     continue;
                 }
                 if (isConnected()) {
-                    notifyEventListeners(event);
+                    synchronized (eventListeners) {
+                        notifyEventListeners(eventListeners, event);
+                    }
                     updateClientBinlogFilenameAndPosition(event);
                 }
             }
@@ -549,15 +551,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private void notifyEventListeners(Event event) {
-        synchronized (eventListeners) {
-            for (EventListener eventListener : eventListeners) {
-                try {
-                    eventListener.onEvent(event);
-                } catch (Exception e) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.log(Level.WARNING, eventListener + " choked on " + event, e);
-                    }
+    protected void notifyEventListeners(List<EventListener> eventListeners, Event event) {
+        for (EventListener eventListener : eventListeners) {
+            try {
+                eventListener.onEvent(event);
+            } catch (Exception e) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.log(Level.WARNING, eventListener + " choked on " + event, e);
                 }
             }
         }
