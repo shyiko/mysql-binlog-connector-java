@@ -37,8 +37,8 @@ import java.util.logging.Logger;
  */
 public class BinaryLogClient extends AbstractBinaryLogClient {
 
-    private final BroadcastEventListener eventListener = new BroadcastEventListener();
-    private final BroadcastLifecycleListener lifecycleListener = new BroadcastLifecycleListener();
+    private final List<EventListener> eventListeners = new LinkedList<EventListener>();
+    private final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
     private ThreadFactory threadFactory;
     private final Logger logger = Logger.getLogger(getClass().getName());
 
@@ -134,87 +134,139 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
         }
     }
 
-    @Override
-    protected void onEvent(Event event) {
-        eventListener.onEvent(event);
-    }
-
     /**
      * @return registered event listeners
      */
     public List<EventListener> getEventListeners() {
-        return eventListener.getEventListeners();
+        return Collections.unmodifiableList(eventListeners);
     }
 
     /**
      * Register event listener. Note that multiple event listeners will be called in order they
      * where registered.
      */
-    public void registerEventListener(EventListener listener) {
-        eventListener.registerEventListener(listener);
+    public void registerEventListener(EventListener eventListener) {
+        synchronized (eventListeners) {
+            eventListeners.add(eventListener);
+        }
     }
 
     /**
      * Unregister all event listener of specific type.
      */
     public void unregisterEventListener(Class<? extends EventListener> listenerClass) {
-        eventListener.unregisterEventListener(listenerClass);
+        synchronized (eventListeners) {
+            Iterator<EventListener> iterator = eventListeners.iterator();
+            while (iterator.hasNext()) {
+                EventListener eventListener = iterator.next();
+                if (listenerClass.isInstance(eventListener)) {
+                    iterator.remove();
+                }
+            }
+        }
     }
 
     /**
      * Unregister single event listener.
      */
-    public void unregisterEventListener(EventListener listener) {
-        eventListener.unregisterEventListener(listener);
+    public void unregisterEventListener(EventListener eventListener) {
+        synchronized (eventListeners) {
+            eventListeners.remove(eventListener);
+        }
     }
 
     @Override
-    protected void onConnect() {
-        lifecycleListener.onConnect(this);
-    }
-
-    @Override
-    protected void onCommunicationFailure(Exception ex) {
-        lifecycleListener.onCommunicationFailure(this, ex);
-    }
-
-    @Override
-    protected void onEventDeserializationFailure(Exception ex) {
-        lifecycleListener.onEventDeserializationFailure(this, ex);
-    }
-
-    @Override
-    protected void onDisconnect() {
-        lifecycleListener.onDisconnect(this);
+    protected void onEvent(Event event) {
+        synchronized (eventListeners) {
+            for (EventListener eventListener : eventListeners) {
+                try {
+                    eventListener.onEvent(event);
+                } catch (Exception e) {
+                    if (logger.isLoggable(Level.WARNING)) {
+                        logger.log(Level.WARNING, eventListener + " choked on " + event, e);
+                    }
+                }
+            }
+        }
     }
 
     /**
      * @return registered lifecycle listeners
      */
     public List<LifecycleListener> getLifecycleListeners() {
-        return lifecycleListener.getLifecycleListeners();
+        return Collections.unmodifiableList(lifecycleListeners);
     }
 
     /**
      * Register lifecycle listener. Note that multiple lifecycle listeners will be called in order they
      * where registered.
      */
-    public void registerLifecycleListener(LifecycleListener listener) {
-        lifecycleListener.registerLifecycleListener(listener);
+    public void registerLifecycleListener(LifecycleListener lifecycleListener) {
+        synchronized (lifecycleListeners) {
+            lifecycleListeners.add(lifecycleListener);
+        }
     }
 
     /**
      * Unregister all lifecycle listener of specific type.
      */
     public synchronized void unregisterLifecycleListener(Class<? extends LifecycleListener> listenerClass) {
-        lifecycleListener.unregisterLifecycleListener(listenerClass);
+        synchronized (lifecycleListeners) {
+            Iterator<LifecycleListener> iterator = lifecycleListeners.iterator();
+            while (iterator.hasNext()) {
+                LifecycleListener lifecycleListener = iterator.next();
+                if (listenerClass.isInstance(lifecycleListener)) {
+                    iterator.remove();
+                }
+            }
+        }
     }
 
     /**
      * Unregister single lifecycle listener.
      */
-    public synchronized void unregisterLifecycleListener(LifecycleListener listener) {
-        lifecycleListener.unregisterLifecycleListener(listener);
+    public synchronized void unregisterLifecycleListener(LifecycleListener eventListener) {
+        synchronized (lifecycleListeners) {
+            lifecycleListeners.remove(eventListener);
+        }
+    }
+
+    @Override
+    protected void onConnect() {
+        synchronized (lifecycleListeners) {
+            for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                lifecycleListener.onConnect(this);
+            }
+        }
+    }
+
+    @Override
+    protected void onCommunicationFailure(Exception ex) {
+        synchronized (lifecycleListeners) {
+            for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                lifecycleListener.onCommunicationFailure(this, ex);
+            }
+        }
+
+    }
+
+    @Override
+    protected void onEventDeserializationFailure(Exception ex) {
+        synchronized (lifecycleListeners) {
+            for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                lifecycleListener.onEventDeserializationFailure(this, ex);
+            }
+        }
+
+    }
+
+    @Override
+    protected void onDisconnect() {
+        synchronized (lifecycleListeners) {
+            for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                lifecycleListener.onDisconnect(this);
+            }
+        }
     }
 
     /**
@@ -223,74 +275,6 @@ public class BinaryLogClient extends AbstractBinaryLogClient {
     public interface EventListener {
 
         void onEvent(Event event);
-    }
-
-    /**
-     * An {@link EventListener} that rebroadcasts events to a dynamically managed list of other event listeners.
-     */
-    public class BroadcastEventListener implements EventListener {
-        private final List<EventListener> eventListeners = new LinkedList<EventListener>();
-
-        /**
-         * Rebroadcast the event to the child listeners.  If any of the children throws an exception, we log it and
-         * continue with the next one.
-         */
-        @Override
-        public synchronized void onEvent(Event event) {
-            synchronized (eventListeners) {
-                for (BinaryLogClient.EventListener eventListener : eventListeners) {
-                    try {
-                        eventListener.onEvent(event);
-                    } catch (Exception e) {
-                        if (logger.isLoggable(Level.WARNING)) {
-                            logger.log(Level.WARNING, eventListener + " choked on " + event, e);
-                        }
-                    }
-                }
-            }
-        }
-
-        /**
-         * @return registered event listeners
-         */
-        public List<EventListener> getEventListeners() {
-            return Collections.unmodifiableList(eventListeners);
-        }
-
-        /**
-         * Register event listener. Note that multiple event listeners will be called in order they
-         * where registered.
-         */
-        public void registerEventListener(EventListener eventListener) {
-            synchronized (eventListeners) {
-                eventListeners.add(eventListener);
-            }
-        }
-
-        /**
-         * Unregister all event listener of specific type.
-         */
-        public void unregisterEventListener(Class<? extends EventListener> listenerClass) {
-            synchronized (eventListeners) {
-                Iterator<EventListener> iterator = eventListeners.iterator();
-                while (iterator.hasNext()) {
-                    EventListener eventListener = iterator.next();
-                    if (listenerClass.isInstance(eventListener)) {
-                        iterator.remove();
-                    }
-                }
-            }
-        }
-
-        /**
-         * Unregister single event listener.
-         */
-        public void unregisterEventListener(EventListener eventListener) {
-            synchronized (eventListeners) {
-                eventListeners.remove(eventListener);
-            }
-        }
-
     }
 
     /**
