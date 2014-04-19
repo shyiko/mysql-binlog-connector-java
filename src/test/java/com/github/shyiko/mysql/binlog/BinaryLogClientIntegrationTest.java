@@ -74,12 +74,15 @@ public class BinaryLogClientIntegrationTest {
         logger.setLevel(Level.FINEST);
     }
 
+    private final TimeZone timeZoneBeforeTheTest = TimeZone.getDefault();
+
     private MySQLConnection master, slave;
     private BinaryLogClient client;
     private CountDownEventListener eventListener;
 
     @BeforeClass
     public void setUp() throws Exception {
+        TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
         ResourceBundle bundle = ResourceBundle.getBundle("jdbc");
         String prefix = "jdbc.mysql.replication.";
         master = new MySQLConnection(bundle.getString(prefix + "master.hostname"),
@@ -517,6 +520,7 @@ public class BinaryLogClientIntegrationTest {
 
     @AfterClass(alwaysRun = true)
     public void tearDown() throws Exception {
+        TimeZone.setDefault(timeZoneBeforeTheTest);
         try {
             if (client != null) {
                 client.disconnect();
@@ -555,12 +559,7 @@ public class BinaryLogClientIntegrationTest {
 
                 @Override
                 public void execute(Statement statement) throws SQLException {
-                    // fixing connection timezone to the "client's one"
-                    TimeZone currentTimeZone = TimeZone.getDefault();
-                    int offset = currentTimeZone.getRawOffset() + currentTimeZone.getDSTSavings();
-                    String timeZoneAsAString = String.format("%s%02d:%02d", offset >= 0 ? "+" : "-", offset / 3600000,
-                        (offset / 60000) % 60);
-                    statement.execute("SET time_zone = '" + timeZoneAsAString + "'");
+                    statement.execute("SET time_zone = '+00:00'");
                 }
             });
         }
