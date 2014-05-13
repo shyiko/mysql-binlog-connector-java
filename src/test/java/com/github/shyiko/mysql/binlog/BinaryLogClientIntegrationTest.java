@@ -16,10 +16,16 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
+import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventHeaderV4Deserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import org.mockito.InOrder;
 import org.testng.annotations.AfterClass;
@@ -29,10 +35,12 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.Closeable;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.net.SocketException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -439,6 +447,94 @@ public class BinaryLogClientIntegrationTest {
             }
         } finally {
             tcpReverseProxy.unbind();
+        }
+    }
+
+    @Test
+    public void testEOFExceptionTriggersReconnectIfKeepAliveIsOn() throws Exception {
+        testCommunicationFailureInTheMiddleOfEventHeaderDeserialization(new EOFException());
+        testCommunicationFailureInTheMiddleOfEventDataDeserialization(new EventDataDeserializationException(null,
+                new EOFException()));
+    }
+
+    @Test
+    public void testSocketExceptionTriggersReconnectIfKeepAliveIsOn() throws Exception {
+        testCommunicationFailureInTheMiddleOfEventHeaderDeserialization(new SocketException());
+        testCommunicationFailureInTheMiddleOfEventDataDeserialization(new EventDataDeserializationException(null,
+                new SocketException()));
+    }
+
+    private void testCommunicationFailureInTheMiddleOfEventHeaderDeserialization(final IOException ex)
+            throws Exception {
+        testCommunicationFailure(new EventDeserializer(new EventHeaderV4Deserializer() {
+
+            private boolean failureSimulated;
+
+            @Override
+            public EventHeaderV4 deserialize(ByteArrayInputStream inputStream) throws IOException {
+                EventHeaderV4 eventHeader = super.deserialize(inputStream);
+                if (eventHeader.getEventType() == EventType.QUERY && !failureSimulated) {
+                    failureSimulated = true;
+                    throw ex;
+                }
+                return eventHeader;
+            }
+        }));
+    }
+
+    private void testCommunicationFailureInTheMiddleOfEventDataDeserialization(final IOException ex) throws Exception {
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        eventDeserializer.setEventDataDeserializer(EventType.QUERY, new QueryEventDataDeserializer() {
+
+            private boolean failureSimulated;
+
+            @Override
+            public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
+                QueryEventData eventData = super.deserialize(inputStream);
+                if (!failureSimulated) {
+                    failureSimulated = true;
+                    throw new SocketException();
+                }
+                return eventData;
+            }
+        });
+        testCommunicationFailure(eventDeserializer);
+    }
+
+    private void testCommunicationFailure(EventDeserializer eventDeserializer) throws Exception {
+        try {
+            client.disconnect();
+            final BinaryLogClient clientWithKeepAlive = new BinaryLogClient(slave.hostname, slave.port,
+                    slave.username, slave.password);
+            clientWithKeepAlive.setKeepAliveInterval(TimeUnit.MILLISECONDS.toMillis(100));
+            clientWithKeepAlive.setKeepAliveConnectTimeout(TimeUnit.SECONDS.toMillis(2));
+            clientWithKeepAlive.registerEventListener(eventListener);
+            clientWithKeepAlive.setEventDeserializer(eventDeserializer);
+            try {
+                eventListener.reset();
+                clientWithKeepAlive.connect(DEFAULT_TIMEOUT);
+                eventListener.waitFor(EventType.FORMAT_DESCRIPTION, 1, DEFAULT_TIMEOUT);
+                BinaryLogClient.LifecycleListener lifecycleListenerMock =
+                        mock(BinaryLogClient.LifecycleListener.class);
+                clientWithKeepAlive.registerLifecycleListener(lifecycleListenerMock);
+                master.execute(new Callback<Statement>() {
+                    @Override
+                    public void execute(Statement statement) throws SQLException {
+                        statement.execute("drop table if exists not_meant_to_exist");
+                    }
+                });
+                eventListener.waitFor(QueryEventData.class, 1, TimeUnit.SECONDS.toMillis(4));
+                InOrder inOrder = inOrder(lifecycleListenerMock);
+                inOrder.verify(lifecycleListenerMock).onCommunicationFailure(eq(clientWithKeepAlive),
+                        any(EOFException.class));
+                inOrder.verify(lifecycleListenerMock).onDisconnect(eq(clientWithKeepAlive));
+                inOrder.verify(lifecycleListenerMock).onConnect(eq(clientWithKeepAlive));
+                verifyNoMoreInteractions(lifecycleListenerMock);
+            } finally {
+                clientWithKeepAlive.disconnect();
+            }
+        } finally {
+            client.connect(DEFAULT_TIMEOUT);
         }
     }
 

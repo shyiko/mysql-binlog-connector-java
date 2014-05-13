@@ -39,6 +39,27 @@ public class EventDeserializer {
 
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
+    public EventDeserializer() {
+        this(new EventHeaderV4Deserializer(), new NullEventDataDeserializer());
+    }
+
+    public EventDeserializer(EventHeaderDeserializer eventHeaderDeserializer) {
+        this(eventHeaderDeserializer, new NullEventDataDeserializer());
+    }
+
+    public EventDeserializer(EventDataDeserializer defaultEventDataDeserializer) {
+        this(new EventHeaderV4Deserializer(), defaultEventDataDeserializer);
+    }
+
+    public EventDeserializer(
+            EventHeaderDeserializer eventHeaderDeserializer,
+            EventDataDeserializer defaultEventDataDeserializer
+    ) {
+        this(eventHeaderDeserializer, defaultEventDataDeserializer,
+                new HashMap<EventType, EventDataDeserializer>(), new HashMap<Long, TableMapEventData>());
+        registerDefaultEventDataDeserializers();
+    }
+
     public EventDeserializer(
             EventHeaderDeserializer eventHeaderDeserializer,
             EventDataDeserializer defaultEventDataDeserializer,
@@ -47,15 +68,11 @@ public class EventDeserializer {
     ) {
         this.eventHeaderDeserializer = eventHeaderDeserializer;
         this.defaultEventDataDeserializer = defaultEventDataDeserializer;
-        this.tableMapEventByTableId = tableMapEventByTableId;
         this.eventDataDeserializers = eventDataDeserializers;
+        this.tableMapEventByTableId = tableMapEventByTableId;
     }
 
-    public EventDeserializer() {
-        this.eventHeaderDeserializer = new EventHeaderV4Deserializer();
-        this.defaultEventDataDeserializer = new NullEventDataDeserializer();
-        this.tableMapEventByTableId = new HashMap<Long, TableMapEventData>();
-        this.eventDataDeserializers = new HashMap<EventType, EventDataDeserializer>();
+    private void registerDefaultEventDataDeserializers() {
         eventDataDeserializers.put(EventType.FORMAT_DESCRIPTION, new FormatDescriptionEventDataDeserializer());
         eventDataDeserializers.put(EventType.ROTATE, new RotateEventDataDeserializer());
         eventDataDeserializers.put(EventType.QUERY, new QueryEventDataDeserializer());

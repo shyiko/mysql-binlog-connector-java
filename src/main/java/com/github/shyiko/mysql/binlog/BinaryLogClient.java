@@ -21,6 +21,7 @@ import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
@@ -39,6 +40,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -452,6 +454,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 try {
                     event = eventDeserializer.nextEvent(inputStream);
                 } catch (Exception e) {
+                    Throwable cause = e instanceof EventDataDeserializationException ? e.getCause() : e;
+                    if (cause instanceof EOFException || cause instanceof SocketException) {
+                        throw e;
+                    }
                     if (isConnected()) {
                         synchronized (lifecycleListeners) {
                             for (LifecycleListener lifecycleListener : lifecycleListeners) {
