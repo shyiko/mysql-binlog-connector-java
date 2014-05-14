@@ -67,6 +67,12 @@ client.registerEventListener(new EventListener() {
         ...
     }
 });
+
+// start replication from oldest binlog
+// remove these lines to start from the current master binlog position
+client.setBinlogFilename("");
+client.setBinlogPosition(4);
+
 client.connect();
 ```
 
