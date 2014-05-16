@@ -184,6 +184,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.binlogPosition = binlogPosition;
     }
 
+    public boolean isKeepAlive() {
+        return keepAlive;
+    }
+
     /**
      * @param keepAlive true if "keep alive" thread should be automatically started (recommended and true by default),
      * false otherwise.
@@ -192,11 +196,19 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.keepAlive = keepAlive;
     }
 
+    public long getKeepAliveInterval() {
+        return keepAliveInterval;
+    }
+
     /**
      * @param keepAliveInterval "keep alive" interval in milliseconds.
      */
     public void setKeepAliveInterval(long keepAliveInterval) {
         this.keepAliveInterval = keepAliveInterval;
+    }
+
+    public long getKeepAliveConnectTimeout() {
+        return keepAliveConnectTimeout;
     }
 
     /**
