@@ -67,14 +67,11 @@ client.registerEventListener(new EventListener() {
         ...
     }
 });
-
-// start replication from oldest binlog
-// remove these lines to start from the current master binlog position
-client.setBinlogFilename("");
-client.setBinlogPosition(4);
-
 client.connect();
 ```
+
+> By default, BinaryLogClient starts from the current (at the time of connect) master binlog position. If you wish to
+kick off from a specific filename or position, use client.setBinlogFilename(...) + client.setBinlogPosition(...).
 
 ### Making client available through JMX
 

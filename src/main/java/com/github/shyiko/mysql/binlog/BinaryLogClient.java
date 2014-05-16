@@ -140,6 +140,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     /**
      * @return server id (65535 by default)
+     * @see #setServerId(long)
      */
     public long getServerId() {
         return serverId;
@@ -150,40 +151,56 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * group (that is, different from any other server id being used by any master or slave). Keep in mind that each
      * binary log client (mysql-binlog-connector-java/BinaryLogClient, mysqlbinlog, etc) should be treated as a
      * simplified slave and thus MUST also use a different server id.
+     * @see #getServerId()
      */
     public void setServerId(long serverId) {
         this.serverId = serverId;
     }
 
     /**
-     * @return binary log filename, nullable. Note that this value is automatically tracked by the client and thus
-     * is subject to change (in response to {@link EventType#ROTATE}, for example).
+     * @return binary log filename, nullable (and null be default). Note that this value is automatically tracked by
+     * the client and thus is subject to change (in response to {@link EventType#ROTATE}, for example).
+     * @see #setBinlogFilename(String)
      */
     public String getBinlogFilename() {
         return binlogFilename;
     }
 
     /**
-     * @param binlogFilename binary log filename (null indicates automatic resolution).
+     * @param binlogFilename binary log filename.
+     * Special values are:
+     * <ul>
+     *   <li>null, which turns on automatic resolution (resulting in the last known binlog and position). This is what
+     * happens by default when you don't specify binary log filename explicitly.</li>
+     *   <li>"" (empty string), which instructs server to stream events starting from the oldest known binlog.</li>
+     * </ul>
+     * @see #getBinlogFilename()
      */
     public void setBinlogFilename(String binlogFilename) {
         this.binlogFilename = binlogFilename;
     }
 
     /**
-     * @return binary log position of the next event. Note that this value changes with each incoming event.
+     * @return binary log position of the next event, 4 by default (which is a position of first event). Note that this
+     * value changes with each incoming event.
+     * @see #setBinlogPosition(long)
      */
     public long getBinlogPosition() {
         return binlogPosition;
     }
 
     /**
-     * @param binlogPosition binary log position
+     * @param binlogPosition binary log position. Any value less than 4 gets automatically adjusted to 4 on connect.
+     * @see #getBinlogPosition()
      */
     public void setBinlogPosition(long binlogPosition) {
         this.binlogPosition = binlogPosition;
     }
 
+    /**
+     * @return true if "keep alive" thread should be automatically started (default), false otherwise.
+     * @see #setKeepAlive(boolean)
+     */
     public boolean isKeepAlive() {
         return keepAlive;
     }
@@ -191,28 +208,39 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     /**
      * @param keepAlive true if "keep alive" thread should be automatically started (recommended and true by default),
      * false otherwise.
+     * @see #isKeepAlive()
      */
     public void setKeepAlive(boolean keepAlive) {
         this.keepAlive = keepAlive;
     }
 
+    /**
+     * @return "keep alive" interval in milliseconds, 1 minute by default.
+     * @see #setKeepAliveInterval(long)
+     */
     public long getKeepAliveInterval() {
         return keepAliveInterval;
     }
 
     /**
      * @param keepAliveInterval "keep alive" interval in milliseconds.
+     * @see #getKeepAliveInterval()
      */
     public void setKeepAliveInterval(long keepAliveInterval) {
         this.keepAliveInterval = keepAliveInterval;
     }
 
+    /**
+     * @return "keep alive" connect timeout in milliseconds, 3 seconds by default.
+     * @see #setKeepAliveConnectTimeout(long)
+     */
     public long getKeepAliveConnectTimeout() {
         return keepAliveConnectTimeout;
     }
 
     /**
-     * @param keepAliveConnectTimeout "keep alive" connect interval in milliseconds.
+     * @param keepAliveConnectTimeout "keep alive" connect timeout in milliseconds.
+     * @see #getKeepAliveConnectTimeout()
      */
     public void setKeepAliveConnectTimeout(long keepAliveConnectTimeout) {
         this.keepAliveConnectTimeout = keepAliveConnectTimeout;
