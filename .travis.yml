@@ -1,5 +1,5 @@
 language: java
-script: '[[ $TRAVIS_REPO_SLUG == "shyiko/mysql-binlog-connector-java" ]] && [[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_PULL_REQUEST == "false" ]] && mvn -P with-sources-and-javadocs -Ddeploy=snapshot -DskipTests=true -s .travis.settings.xml'
+script: 'if [[ $TRAVIS_REPO_SLUG == "shyiko/mysql-binlog-connector-java" && $TRAVIS_BRANCH == "master" && $TRAVIS_PULL_REQUEST == "false" ]]; then mvn -P with-sources-and-javadocs -Ddeploy=snapshot -DskipTests=true -s .travis.settings.xml; fi'
 env:
   global: 
   - secure: QI6w4d/W9Sjckgcdwc/K5Rb+UFa6PxDbhiilv70fEZCXg0P4GMBFGD/zbpsfTlLbA9rgKBotrSm7EXRtQM94dluW0kS9jQiJfw33l9WbfMAJL4797xq+7ekvIvPBf7xVfwGsAcCcB5DcPBTKroX2s8tJEY3CQTienkW4pT7/zh0=
