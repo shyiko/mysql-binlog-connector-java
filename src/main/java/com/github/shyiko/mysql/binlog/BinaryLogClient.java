@@ -75,7 +75,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private long serverId = 65535;
     private volatile String binlogFilename;
-    private volatile long binlogPosition;
+    private volatile long binlogPosition = 4;
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -267,6 +267,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             }
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
+            }
+            if (binlogPosition < 4) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.warning("Binary log position adjusted from " + binlogPosition + " to " + 4);
+                }
+                binlogPosition = 4;
             }
             ChecksumType checksumType = fetchBinlogChecksum();
             if (checksumType != ChecksumType.NONE) {
