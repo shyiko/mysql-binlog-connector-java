@@ -293,18 +293,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         ". Please make sure it's running.", e);
             }
             GreetingPacket greetingPacket = new GreetingPacket(channel.read());
-            AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
-                    greetingPacket.getScramble());
-            authenticateCommand.setCollation(greetingPacket.getServerCollation());
-            channel.write(authenticateCommand);
-            byte[] authenticationResult = channel.read();
-            if (authenticationResult[0] != (byte) 0x00 /* ok */) {
-                if (authenticationResult[0] == (byte) 0xFF /* error */) {
-                    byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
-                    throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
-                }
-                throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
-            }
+            authenticate(greetingPacket.getScramble(), greetingPacket.getServerCollation());
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
             }
@@ -338,6 +327,20 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             spawnKeepAliveThread();
         }
         listenForEventPackets();
+    }
+
+    private void authenticate(String salt, int collation) throws IOException {
+        AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password, salt);
+        authenticateCommand.setCollation(collation);
+        channel.write(authenticateCommand);
+        byte[] authenticationResult = channel.read();
+        if (authenticationResult[0] != (byte) 0x00 /* ok */) {
+            if (authenticationResult[0] == (byte) 0xFF /* error */) {
+                byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
+                throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
+            }
+            throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
+        }
     }
 
     private void spawnKeepAliveThread() {
