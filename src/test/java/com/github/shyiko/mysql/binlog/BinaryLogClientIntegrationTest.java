@@ -16,6 +16,8 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
@@ -51,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.TimeZone;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
@@ -611,6 +614,28 @@ public class BinaryLogClientIntegrationTest {
 
     @AfterMethod
     public void afterEachTest() throws Exception {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String markerQuery = "drop table if exists _EOS_marker";
+        BinaryLogClient.EventListener markerInterceptor = new BinaryLogClient.EventListener() {
+            @Override
+            public void onEvent(Event event) {
+                if (event.getHeader().getEventType() == EventType.QUERY) {
+                    EventData data = event.getData();
+                    if (data != null && ((QueryEventData) data).getSql().contains("_EOS_marker")) {
+                        latch.countDown();
+                    }
+                }
+            }
+        };
+        client.registerEventListener(markerInterceptor);
+        master.execute(new Callback<Statement>() {
+            @Override
+            public void execute(Statement statement) throws SQLException {
+                statement.execute(markerQuery);
+            }
+        });
+        assertTrue(latch.await(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
+        client.unregisterEventListener(markerInterceptor);
         eventListener.reset();
     }
 
