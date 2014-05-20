@@ -47,9 +47,9 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -93,7 +93,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private long keepAliveInterval = TimeUnit.MINUTES.toMillis(1);
     private long keepAliveConnectTimeout = TimeUnit.SECONDS.toMillis(3);
 
-    private volatile ThreadPoolExecutor keepAliveThreadExecutor;
+    private volatile ExecutorService keepAliveThreadExecutor;
     private long keepAliveThreadShutdownTimeout = TimeUnit.SECONDS.toMillis(6);
 
     private final Lock shutdownLock = new ReentrantLock();
@@ -264,8 +264,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
-     * @param threadFactory custom thread factory to use for "connect in separate thread". If not provided, thread
-     * will be created using simple "new Thread()".
+     * @param threadFactory custom thread factory. If not provided, threads will be created using simple "new Thread()".
      */
     public void setThreadFactory(ThreadFactory threadFactory) {
         this.threadFactory = threadFactory;
@@ -344,7 +343,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void spawnKeepAliveThread() {
-        keepAliveThreadExecutor = newSingleDaemonThreadExecutor("blc-keepalive-" + hostname + ":" + port);
+        keepAliveThreadExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+
+            @Override
+            public Thread newThread(Runnable runnable) {
+                return newNamedThread(runnable, "blc-keepalive-" + hostname + ":" + port);
+            }
+        });
         keepAliveThreadExecutor.submit(new Runnable() {
             @Override
             public void run() {
@@ -385,17 +390,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         });
     }
 
-    private ThreadPoolExecutor newSingleDaemonThreadExecutor(final String threadName) {
-        return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
-
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r, threadName);
-                thread.setDaemon(true);
-                return thread;
-            }
-        });
+    private Thread newNamedThread(Runnable runnable, String threadName) {
+        Thread thread = threadFactory == null ? new Thread(runnable) : threadFactory.newThread(runnable);
+        thread.setName(threadName);
+        return thread;
     }
 
     protected boolean isKeepAliveThreadRunning() {
@@ -431,8 +429,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
             }
         };
-        Thread thread = threadFactory == null ? new Thread(runnable) : threadFactory.newThread(runnable);
-        thread.start();
+        newNamedThread(runnable, "blc-" + hostname + ":" + port).start();
         boolean started = false;
         try {
             started = countDownLatch.await(timeoutInMilliseconds, TimeUnit.MILLISECONDS);
