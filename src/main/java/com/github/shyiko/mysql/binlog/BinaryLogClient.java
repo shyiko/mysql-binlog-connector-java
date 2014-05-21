@@ -396,7 +396,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return thread;
     }
 
-    protected boolean isKeepAliveThreadRunning() {
+    boolean isKeepAliveThreadRunning() {
         return keepAliveThreadExecutor != null && !keepAliveThreadExecutor.isShutdown();
     }
 
