@@ -8,21 +8,31 @@ Initially project was started as a fork of [open-replicator](https://code.google
 - resumable disconnects
 - plugable failover strategies
 - JMX exposure (optionally with statistics)
-- availability in Maven Central (deferred until everything is thoroughly tested)
+- availability in Maven Central
 - no third-party dependencies
 - binlog_checksum support (for MySQL 5.6.2+ users)
 - test suite over different versions of MySQL releases
 
 ## Usage
 
-The latest development version always available through Sonatype Snapshots repository (see example below).
+Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.shyiko%22%20AND%20a%3A%22mysql-binlog-connector-java%22). Alternatively you can include following Maven dependency (available through Maven Central):
+
+```
+<dependency>
+    <groupId>com.github.shyiko</groupId>
+    <artifactId>mysql-binlog-connector-java</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+The latest development version always available through Sonatype Snapshots repository (as shown below).
 
 ```xml
 <dependencies>
     <dependency>
         <groupId>com.github.shyiko</groupId>
         <artifactId>mysql-binlog-connector-java</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.1-SNAPSHOT</version>
     </dependency>
 </dependencies>
 
