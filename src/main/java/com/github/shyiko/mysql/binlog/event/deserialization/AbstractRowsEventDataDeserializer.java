@@ -68,8 +68,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         TableMapEventData tableMapEvent = tableMapEventByTableId.get(tableId);
         byte[] types = tableMapEvent.getColumnTypes();
         int[] metadata = tableMapEvent.getColumnMetadata();
-        BitSet nullColumns = inputStream.readBitSet(types.length, true);
         Serializable[] result = new Serializable[numberOfBitsSet(includedColumns)];
+        BitSet nullColumns = inputStream.readBitSet(result.length, true);
         for (int i = 0, numberOfSkippedColumns = 0; i < types.length; i++) {
             int typeCode = types[i] & 0xFF, meta = metadata[i], length = 0;
             if (typeCode == ColumnType.STRING.getCode() && meta > 256) {
