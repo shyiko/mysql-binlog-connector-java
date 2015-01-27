@@ -83,6 +83,29 @@ client.connect();
 > By default, BinaryLogClient starts from the current (at the time of connect) master binlog position. If you wish to
 kick off from a specific filename or position, use client.setBinlogFilename(...) + client.setBinlogPosition(...).
 
+### Controlling event deserialization
+
+```java
+EventDeserializer eventDeserializer = new EventDeserializer();
+
+// do not deserialize EXT_DELETE_ROWS event data, return it as a byte array
+eventDeserializer.setEventDataDeserializer(EventType.EXT_DELETE_ROWS, 
+    new ByteArrayEventDataDeserializer()); 
+
+// skip EXT_WRITE_ROWS event data altogether
+eventDeserializer.setEventDataDeserializer(EventType.EXT_WRITE_ROWS, 
+    new NullEventDataDeserializer());
+
+// use custom event data deserializer for EXT_DELETE_ROWS
+eventDeserializer.setEventDataDeserializer(EventType.EXT_DELETE_ROWS, 
+    new EventDataDeserializer() {
+        ...
+    });
+
+BinaryLogClient client = ...
+client.setEventDeserializer(eventDeserializer);
+```
+
 ### Making client available through JMX
 
 ```java
@@ -92,7 +115,8 @@ BinaryLogClient binaryLogClient = ...
 ObjectName objectName = new ObjectName("mysql.binlog:type=BinaryLogClient");
 mBeanServer.registerMBean(binaryLogClient, objectName);
 
-// following bean accumulates various BinaryLogClient stats (e.g. number of disconnects, skipped events)
+// following bean accumulates various BinaryLogClient stats 
+// (e.g. number of disconnects, skipped events)
 BinaryLogClientStatistics stats = new BinaryLogClientStatistics(binaryLogClient);
 ObjectName statsObjectName = new ObjectName("mysql.binlog:type=BinaryLogClientStatistics");
 mBeanServer.registerMBean(stats, statsObjectName);
