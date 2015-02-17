@@ -16,13 +16,16 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
@@ -147,7 +150,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
-     * @param serverId server id (in the range from 1 to 2^32 – 1). This value MUST be unique across whole replication
+     * @param serverId server id (in the range from 1 to 2^32 - 1). This value MUST be unique across whole replication
      * group (that is, different from any other server id being used by any master or slave). Keep in mind that each
      * binary log client (mysql-binlog-connector-java/BinaryLogClient, mysqlbinlog, etc) should be treated as a
      * simplified slave and thus MUST also use a different server id.
@@ -324,6 +327,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
         if (keepAlive && !isKeepAliveThreadRunning()) {
             spawnKeepAliveThread();
+        }
+        EventDataDeserializer eventDataDeserializer = eventDeserializer.getEventDataDeserializer(EventType.ROTATE);
+        if (eventDataDeserializer.getClass() != RotateEventDataDeserializer.class &&
+            eventDataDeserializer.getClass() != EventDeserializer.EventDataWrapper.Deserializer.class) {
+            eventDeserializer.setEventDataDeserializer(EventType.ROTATE,
+                new EventDeserializer.EventDataWrapper.Deserializer(new RotateEventDataDeserializer(),
+                    eventDataDeserializer));
         }
         listenForEventPackets();
     }
@@ -536,11 +546,15 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void updateClientBinlogFilenameAndPosition(Event event) {
         EventHeader eventHeader = event.getHeader();
         if (eventHeader.getEventType() == EventType.ROTATE) {
-            RotateEventData eventData = event.getData();
-            if (eventData != null) {
-                binlogFilename = eventData.getBinlogFilename();
-                binlogPosition = eventData.getBinlogPosition();
+            EventData eventData = event.getData();
+            RotateEventData rotateEventData;
+            if (eventData instanceof EventDeserializer.EventDataWrapper) {
+                rotateEventData = (RotateEventData) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
+            } else {
+                rotateEventData = (RotateEventData) eventData;
             }
+            binlogFilename = rotateEventData.getBinlogFilename();
+            binlogPosition = rotateEventData.getBinlogPosition();
         } else
         if (eventHeader instanceof EventHeaderV4) {
             EventHeaderV4 trackableEventHeader = (EventHeaderV4) eventHeader;
@@ -602,6 +616,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void notifyEventListeners(Event event) {
+        if (event.getData() instanceof EventDeserializer.EventDataWrapper) {
+            event = new Event(event.getHeader(), ((EventDeserializer.EventDataWrapper) event.getData()).getExternal());
+        }
         synchronized (eventListeners) {
             for (EventListener eventListener : eventListeners) {
                 try {

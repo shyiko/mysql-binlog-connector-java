@@ -15,6 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog;
 
+import com.github.shyiko.mysql.binlog.event.ByteArrayEventData;
 import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventData;
@@ -23,6 +24,7 @@ import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
+import com.github.shyiko.mysql.binlog.event.deserialization.ByteArrayEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventHeaderV4Deserializer;
@@ -535,6 +537,48 @@ public class BinaryLogClientIntegrationTest {
                 verifyNoMoreInteractions(lifecycleListenerMock);
             } finally {
                 clientWithKeepAlive.disconnect();
+            }
+        } finally {
+            client.connect(DEFAULT_TIMEOUT);
+        }
+    }
+
+    @Test
+    public void testCustomEventDataDeserializers() throws Exception {
+        try {
+            client.disconnect();
+            final BinaryLogClient binaryLogClient = new BinaryLogClient(slave.hostname, slave.port,
+                    slave.username, slave.password);
+            binaryLogClient.registerEventListener(new TraceEventListener());
+            binaryLogClient.registerEventListener(eventListener);
+            EventDeserializer deserializer = new EventDeserializer();
+            deserializer.setEventDataDeserializer(EventType.QUERY, new ByteArrayEventDataDeserializer());
+            // TABLE_MAP and ROTATE events are both used internally, but that doesn't mean it shouldn't be possible to
+            // specify different EventDataDeserializer|s
+            deserializer.setEventDataDeserializer(EventType.TABLE_MAP, new ByteArrayEventDataDeserializer());
+            deserializer.setEventDataDeserializer(EventType.ROTATE, new ByteArrayEventDataDeserializer());
+            binaryLogClient.setEventDeserializer(deserializer);
+            try {
+                eventListener.reset();
+                binaryLogClient.connect(DEFAULT_TIMEOUT);
+                eventListener.waitFor(EventType.FORMAT_DESCRIPTION, 1, DEFAULT_TIMEOUT);
+                master.execute(new Callback<Statement>() {
+                    @Override
+                    public void execute(Statement statement) throws SQLException {
+                        statement.execute("insert into bikini_bottom values('SpongeBob')");
+                    }
+                });
+                slave.execute(new Callback<Statement>() {
+                    @Override
+                    public void execute(Statement statement) throws SQLException {
+                        statement.execute("flush logs");
+                    }
+                });
+                eventListener.waitFor(EventType.QUERY, 1, DEFAULT_TIMEOUT);
+                eventListener.waitFor(EventType.ROTATE, 3, DEFAULT_TIMEOUT); /* 2 with timestamp 0 */
+                eventListener.waitFor(ByteArrayEventData.class, 5, DEFAULT_TIMEOUT);
+            } finally {
+                binaryLogClient.disconnect();
             }
         } finally {
             client.connect(DEFAULT_TIMEOUT);
