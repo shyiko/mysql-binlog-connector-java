@@ -147,6 +147,7 @@ mvn # shows how to build, test, etc. project
 ## Used by
 
 * [rook](https://github.com/shyiko/rook) - Change Data Capture (CDC) toolkit for keeping system layers in sync with the database.
+* [mydit](https://github.com/ngocdaothanh/mydit) - MySQL to MongoDB Replicator.
 
 ## Contributing
 
