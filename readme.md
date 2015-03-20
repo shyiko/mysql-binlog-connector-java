@@ -17,7 +17,7 @@ Initially project was started as a fork of [open-replicator](https://code.google
 
 Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.shyiko%22%20AND%20a%3A%22mysql-binlog-connector-java%22). Alternatively you can include following Maven dependency (available through Maven Central):
 
-```
+```xml
 <dependency>
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
@@ -126,6 +126,11 @@ mBeanServer.registerMBean(stats, statsObjectName);
 
 - data of numeric types (tinyint, etc) always returned signed(!) regardless of whether column definition includes "unsigned" keyword or not
 - data of \*text/\*blob types always returned as a byte array
+
+## Frequently Asked Questions
+
+Q: How do I get column names of a table?   
+A: The easiest way is to use JDBC (as described [here](https://github.com/shyiko/mysql-binlog-connector-java/issues/24#issuecomment-43747417)). Binary log itself does not contain that piece of information.
 
 ## Documentation
 
