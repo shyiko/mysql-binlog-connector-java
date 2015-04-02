@@ -77,7 +77,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             }
             int index = i - numberOfSkippedColumns;
             if (!nullColumns.get(index)) {
-            int typeCode = types[i] & 0xFF, meta = metadata[i], length = 0;
+                int typeCode = types[i] & 0xFF, meta = metadata[i], length = 0;
                 if (typeCode == ColumnType.STRING.getCode() && meta > 256) {
                     int meta0 = meta >> 8, meta1 = meta & 0xFF;
                     if ((meta0 & 0x30) != 0x30) { // long CHAR field
