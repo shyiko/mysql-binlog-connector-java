@@ -71,28 +71,28 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         Serializable[] result = new Serializable[numberOfBitsSet(includedColumns)];
         BitSet nullColumns = inputStream.readBitSet(result.length, true);
         for (int i = 0, numberOfSkippedColumns = 0; i < types.length; i++) {
-            int typeCode = types[i] & 0xFF, meta = metadata[i], length = 0;
-            if (typeCode == ColumnType.STRING.getCode() && meta > 256) {
-                int meta0 = meta >> 8, meta1 = meta & 0xFF;
-                if ((meta0 & 0x30) != 0x30) { // long CHAR field
-                    typeCode = meta0 | 0x30;
-                    length = meta1 | (((meta0 & 0x30) ^ 0x30) << 4);
-                } else {
-                    if (meta0 == ColumnType.SET.getCode() || meta0 == ColumnType.ENUM.getCode() ||
-                            meta0 == ColumnType.STRING.getCode()) {
-                        typeCode = meta0;
-                        length = meta1;
-                    } else {
-                        throw new IOException("Unexpected meta " + meta + " for column of type " + typeCode);
-                    }
-                }
-            }
             if (!includedColumns.get(i)) {
                 numberOfSkippedColumns++;
                 continue;
             }
             int index = i - numberOfSkippedColumns;
             if (!nullColumns.get(index)) {
+            int typeCode = types[i] & 0xFF, meta = metadata[i], length = 0;
+                if (typeCode == ColumnType.STRING.getCode() && meta > 256) {
+                    int meta0 = meta >> 8, meta1 = meta & 0xFF;
+                    if ((meta0 & 0x30) != 0x30) { // long CHAR field
+                        typeCode = meta0 | 0x30;
+                        length = meta1 | (((meta0 & 0x30) ^ 0x30) << 4);
+                    } else {
+                        if (meta0 == ColumnType.SET.getCode() || meta0 == ColumnType.ENUM.getCode() ||
+                                meta0 == ColumnType.STRING.getCode()) {
+                            typeCode = meta0;
+                            length = meta1;
+                        } else {
+                            throw new IOException("Unexpected meta " + meta + " for column of type " + typeCode);
+                        }
+                    }
+                }                
                 result[index] = deserializeCell(ColumnType.byCode(typeCode), meta, length, inputStream);
             }
         }
