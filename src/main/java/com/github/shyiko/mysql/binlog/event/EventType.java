@@ -33,7 +33,7 @@ public enum EventType {
      */
     START_V3,
     /**
-     * Represents query statement.
+     * Written when an updating statement is done.
      */
     QUERY,
     /**

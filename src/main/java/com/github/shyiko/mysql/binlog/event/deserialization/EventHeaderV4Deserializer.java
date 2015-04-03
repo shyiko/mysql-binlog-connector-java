@@ -34,7 +34,7 @@ public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventH
         header.setTimestamp(inputStream.readLong(4) * 1000L);
         header.setEventType(getEventType(inputStream.readInteger(1)));
         header.setServerId(inputStream.readLong(4));
-        header.setEventLength(inputStream.readInteger(4));
+        header.setEventLength(inputStream.readLong(4));
         header.setNextPosition(inputStream.readLong(4));
         header.setFlags(inputStream.readInteger(2));
         return header;
