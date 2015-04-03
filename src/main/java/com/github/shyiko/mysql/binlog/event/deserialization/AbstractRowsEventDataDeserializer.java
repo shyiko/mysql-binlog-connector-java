@@ -92,7 +92,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
                             throw new IOException("Unexpected meta " + meta + " for column of type " + typeCode);
                         }
                     }
-                }                
+                }
                 result[index] = deserializeCell(ColumnType.byCode(typeCode), meta, length, inputStream);
             }
         }
