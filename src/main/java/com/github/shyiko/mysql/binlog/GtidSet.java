@@ -15,11 +15,15 @@
  */
 package com.github.shyiko.mysql.binlog;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * GTID set as described in <a href="https://dev.mysql.com/doc/refman/5.6/en/replication-gtids-concepts.html">GTID Concepts</a>
- * of MySQL 5.6 Reference Manual.
+ * GTID set as described in <a href="https://dev.mysql.com/doc/refman/5.6/en/replication-gtids-concepts.html">GTID
+ * Concepts</a> of MySQL 5.6 Reference Manual.
  *
  * <pre>
  * gtid_set: uuid_set[,uuid_set]...
@@ -154,6 +158,9 @@ public class GtidSet {
         return sb.substring(0, sb.length() - delimiter.length());
     }
 
+    /**
+     * @see GtidSet
+     */
     public static class UUIDSet {
 
         private String uuid;
@@ -173,6 +180,9 @@ public class GtidSet {
         }
     }
 
+    /**
+     * @see GtidSet
+     */
     public static class Interval implements Comparable<Interval> {
 
         private long start;

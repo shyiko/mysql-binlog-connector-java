@@ -37,7 +37,6 @@ public class GtidSetTest {
             "00000000-0000-0000-0000-000000000000:0-1:2-6:7-8,00000000-0000-0000-0000-000000000001:9-10");
     }
 
-
     @Test
     public void testJoin() throws Exception {
         GtidSet gtidSet = new GtidSet("00000000-0000-0000-0000-000000000000:3-5:6-7");
