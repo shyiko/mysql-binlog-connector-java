@@ -20,11 +20,13 @@ import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.GtidEventData;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
@@ -35,7 +37,9 @@ import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
 import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
+import com.github.shyiko.mysql.binlog.network.protocol.command.Command;
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogCommand;
+import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogGtidCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.PingCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 
@@ -79,6 +83,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private long serverId = 65535;
     private volatile String binlogFilename;
     private volatile long binlogPosition = 4;
+
+    private GtidSet gtidSet;
+    private final Object gtidSetAccessLock = new Object();
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -201,6 +208,34 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
+     * @return GTID set. Note that this value changes with each received GTID event (provided client is in GTID mode).
+     * @see #setGtidSet(String)
+     */
+    public String getGtidSet() {
+        synchronized (gtidSetAccessLock) {
+            return gtidSet != null ? gtidSet.toString() : null;
+        }
+    }
+
+    /**
+     * @param gtidSet GTID set (can be an empty string).
+     * <p>NOTE #1: Any value but null will switch BinaryLogClient into a GTID mode (in which case GTID set will be
+     * updated with each incoming GTID event) as well as set binlogFilename to "" (empty string) (meaning
+     * BinaryLogClient will request events "outside of the set" <u>starting from the oldest known binlog</u>).
+     * <p>NOTE #2: {@link #setBinlogFilename(String)} and {@link #setBinlogPosition(long)} can be used to specify the
+     * exact position from which MySQL server should start streaming events (taking into account GTID set).
+     * @see #getGtidSet()
+     */
+    public void setGtidSet(String gtidSet) {
+        if (gtidSet != null && this.binlogFilename == null) {
+            this.binlogFilename = "";
+        }
+        synchronized (gtidSetAccessLock) {
+            this.gtidSet = gtidSet != null ? new GtidSet(gtidSet) : null;
+        }
+    }
+
+    /**
      * @return true if "keep alive" thread should be automatically started (default), false otherwise.
      * @see #setKeepAlive(boolean)
      */
@@ -309,7 +344,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             if (checksumType != ChecksumType.NONE) {
                 confirmSupportOfChecksum(checksumType);
             }
-            channel.write(new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition));
+            requestBinaryLogStream();
         } catch (IOException e) {
             if (channel != null && channel.isOpen()) {
                 channel.close();
@@ -328,14 +363,42 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (keepAlive && !isKeepAliveThreadRunning()) {
             spawnKeepAliveThread();
         }
-        EventDataDeserializer eventDataDeserializer = eventDeserializer.getEventDataDeserializer(EventType.ROTATE);
-        if (eventDataDeserializer.getClass() != RotateEventDataDeserializer.class &&
-            eventDataDeserializer.getClass() != EventDeserializer.EventDataWrapper.Deserializer.class) {
-            eventDeserializer.setEventDataDeserializer(EventType.ROTATE,
-                new EventDeserializer.EventDataWrapper.Deserializer(new RotateEventDataDeserializer(),
-                    eventDataDeserializer));
+        ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
+        synchronized (gtidSetAccessLock) {
+            if (gtidSet != null) {
+                ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+            }
         }
         listenForEventPackets();
+    }
+
+    private void requestBinaryLogStream() throws IOException {
+        Command dumpBinaryLogCommand;
+        synchronized (gtidSetAccessLock) {
+            if (gtidSet != null) {
+                dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
+            } else {
+                dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
+            }
+        }
+        channel.write(dumpBinaryLogCommand);
+    }
+
+    private void ensureEventDataDeserializer(EventType eventType,
+             Class<? extends EventDataDeserializer> eventDataDeserializerClass) {
+        EventDataDeserializer eventDataDeserializer = eventDeserializer.getEventDataDeserializer(eventType);
+        if (eventDataDeserializer.getClass() != eventDataDeserializerClass &&
+            eventDataDeserializer.getClass() != EventDeserializer.EventDataWrapper.Deserializer.class) {
+            EventDataDeserializer internalEventDataDeserializer;
+            try {
+                internalEventDataDeserializer = eventDataDeserializerClass.newInstance();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            eventDeserializer.setEventDataDeserializer(eventType,
+                new EventDeserializer.EventDataWrapper.Deserializer(internalEventDataDeserializer,
+                    eventDataDeserializer));
+        }
     }
 
     private void authenticate(String salt, int collation) throws IOException {
@@ -526,6 +589,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 if (isConnected()) {
                     notifyEventListeners(event);
                     updateClientBinlogFilenameAndPosition(event);
+                    updateGtidSet(event);
                 }
             }
         } catch (Exception e) {
@@ -561,6 +625,24 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             long nextBinlogPosition = trackableEventHeader.getNextPosition();
             if (nextBinlogPosition > 0) {
                 binlogPosition = nextBinlogPosition;
+            }
+        }
+    }
+
+    private void updateGtidSet(Event event) {
+        EventHeader eventHeader = event.getHeader();
+        if (eventHeader.getEventType() == EventType.GTID) {
+            synchronized (gtidSetAccessLock) {
+                if (gtidSet != null) {
+                    EventData eventData = event.getData();
+                    GtidEventData gtidEventData;
+                    if (eventData instanceof EventDeserializer.EventDataWrapper) {
+                        gtidEventData = (GtidEventData) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
+                    } else {
+                        gtidEventData = (GtidEventData) eventData;
+                    }
+                    gtidSet.add(gtidEventData.getGtid());
+                }
             }
         }
     }
