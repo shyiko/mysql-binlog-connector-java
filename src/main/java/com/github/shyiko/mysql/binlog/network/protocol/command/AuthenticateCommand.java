@@ -67,7 +67,7 @@ public class AuthenticateCommand implements Command {
             buffer.write(0);
         }
         buffer.writeZeroTerminatedString(username);
-        byte[] passwordSHA1 = passwordCompatibleWithMySQL411(password, salt);
+        byte[] passwordSHA1 = "".equals(password) ? new byte[0] : passwordCompatibleWithMySQL411(password, salt);
         buffer.writeInteger(passwordSHA1.length, 1);
         buffer.write(passwordSHA1);
         if (schema != null) {
