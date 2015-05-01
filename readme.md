@@ -81,7 +81,10 @@ client.connect();
 ```
 
 > By default, BinaryLogClient starts from the current (at the time of connect) master binlog position. If you wish to
-kick off from a specific filename or position, use client.setBinlogFilename(...) + client.setBinlogPosition(...).
+kick off from a specific filename or position, use `client.setBinlogFilename(filename)` + `client.setBinlogPosition(position)`.
+
+> `client.connect()` is blocking (meaning that client will listen for events in the current thread). 
+`client.connect(timeout)`, on the other hand, spawns a separate thread.  
 
 ### Controlling event deserialization
 
