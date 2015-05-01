@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2015 Stanley Shyiko
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,38 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.network.protocol;
-
-import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
+package com.github.shyiko.mysql.binlog.network;
 
 import java.io.IOException;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class ErrorPacket implements Packet {
+public class ServerException extends IOException {
 
     private int errorCode;
     private String sqlState;
-    private String errorMessage;
 
-    public ErrorPacket(byte[] bytes) throws IOException {
-        ByteArrayInputStream buffer = new ByteArrayInputStream(bytes);
-        this.errorCode = buffer.readInteger(2);
-        buffer.skip(1); // 1 byte for slash
-        this.sqlState = buffer.readString(5);
-        this.errorMessage = buffer.readString(buffer.available());
+    public ServerException(String message, int errorCode, String sqlState) {
+        super(message);
+        this.errorCode = errorCode;
+        this.sqlState = sqlState;
     }
 
+    /**
+     * @see ErrorCode
+     */
     public int getErrorCode() {
         return errorCode;
     }
 
     public String getSqlState() {
         return sqlState;
-    }
-
-    public String getErrorMessage() {
-        return errorMessage;
     }
 }

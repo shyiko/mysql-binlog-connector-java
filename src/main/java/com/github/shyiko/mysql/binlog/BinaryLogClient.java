@@ -31,6 +31,7 @@ import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeser
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
+import com.github.shyiko.mysql.binlog.network.ServerException;
 import com.github.shyiko.mysql.binlog.network.SocketFactory;
 import com.github.shyiko.mysql.binlog.network.protocol.ErrorPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
@@ -310,7 +311,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     /**
      * Connect to the replication stream. Note that this method blocks until disconnected.
-     * @throws AuthenticationException in case of failed authentication
+     * @throws AuthenticationException if authentication fails
+     * @throws ServerException if MySQL server responds with an error
      * @throws IOException if anything goes wrong while trying to connect
      */
     public void connect() throws IOException {
@@ -327,7 +329,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
             } catch (IOException e) {
                 throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
-                        ". Please make sure it's running.", e);
+                    ". Please make sure it's running.", e);
             }
             GreetingPacket greetingPacket = new GreetingPacket(channel.read());
             authenticate(greetingPacket.getScramble(), greetingPacket.getServerCollation());
@@ -409,7 +411,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (authenticationResult[0] != (byte) 0x00 /* ok */) {
             if (authenticationResult[0] == (byte) 0xFF /* error */) {
                 byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
-                throw new AuthenticationException(new ErrorPacket(bytes).getErrorMessage());
+                ErrorPacket errorPacket = new ErrorPacket(bytes);
+                throw new AuthenticationException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                    errorPacket.getSqlState());
             }
             throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
         }
@@ -476,9 +480,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     /**
      * Connect to the replication stream in a separate thread.
      * @param timeoutInMilliseconds timeout in milliseconds
-     * @throws AuthenticationException in case of failed authentication
+     * @throws AuthenticationException if authentication fails
+     * @throws ServerException if MySQL server responds with an error
      * @throws IOException if anything goes wrong while trying to connect
-     * @throws TimeoutException if client wasn't able to connect in the requested period of time
+     * @throws TimeoutException if client was unable to connect within given time limit
      */
     public void connect(long timeoutInMilliseconds) throws IOException, TimeoutException {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
@@ -553,7 +558,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         byte[] statementResult = channel.read();
         if (statementResult[0] == (byte) 0xFF /* error */) {
             byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
-            throw new IOException(new ErrorPacket(bytes).getErrorMessage());
+            ErrorPacket errorPacket = new ErrorPacket(bytes);
+            throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                errorPacket.getSqlState());
         }
         eventDeserializer.setChecksumType(checksumType);
     }
@@ -567,7 +574,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 int marker = inputStream.read();
                 if (marker == 0xFF) {
                     ErrorPacket errorPacket = new ErrorPacket(inputStream.read(packetLength - 1));
-                    throw new IOException(errorPacket.getErrorCode() + " - " + errorPacket.getErrorMessage());
+                    throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                        errorPacket.getSqlState());
                 }
                 Event event;
                 try {

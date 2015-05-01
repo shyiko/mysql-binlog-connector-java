@@ -9,10 +9,12 @@
 
     <!-- checks that file size does not exceeds limit -->
     <!-- http://checkstyle.sf.net/config_sizes.html#FileLength -->
+<!--
     <module name="FileLength">
         <property name="max" value="1000"/>
         <property name="fileExtensions" value="java"/>
     </module>
+-->
 
     <!-- checks that files are 'tab'-free -->
     <!-- http://checkstyle.sf.net/config_whitespace.html#FileTabCharacter -->
