@@ -1,10 +1,16 @@
 # Changelog
-All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.1.3...HEAD)
 ### Added
 - Support for COM_BINLOG_DUMP_GTID (`BinaryLogClient`::[gtidSet](https://github.com/shyiko/mysql-binlog-connector-java/commit/3f30768791ef61ab0a83bd2bdb98af80bc799abd#diff-7addc4e3eed6e9254e088abc015ac8adR229)) ([#41](https://github.com/shyiko/mysql-binlog-connector-java/issues/41)).
+- Support for authentication via empty password ([#39](https://github.com/shyiko/mysql-binlog-connector-java/issues/39)).
+
+### Changed
+- Server error reporting ([#37](https://github.com/shyiko/mysql-binlog-connector-java/issues/37)).  
+  WARNING: If you are using exception message to identify specific server errors - you'll need to switch to 
+  `ServerException`::[errorCode](https://github.com/shyiko/mysql-binlog-connector-java/commit/1817d0ff709c65c31af9236dcc4e50cc3ad1023b#diff-0dff747d57cb3f5f0548be89a81e29f8R37) (as message no longer includes error code).
 
 ### Fixed
 - `EventHeaderV4Deserializer` eventLength handling ([#35](https://github.com/shyiko/mysql-binlog-connector-java/issues/35)).
