@@ -77,20 +77,23 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             }
             int index = i - numberOfSkippedColumns;
             if (!nullColumns.get(index)) {
+                // mysql-5.6.24 sql/log_event.cc log_event_print_value (line 1980)
                 int typeCode = types[i] & 0xFF, meta = metadata[i], length = 0;
-                if (typeCode == ColumnType.STRING.getCode() && meta > 256) {
-                    int meta0 = meta >> 8, meta1 = meta & 0xFF;
-                    if ((meta0 & 0x30) != 0x30) { // long CHAR field
-                        typeCode = meta0 | 0x30;
-                        length = meta1 | (((meta0 & 0x30) ^ 0x30) << 4);
-                    } else {
-                        if (meta0 == ColumnType.SET.getCode() || meta0 == ColumnType.ENUM.getCode() ||
-                                meta0 == ColumnType.STRING.getCode()) {
-                            typeCode = meta0;
-                            length = meta1;
+                if (typeCode == ColumnType.STRING.getCode()) {
+                    if (meta >= 256) {
+                        int meta0 = meta >> 8, meta1 = meta & 0xFF;
+                        if ((meta0 & 0x30) != 0x30) {
+                            typeCode = meta0 | 0x30;
+                            length = meta1 | (((meta0 & 0x30) ^ 0x30) << 4);
                         } else {
-                            throw new IOException("Unexpected meta " + meta + " for column of type " + typeCode);
+                            // mysql-5.6.24 sql/rpl_utility.h enum_field_types (line 278)
+                            if (meta0 == ColumnType.ENUM.getCode() || meta0 == ColumnType.SET.getCode()) {
+                                typeCode = meta0;
+                            }
+                            length = meta1;
                         }
+                    } else {
+                        length = meta;
                     }
                 }
                 result[index] = deserializeCell(ColumnType.byCode(typeCode), meta, length, inputStream);
