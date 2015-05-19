@@ -319,6 +319,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (connected) {
             throw new IllegalStateException("BinaryLogClient is already connected");
         }
+        Long connectionId;
         try {
             try {
                 Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
@@ -339,6 +340,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         errorPacket.getSqlState());
             }
             GreetingPacket greetingPacket = new GreetingPacket(initialHandshakePacket);
+            connectionId = greetingPacket.getThreadId();
             authenticate(greetingPacket.getScramble(), greetingPacket.getServerCollation());
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
@@ -362,7 +364,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
         connected = true;
         if (logger.isLoggable(Level.INFO)) {
-            logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition);
+            logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition +
+                " (sid:" + serverId + ", cid:" + connectionId + ")");
         }
         synchronized (lifecycleListeners) {
             for (LifecycleListener lifecycleListener : lifecycleListeners) {
