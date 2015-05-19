@@ -16,11 +16,12 @@
 package com.github.shyiko.mysql.binlog.network;
 
 import java.net.Socket;
+import java.net.SocketException;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public interface SocketFactory {
 
-    Socket createSocket();
+    Socket createSocket() throws SocketException;
 }
