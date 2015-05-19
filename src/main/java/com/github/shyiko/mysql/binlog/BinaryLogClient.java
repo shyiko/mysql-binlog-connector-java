@@ -331,7 +331,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
                     ". Please make sure it's running.", e);
             }
-            GreetingPacket greetingPacket = new GreetingPacket(channel.read());
+            byte[] initialHandshakePacket = channel.read();
+            if (initialHandshakePacket[0] == (byte) 0xFF /* error */) {
+                byte[] bytes = Arrays.copyOfRange(initialHandshakePacket, 1, initialHandshakePacket.length);
+                ErrorPacket errorPacket = new ErrorPacket(bytes);
+                throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                        errorPacket.getSqlState());
+            }
+            GreetingPacket greetingPacket = new GreetingPacket(initialHandshakePacket);
             authenticate(greetingPacket.getScramble(), greetingPacket.getServerCollation());
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();

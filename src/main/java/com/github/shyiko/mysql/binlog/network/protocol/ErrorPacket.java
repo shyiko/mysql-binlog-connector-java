@@ -31,8 +31,10 @@ public class ErrorPacket implements Packet {
     public ErrorPacket(byte[] bytes) throws IOException {
         ByteArrayInputStream buffer = new ByteArrayInputStream(bytes);
         this.errorCode = buffer.readInteger(2);
-        buffer.skip(1); // 1 byte for slash
-        this.sqlState = buffer.readString(5);
+        if (buffer.peek() == '#') {
+            buffer.skip(1); // marker of the SQL State
+            this.sqlState = buffer.readString(5);
+        }
         this.errorMessage = buffer.readString(buffer.available());
     }
 
