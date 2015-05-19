@@ -319,7 +319,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (connected) {
             throw new IllegalStateException("BinaryLogClient is already connected");
         }
-        Long connectionId;
+        GreetingPacket greetingPacket;
         try {
             try {
                 Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
@@ -332,15 +332,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
                     ". Please make sure it's running.", e);
             }
-            byte[] initialHandshakePacket = channel.read();
-            if (initialHandshakePacket[0] == (byte) 0xFF /* error */) {
-                byte[] bytes = Arrays.copyOfRange(initialHandshakePacket, 1, initialHandshakePacket.length);
-                ErrorPacket errorPacket = new ErrorPacket(bytes);
-                throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
-                        errorPacket.getSqlState());
-            }
-            GreetingPacket greetingPacket = new GreetingPacket(initialHandshakePacket);
-            connectionId = greetingPacket.getThreadId();
+            greetingPacket = receiveGreeting();
             authenticate(greetingPacket.getScramble(), greetingPacket.getServerCollation());
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
@@ -365,7 +357,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         connected = true;
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition +
-                " (sid:" + serverId + ", cid:" + connectionId + ")");
+                " (sid:" + serverId + ", cid:" + greetingPacket.getThreadId() + ")");
         }
         synchronized (lifecycleListeners) {
             for (LifecycleListener lifecycleListener : lifecycleListeners) {
@@ -382,6 +374,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             }
         }
         listenForEventPackets();
+    }
+
+    private GreetingPacket receiveGreeting() throws IOException {
+        byte[] initialHandshakePacket = channel.read();
+        if (initialHandshakePacket[0] == (byte) 0xFF /* error */) {
+            byte[] bytes = Arrays.copyOfRange(initialHandshakePacket, 1, initialHandshakePacket.length);
+            ErrorPacket errorPacket = new ErrorPacket(bytes);
+            throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                    errorPacket.getSqlState());
+        }
+        return new GreetingPacket(initialHandshakePacket);
     }
 
     private void requestBinaryLogStream() throws IOException {
