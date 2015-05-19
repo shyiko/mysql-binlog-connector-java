@@ -163,7 +163,9 @@ public class ByteArrayInputStream extends InputStream {
     }
 
     public int peek() throws IOException {
-        this.peek = readWithinBlockBoundaries();
+        if (peek == null) {
+            peek = readWithinBlockBoundaries();
+        }
         return peek;
     }
 
