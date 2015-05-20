@@ -32,7 +32,7 @@ The latest development version always available through Sonatype Snapshots repos
     <dependency>
         <groupId>com.github.shyiko</groupId>
         <artifactId>mysql-binlog-connector-java</artifactId>
-        <version>0.2.1-SNAPSHOT</version>
+        <version>0.2.2-SNAPSHOT</version>
     </dependency>
 </dependencies>
 
