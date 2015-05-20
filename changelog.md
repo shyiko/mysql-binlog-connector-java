@@ -2,7 +2,16 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.0...HEAD)
+## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.1...HEAD)
+
+## [0.2.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.0...0.2.1) - 2015-05-19
+
+### Changed
+- `SocketFactory.createSocket` method signature by adding `throws SocketException`.
+
+### Fixed
+- Initial handshake error reporting (so that actual message received from the server wouldn't be lost).
+- Risk of BinaryLogClient getting stuck while in "pre-close" state.
 
 ## [0.2.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.1.3...0.2.0) - 2015-05-01
 ### Added
