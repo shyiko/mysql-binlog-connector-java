@@ -21,7 +21,7 @@ Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3
 <dependency>
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
 </dependency>
 ```
 
