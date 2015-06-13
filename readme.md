@@ -12,6 +12,7 @@ Initially project was started as a fork of [open-replicator](https://code.google
 - no third-party dependencies
 - binlog_checksum support (for MySQL 5.6.2+ users)
 - test suite over different versions of MySQL releases
+- support Gtid mode for MySQL and MariaDB
 
 ## Usage
 
@@ -85,6 +86,25 @@ kick off from a specific filename or position, use `client.setBinlogFilename(fil
 
 > `client.connect()` is blocking (meaning that client will listen for events in the current thread). 
 `client.connect(timeout)`, on the other hand, spawns a separate thread.  
+
+### Using GTID Mode
+
+```java
+BinaryLogClient client = new BinaryLogClient("hostname", 3306, "username", "password");
+client.registerEventListener(new EventListener() {
+
+    @Override
+    public void onEvent(Event event) {
+        ...
+    }
+});
+client.setGtid("");// Use GTID mode, start from begin
+client.setGtid("0-3306-12");// MariaDB GTID format
+client.setGtid("3E11FA47-71CA-11E1-9E33-C80AA9429562:1-5");// MySQL GTID format
+client.connect();// Will autodetect MariaDB server
+// Use client.isMariaDB() to check is MariaDB server
+// Use client.getGtid() to get current GTID, this value will auto update by event.
+```
 
 ### Controlling event deserialization
 
