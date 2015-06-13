@@ -17,6 +17,7 @@ package com.github.shyiko.mysql.binlog.event;
 
 /**
  * Used in MySQL 5.0+.
+ * @see <a href=https://dev.mysql.com/doc/internals/en/binlog-event-header.html>Binlog Event header</a>
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class EventHeaderV4 implements EventHeader {

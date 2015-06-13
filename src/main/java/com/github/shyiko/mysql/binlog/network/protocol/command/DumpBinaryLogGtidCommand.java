@@ -23,6 +23,7 @@ import java.util.Collection;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+ * @see <a href=http://dev.mysql.com/doc/internals/en/com-binlog-dump-gtid.html>COM_BINLOG_DUMP_GTID</a>
  */
 public class DumpBinaryLogGtidCommand implements Command {
 
