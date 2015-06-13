@@ -213,20 +213,19 @@ public enum EventType {
     MARIA_GTID_LIST_EVENT(163),
     ;
 
-    // Command type is unsigned integer, so use long instead
-    final long v;
+    final int v;
 
     EventType()
     {
         v = ordinal();
     }
 
-    EventType(long n)
+    EventType(int n)
     {
         v = n;
     }
 
-    public long get()
+    public int get()
     {
         return v;
     }

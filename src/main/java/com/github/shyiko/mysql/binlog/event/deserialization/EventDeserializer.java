@@ -32,9 +32,9 @@ import java.util.Map;
  */
 public class EventDeserializer {
 
-    private final EventHeaderDeserializer eventHeaderDeserializer;
-    private final EventDataDeserializer defaultEventDataDeserializer;
-    private final Map<EventType, EventDataDeserializer> eventDataDeserializers;
+    protected final EventHeaderDeserializer eventHeaderDeserializer;
+    protected final EventDataDeserializer defaultEventDataDeserializer;
+    protected final Map<EventType, EventDataDeserializer> eventDataDeserializers;
 
     private int checksumLength;
 
