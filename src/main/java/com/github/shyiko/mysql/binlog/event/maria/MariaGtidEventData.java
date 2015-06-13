@@ -2,7 +2,7 @@ package com.github.shyiko.mysql.binlog.event.maria;
 
 import com.github.shyiko.mysql.binlog.event.EventData;
 
-public class GtidEventData implements EventData
+public class MariaGtidEventData implements EventData
 {
     private long sequenceNumber;//8
     private long domainId;// 4
@@ -43,7 +43,7 @@ public class GtidEventData implements EventData
         return sequenceNumber;
     }
 
-    public GtidEventData setSequenceNumber(long sequenceNumber)
+    public MariaGtidEventData setSequenceNumber(long sequenceNumber)
     {
         this.sequenceNumber = sequenceNumber;
         return this;
@@ -54,7 +54,7 @@ public class GtidEventData implements EventData
         return domainId;
     }
 
-    public GtidEventData setDomainId(long domainId)
+    public MariaGtidEventData setDomainId(long domainId)
     {
         this.domainId = domainId;
         return this;
@@ -65,7 +65,7 @@ public class GtidEventData implements EventData
         return flags2;
     }
 
-    public GtidEventData setFlags2(int flags2)
+    public MariaGtidEventData setFlags2(int flags2)
     {
         this.flags2 = flags2;
         return this;

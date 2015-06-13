@@ -16,6 +16,17 @@ public class Gtid
         this.sequenceNumber = sequenceNumber;
     }
 
+    public Gtid(String gtid)
+    {
+        if (gtid != null && !gtid.isEmpty())
+        {
+            String[] split = gtid.split("-");
+            domainId = Long.parseLong(split[0]);
+            serverId = Long.parseLong(split[1]);
+            sequenceNumber = Long.parseLong(split[2]);
+        }
+    }
+
     public long getDomainId()
     {
         return domainId;
@@ -29,6 +40,24 @@ public class Gtid
     public long getSequenceNumber()
     {
         return sequenceNumber;
+    }
+
+    public Gtid setDomainId(long domainId)
+    {
+        this.domainId = domainId;
+        return this;
+    }
+
+    public Gtid setServerId(long serverId)
+    {
+        this.serverId = serverId;
+        return this;
+    }
+
+    public Gtid setSequenceNumber(long sequenceNumber)
+    {
+        this.sequenceNumber = sequenceNumber;
+        return this;
     }
 
     @Override

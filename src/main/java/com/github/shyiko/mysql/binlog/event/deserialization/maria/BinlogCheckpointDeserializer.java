@@ -2,7 +2,6 @@ package com.github.shyiko.mysql.binlog.event.deserialization.maria;
 
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.maria.BinlogCheckpointEventData;
-import com.github.shyiko.mysql.binlog.event.maria.GtidEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 

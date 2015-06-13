@@ -31,6 +31,8 @@ import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeser
 import com.github.shyiko.mysql.binlog.event.deserialization.maria.BinlogCheckpointDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.maria.GtidDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.maria.GtidListDeserializer;
+import com.github.shyiko.mysql.binlog.event.maria.Gtid;
+import com.github.shyiko.mysql.binlog.event.maria.MariaGtidEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
@@ -46,7 +48,6 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogComm
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogGtidCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.PingCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
-
 import com.github.shyiko.mysql.binlog.network.protocol.command.RegisterSlaveCommand;
 import java.io.EOFException;
 import java.io.IOException;
@@ -90,9 +91,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private volatile long binlogPosition = 4;
 
     private GtidSet gtidSet;
+    private Gtid mariaGtid;
     private String gtid;
+
     private boolean mariaDB;
-    private final Object gtidSetAccessLock = new Object();
+    private final Object gtidAccessLock = new Object();
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -212,34 +215,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public void setBinlogPosition(long binlogPosition) {
         this.binlogPosition = binlogPosition;
-    }
-
-    /**
-     * @return GTID set. Note that this value changes with each received GTID event (provided client is in GTID mode).
-     * @see #setGtidSet(String)
-     */
-    public String getGtidSet() {
-        synchronized (gtidSetAccessLock) {
-            return gtidSet != null ? gtidSet.toString() : null;
-        }
-    }
-
-    /**
-     * @param gtidSet GTID set (can be an empty string).
-     * <p>NOTE #1: Any value but null will switch BinaryLogClient into a GTID mode (in which case GTID set will be
-     * updated with each incoming GTID event) as well as set binlogFilename to "" (empty string) (meaning
-     * BinaryLogClient will request events "outside of the set" <u>starting from the oldest known binlog</u>).
-     * <p>NOTE #2: {@link #setBinlogFilename(String)} and {@link #setBinlogPosition(long)} can be used to specify the
-     * exact position from which MySQL server should start streaming events (taking into account GTID set).
-     * @see #getGtidSet()
-     */
-    public void setGtidSet(String gtidSet) {
-        if (gtidSet != null && this.binlogFilename == null) {
-            this.binlogFilename = "";
-        }
-        synchronized (gtidSetAccessLock) {
-            this.gtidSet = gtidSet != null ? new GtidSet(gtidSet) : null;
-        }
     }
 
     /**
@@ -380,7 +355,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             spawnKeepAliveThread();
         }
         ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
-        synchronized (gtidSetAccessLock) {
+        synchronized (gtidAccessLock) {
             if (gtidSet != null) {
                 ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
             }
@@ -401,11 +376,16 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void requestBinaryLogStream() throws IOException {
         Command dumpBinaryLogCommand;
-        synchronized (gtidSetAccessLock) {
-            // TODO Merge gtid and gtidSet
+        synchronized (gtidAccessLock) {
             if (gtid != null && mariaDB)
             {
                 Command command;
+                mariaGtid = new Gtid(gtid);
+                // update server id
+                channel.write(new QueryCommand("SHOW VARIABLES LIKE 'SERVER_ID'"));
+                ResultSetRowPacket[] rs = readResultSet();
+                mariaGtid.setServerId(Long.parseLong(rs[0].getValue(1)));
+
                 // set up gtid
                 channel.write(new QueryCommand("SET @mariadb_slave_capability = 4"));// support GTID
                 channel.read();// ignore
@@ -426,7 +406,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 eventDeserializer.setEventDataDeserializer(EventType.MARIA_BINLOG_CHECKPOINT_EVENT, new BinlogCheckpointDeserializer());
 
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
-            }else if (gtidSet != null) {
+            }else if (gtid != null) {
+                gtidSet = new GtidSet(gtid);
                 dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
             } else {
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
@@ -646,7 +627,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 if (isConnected()) {
                     notifyEventListeners(event);
                     updateClientBinlogFilenameAndPosition(event);
-                    updateGtidSet(event);
+                    updateGtid(event);
                 }
             }
         } catch (Exception e) {
@@ -686,10 +667,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private void updateGtidSet(Event event) {
+    private void updateGtid(Event event) {
         EventHeader eventHeader = event.getHeader();
         if (eventHeader.getEventType() == EventType.GTID) {
-            synchronized (gtidSetAccessLock) {
+            synchronized (gtidAccessLock) {
                 if (gtidSet != null) {
                     EventData eventData = event.getData();
                     GtidEventData gtidEventData;
@@ -699,6 +680,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         gtidEventData = (GtidEventData) eventData;
                     }
                     gtidSet.add(gtidEventData.getGtid());
+                }
+            }
+        }else if (eventHeader.getEventType() == EventType.MARIA_GTID_EVENT){
+            synchronized (gtidAccessLock) {
+                if (mariaGtid != null) {
+                    MariaGtidEventData eventData = event.getData();
+                    mariaGtid.setDomainId(eventData.getDomainId());
+                    mariaGtid.setSequenceNumber(eventData.getSequenceNumber());
                 }
             }
         }
@@ -917,16 +906,42 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
 
     }
-
+    /**
+     * @param gtid For MySQL this is GTID set format, for MariaDB the format is domainId-serverId-sequenceNumber(can be an empty string).
+     * <p>NOTE #1: Any value but null will switch BinaryLogClient into a GTID mode (in which case GTID set will be
+     * updated with each incoming GTID event) as well as set binlogFilename to "" (empty string) (meaning
+     * BinaryLogClient will request events "outside of the set" <u>starting from the oldest known binlog</u>).
+     * <p>NOTE #2: {@link #setBinlogFilename(String)} and {@link #setBinlogPosition(long)} can be used to specify the
+     * exact position from which MySQL server should start streaming events (taking into account GTID set).
+     * @see #getGtid()
+     */
     public BinaryLogClient setGtid(String gtid)
     {
-        this.gtid = gtid;
+        if (gtid != null && this.binlogFilename == null) {
+            this.binlogFilename = "";
+        }
+        synchronized (gtidAccessLock) {
+            this.gtid = gtid;
+        }
         return this;
     }
 
+    /**
+     * @return Note that this value changes with each received GTID event (provided client is in GTID mode).
+     */
     public String getGtid()
     {
-        return gtid;
+        synchronized (gtidAccessLock)
+        {
+            if (isMariaDB() && mariaGtid != null)
+            {
+                gtid = mariaGtid.toString();
+            }else if (gtidSet != null)
+            {
+                gtid = gtidSet.toString();
+            }
+            return gtid;
+        }
     }
 
     public boolean isMariaDB()
