@@ -28,6 +28,9 @@ import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserialize
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.maria.BinlogCheckpointDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.maria.GtidDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.maria.GtidListDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
@@ -44,6 +47,7 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogGtid
 import com.github.shyiko.mysql.binlog.network.protocol.command.PingCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 
+import com.github.shyiko.mysql.binlog.network.protocol.command.RegisterSlaveCommand;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -86,6 +90,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private volatile long binlogPosition = 4;
 
     private GtidSet gtidSet;
+    private String gtid;
+    private boolean mariaDB;
     private final Object gtidSetAccessLock = new Object();
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
@@ -347,6 +353,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             if (checksumType != ChecksumType.NONE) {
                 confirmSupportOfChecksum(checksumType);
             }
+            if(isMariaDB() || greetingPacket.getServerVersion().contains("MariaDB")){
+                mariaDB = true;
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("Switch to mariadb mode,server version is " + greetingPacket.getServerVersion());
+                }
+            }
             requestBinaryLogStream();
         } catch (IOException e) {
             if (channel != null && channel.isOpen()) {
@@ -390,7 +402,31 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void requestBinaryLogStream() throws IOException {
         Command dumpBinaryLogCommand;
         synchronized (gtidSetAccessLock) {
-            if (gtidSet != null) {
+            // TODO Merge gtid and gtidSet
+            if (gtid != null && mariaDB)
+            {
+                Command command;
+                // set up gtid
+                channel.write(new QueryCommand("SET @mariadb_slave_capability = 4"));// support GTID
+                channel.read();// ignore
+                channel.write(new QueryCommand("SET @slave_connect_state = '"+gtid+"'"));
+                channel.read();// ignore
+                channel.write(new QueryCommand("SET @slave_gtid_strict_mode = 0"));
+                channel.read();// ignore
+                channel.write(new QueryCommand("SET @slave_gtid_ignore_duplicates = 0"));
+                channel.read();// ignore
+                // Register First
+                command = new RegisterSlaveCommand(serverId, "", "", "", 0, 0, 0);
+                channel.write(command);
+                channel.read();// ignore
+
+                // MariaDB Event
+                eventDeserializer.setEventDataDeserializer(EventType.MARIA_GTID_EVENT, new GtidDeserializer());
+                eventDeserializer.setEventDataDeserializer(EventType.MARIA_GTID_LIST_EVENT, new GtidListDeserializer());
+                eventDeserializer.setEventDataDeserializer(EventType.MARIA_BINLOG_CHECKPOINT_EVENT, new BinlogCheckpointDeserializer());
+
+                dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
+            }else if (gtidSet != null) {
                 dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
             } else {
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
@@ -882,4 +918,19 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     }
 
+    public BinaryLogClient setGtid(String gtid)
+    {
+        this.gtid = gtid;
+        return this;
+    }
+
+    public String getGtid()
+    {
+        return gtid;
+    }
+
+    public boolean isMariaDB()
+    {
+        return mariaDB;
+    }
 }
