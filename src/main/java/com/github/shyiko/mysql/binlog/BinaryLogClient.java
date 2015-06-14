@@ -680,6 +680,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         gtidEventData = (GtidEventData) eventData;
                     }
                     gtidSet.add(gtidEventData.getGtid());
+                    gtid = gtidSet.toString();
                 }
             }
         }else if (eventHeader.getEventType() == EventType.MARIA_GTID_EVENT){
@@ -688,6 +689,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     MariaGtidEventData eventData = event.getData();
                     mariaGtid.setDomainId(eventData.getDomainId());
                     mariaGtid.setSequenceNumber(eventData.getSequenceNumber());
+                    gtid = mariaGtid.toString();
                 }
             }
         }
@@ -933,13 +935,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     {
         synchronized (gtidAccessLock)
         {
-            if (isMariaDB() && mariaGtid != null)
-            {
-                gtid = mariaGtid.toString();
-            }else if (gtidSet != null)
-            {
-                gtid = gtidSet.toString();
-            }
             return gtid;
         }
     }
