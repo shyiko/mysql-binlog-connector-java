@@ -46,6 +46,11 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <vagrant.bin>vagrant</vagrant.bin>
         <vagrant.integration.box>${basedir}/supplement/vagrant/mysql-5.6.12-sandbox-prepackaged</vagrant.integration.box>
+        <!--
+        | Skip test by default
+        | override this in command -DskipTests=false
+        -->
+        <skipTests>true</skipTests>
     </properties>
 
     <dependencies>
@@ -173,12 +178,12 @@
                     <consoleOutput>true</consoleOutput>
                 </configuration>
                 <executions>
-                    <execution>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>checkstyle</goal>
-                        </goals>
-                    </execution>
+                    <!--<execution>-->
+                        <!--<phase>verify</phase>-->
+                        <!--<goals>-->
+                            <!--<goal>checkstyle</goal>-->
+                        <!--</goals>-->
+                    <!--</execution>-->
                 </executions>
                 <dependencies>
                     <dependency>
