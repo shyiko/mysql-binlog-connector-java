@@ -103,7 +103,7 @@ public class BinaryLogClientIntegrationTest {
                 bundle.getString(prefix + "master.username"), bundle.getString(prefix + "master.password"));
         slave = new MySQLConnection(bundle.getString(prefix + "slave.hostname"),
                 Integer.parseInt(bundle.getString(prefix + "slave.port")),
-                bundle.getString(prefix + "slave.username"), bundle.getString(prefix + "slave.password"));
+                bundle.getString(prefix + "slave.superUsername"), bundle.getString(prefix + "slave.superPassword"));
         client = new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password);
         client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
         client.setKeepAlive(false);
@@ -603,6 +603,23 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
+    @Test
+    public void testExceptionIsThrownWhenInsufficientPermissionsToDetectPosition() throws Exception {
+        ResourceBundle bundle = ResourceBundle.getBundle("jdbc");
+        String prefix = "jdbc.mysql.replication.";
+        String slaveUsername = bundle.getString(prefix + "slave.slaveUsername");
+        String slavePassword = bundle.getString(prefix + "slave.slavePassword");
+        BinaryLogClient binaryLogClient =
+            new BinaryLogClient(slave.hostname, slave.port, slaveUsername, slavePassword);
+
+        try {
+            binaryLogClient.connect();
+            fail("No REPLICATION CLIENT privilege should have resulted in IOException being thrown");
+        } catch (IOException e) {
+            assertFalse(binaryLogClient.isConnected());
+        }
+    }
+
     private void bindInSeparateThread(final TCPReverseProxy tcpReverseProxy) throws InterruptedException {
         new Thread(new Runnable() {
 
@@ -755,4 +772,3 @@ public class BinaryLogClientIntegrationTest {
         void execute(T obj) throws SQLException;
     }
 }
-
