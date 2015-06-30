@@ -670,11 +670,16 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private ResultSetRowPacket[] readResultSet() throws IOException {
         List<ResultSetRowPacket> resultSet = new LinkedList<ResultSetRowPacket>();
-        if ((channel.read())[0] != (byte) 0xFF /* error */) {
-            while ((channel.read())[0] != (byte) 0xFE /* eof */) { /* skip */ }
-            for (byte[] bytes; (bytes = channel.read())[0] != (byte) 0xFE /* eof */; ) {
-                resultSet.add(new ResultSetRowPacket(bytes));
-            }
+        byte[] statementResult = channel.read();
+        if (statementResult[0] == (byte) 0xFF /* error */) {
+            byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
+            ErrorPacket errorPacket = new ErrorPacket(bytes);
+            throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                    errorPacket.getSqlState());
+        }
+        while ((channel.read())[0] != (byte) 0xFE /* eof */) { /* skip */ }
+        for (byte[] bytes; (bytes = channel.read())[0] != (byte) 0xFE /* eof */; ) {
+            resultSet.add(new ResultSetRowPacket(bytes));
         }
         return resultSet.toArray(new ResultSetRowPacket[resultSet.size()]);
     }

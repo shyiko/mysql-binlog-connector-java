@@ -31,6 +31,7 @@ import com.github.shyiko.mysql.binlog.event.deserialization.EventHeaderV4Deseria
 import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
+import com.github.shyiko.mysql.binlog.network.ServerException;
 import org.mockito.InOrder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -603,21 +604,13 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
-    @Test
+    @Test(expectedExceptions = ServerException.class)
     public void testExceptionIsThrownWhenInsufficientPermissionsToDetectPosition() throws Exception {
         ResourceBundle bundle = ResourceBundle.getBundle("jdbc");
         String prefix = "jdbc.mysql.replication.";
         String slaveUsername = bundle.getString(prefix + "slave.slaveUsername");
         String slavePassword = bundle.getString(prefix + "slave.slavePassword");
-        BinaryLogClient binaryLogClient =
-            new BinaryLogClient(slave.hostname, slave.port, slaveUsername, slavePassword);
-
-        try {
-            binaryLogClient.connect();
-            fail("No REPLICATION CLIENT privilege should have resulted in IOException being thrown");
-        } catch (IOException e) {
-            assertFalse(binaryLogClient.isConnected());
-        }
+        new BinaryLogClient(slave.hostname, slave.port, slaveUsername, slavePassword).connect();
     }
 
     private void bindInSeparateThread(final TCPReverseProxy tcpReverseProxy) throws InterruptedException {
