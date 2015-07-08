@@ -1,8 +1,7 @@
-.idea
-.iml
+*.idea
+*.iml
 .DS_Store
-target
-.classpath
+target.classpath
 .project
 .settings
 .vagrant
