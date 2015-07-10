@@ -16,10 +16,10 @@ public class GtidDeserializer implements EventDataDeserializer<MariaGtidEventDat
         MariaGtidEventData e = new MariaGtidEventData();
         e.setSequenceNumber(is.readLong(8));
         e.setDomainId(is.readLong(4));
-        e.setFlags2(is.readInteger(1));
+        e.setFlags(is.readInteger(1));
 
         // reserved
-        long n = 6 + ((e.getFlags2() & MariaGtidEventData.FL_GROUP_COMMIT_ID) > 0 ? 2 : 0);
+        long n = 6 + ((e.getFlags() & MariaGtidEventData.FL_GROUP_COMMIT_ID) > 0 ? 2 : 0);
         long skip = is.skip(n);
         assert n == skip;
         return e;

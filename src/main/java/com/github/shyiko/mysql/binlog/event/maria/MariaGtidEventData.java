@@ -6,9 +6,9 @@ public class MariaGtidEventData implements EventData
 {
     private long sequenceNumber;//8
     private long domainId;// 4
-    private int flags2;// 1
+    private int flags;// 1
 
-    /* Flags2. */
+    /* Flags. */
 
     /**
      * FL_STANDALONE is set when there is no terminating COMMIT event.
@@ -60,14 +60,14 @@ public class MariaGtidEventData implements EventData
         return this;
     }
 
-    public int getFlags2()
+    public int getFlags()
     {
-        return flags2;
+        return flags;
     }
 
-    public MariaGtidEventData setFlags2(int flags2)
+    public MariaGtidEventData setFlags(int flags)
     {
-        this.flags2 = flags2;
+        this.flags = flags;
         return this;
     }
 
@@ -77,7 +77,7 @@ public class MariaGtidEventData implements EventData
         return "GtidEventData{" +
                 "sequenceNumber=" + sequenceNumber +
                 ", domainId=" + domainId +
-                ", flags2=" + flags2 +
+                ", flags2=" + flags +
                 '}';
     }
 }

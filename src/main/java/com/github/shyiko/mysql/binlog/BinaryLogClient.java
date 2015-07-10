@@ -379,7 +379,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         synchronized (gtidAccessLock) {
             if (gtid != null && mariaDB)
             {
-                Command command;
+                if ("gtid_current_pos".equals(gtid) || "".equals(gtid)) {
+                    channel.write(new QueryCommand("select @@gtid_current_pos"));
+                    ResultSetRowPacket[] rs = readResultSet();
+                    gtid = rs[0].getValue(0);
+                }
+
                 mariaGtid = new Gtid(gtid);
                 // update server id
                 channel.write(new QueryCommand("SHOW VARIABLES LIKE 'SERVER_ID'"));
@@ -396,7 +401,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 channel.write(new QueryCommand("SET @slave_gtid_ignore_duplicates = 0"));
                 channel.read();// ignore
                 // Register First
-                command = new RegisterSlaveCommand(serverId, "", "", "", 0, 0, 0);
+                Command command = new RegisterSlaveCommand(serverId, "", "", "", 0, 0, 0);
                 channel.write(command);
                 channel.read();// ignore
 
