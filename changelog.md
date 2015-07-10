@@ -4,6 +4,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.1...HEAD)
 
+### Fixed
+ - TIMESTAMP_V2 deserialization ([#46](https://github.com/shyiko/mysql-binlog-connector-java/pull/46)).
+ - Freeze during `BinaryLogClient.connect` in case of missing `REPLICATION CLIENT` permission ([#55](https://github.com/shyiko/mysql-binlog-connector-java/pull/55)).
+
 ## [0.2.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.0...0.2.1) - 2015-05-19
 
 ### Changed
