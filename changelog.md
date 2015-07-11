@@ -2,7 +2,9 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.1...HEAD)
+## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.2...HEAD)
+
+## [0.2.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.1...0.2.2) - 2015-07-10
 
 ### Fixed
  - TIMESTAMP_V2 deserialization ([#46](https://github.com/shyiko/mysql-binlog-connector-java/pull/46)).
