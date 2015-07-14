@@ -39,6 +39,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import javax.xml.bind.DatatypeConverter;
 import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
@@ -151,7 +152,7 @@ public class BinaryLogClientIntegrationTest {
             List<Serializable[]> writtenRows =
                 capturingEventListener.getEvents(WriteRowsEventData.class).get(0).getRows();
             assertEquals(writtenRows.size(), 1);
-            assertEquals(writtenRows.get(0), new Serializable[]{"SpongeBob"});
+            assertEquals(writtenRows.get(0), new Serializable[]{"SpongeBob".getBytes()});
             master.execute(new Callback<Statement>() {
                 @Override
                 public void execute(Statement statement) throws SQLException {
@@ -162,8 +163,8 @@ public class BinaryLogClientIntegrationTest {
             List<Map.Entry<Serializable[], Serializable[]>> updatedRows =
                 capturingEventListener.getEvents(UpdateRowsEventData.class).get(0).getRows();
             assertEquals(updatedRows.size(), 1);
-            assertEquals(updatedRows.get(0).getKey(), new Serializable[]{"SpongeBob"});
-            assertEquals(updatedRows.get(0).getValue(), new Serializable[]{"Patrick"});
+            assertEquals(updatedRows.get(0).getKey(), new Serializable[]{"SpongeBob".getBytes()});
+            assertEquals(updatedRows.get(0).getValue(), new Serializable[]{"Patrick".getBytes()});
             master.execute(new Callback<Statement>() {
                 @Override
                 public void execute(Statement statement) throws SQLException {
@@ -174,7 +175,7 @@ public class BinaryLogClientIntegrationTest {
             List<Serializable[]> deletedRows =
                 capturingEventListener.getEvents(DeleteRowsEventData.class).get(0).getRows();
             assertEquals(deletedRows.size(), 1);
-            assertEquals(deletedRows.get(0), new Serializable[]{"Patrick"});
+            assertEquals(deletedRows.get(0), new Serializable[]{"Patrick".getBytes()});
         } finally {
             client.unregisterEventListener(capturingEventListener);
         }
@@ -224,10 +225,12 @@ public class BinaryLogClientIntegrationTest {
             new java.sql.Time(generateTime(1970, 1, 1, 1, 2, 3, 0))});
         assertEquals(writeAndCaptureRow("year", "'69'"), new Serializable[]{2069});
         // string types
-        assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q"});
-        assertEquals(writeAndCaptureRow("varchar(255)", "'we'"), new Serializable[]{"we"});
-        assertEquals(writeAndCaptureRow("binary", "'r'"), new Serializable[]{"r"});
-        assertEquals(writeAndCaptureRow("varbinary(255)", "'ty'"), new Serializable[]{"ty"});
+        assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q".getBytes()});
+        assertEquals(writeAndCaptureRow("varchar(255)", "'we'"), new Serializable[]{"we".getBytes()});
+        assertEquals(writeAndCaptureRow("binary", "'r'"), new Serializable[]{"r".getBytes()});
+        assertEquals(writeAndCaptureRow("binary(16)", "unhex(md5(\"glob\"))"),
+            new Serializable[]{DatatypeConverter.parseHexBinary("8684147451a6cc3b92142c6f4b78e61c")});
+        assertEquals(writeAndCaptureRow("varbinary(255)", "'ty'"), new Serializable[]{"ty".getBytes()});
         assertEquals(writeAndCaptureRow("tinyblob", "'ui'"), new Serializable[]{"ui".getBytes()});
         assertEquals(writeAndCaptureRow("tinytext", "'op'"), new Serializable[]{"op".getBytes()});
         assertEquals(writeAndCaptureRow("blob", "'as'"), new Serializable[]{"as".getBytes()});

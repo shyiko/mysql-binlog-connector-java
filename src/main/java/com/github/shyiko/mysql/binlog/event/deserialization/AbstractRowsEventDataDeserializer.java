@@ -143,12 +143,15 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             case YEAR:
                 return 1900 + inputStream.readInteger(1);
             case STRING:
+                // CHAR or BINARY:
+                // because there is no charset info (read: a way to distinguish between these two)
+                // we are returning byte[] instead of an actual String
                 int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.readString(stringLength);
-            case VARCHAR:
+                return inputStream.read(stringLength);
+            case VARCHAR: // or VARBINARY
             case VAR_STRING:
                 int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.readString(varcharLength);
+                return inputStream.read(varcharLength);
             case BLOB:
                 int blobLength = inputStream.readInteger(meta);
                 return inputStream.read(blobLength);
