@@ -385,16 +385,24 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     gtid = rs[0].getValue(0);
                 }
 
-                mariaGtid = new Gtid(gtid);
                 // update server id
                 channel.write(new QueryCommand("SHOW VARIABLES LIKE 'SERVER_ID'"));
                 ResultSetRowPacket[] rs = readResultSet();
-                mariaGtid.setServerId(Long.parseLong(rs[0].getValue(1)));
+                {
+                    long serverId = Long.parseLong(rs[0].getValue(1));
+                    String[] split = gtid.split(",");
+                    for (String s : split) {
+                        Gtid g = new Gtid(s);
+                        if (g.getServerId() == serverId) {
+                            mariaGtid = g;
+                        }
+                    }
+                }
 
                 // set up gtid
                 channel.write(new QueryCommand("SET @mariadb_slave_capability = 4"));// support GTID
                 channel.read();// ignore
-                channel.write(new QueryCommand("SET @slave_connect_state = '"+gtid+"'"));
+                channel.write(new QueryCommand("SET @slave_connect_state = '" + gtid + "'"));
                 channel.read();// ignore
                 channel.write(new QueryCommand("SET @slave_gtid_strict_mode = 0"));
                 channel.read();// ignore
