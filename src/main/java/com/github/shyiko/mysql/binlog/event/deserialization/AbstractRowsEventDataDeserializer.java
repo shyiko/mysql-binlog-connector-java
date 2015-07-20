@@ -32,19 +32,29 @@ import java.util.Map;
  *
  * Current {@link ColumnType} to java type mapping is following:
  * <pre>
- * Integer: {@link ColumnType#TINY}, {@link ColumnType#SHORT}, {@link ColumnType#LONG}, {@link ColumnType#INT24},
- * {@link ColumnType#YEAR}, {@link ColumnType#ENUM}, {@link ColumnType#SET},
- * Long: {@link ColumnType#LONGLONG},
- * Float: {@link ColumnType#FLOAT},
- * Double: {@link ColumnType#DOUBLE},
- * String: {@link ColumnType#VARCHAR}, {@link ColumnType#VAR_STRING}, {@link ColumnType#STRING},
- * java.util.BitSet: {@link ColumnType#BIT},
- * java.util.Date: {@link ColumnType#DATETIME}, {@link ColumnType#DATETIME_V2},
- * java.math.BigDecimal: {@link ColumnType#NEWDECIMAL},
- * java.sql.Timestamp: {@link ColumnType#TIMESTAMP}, {@link ColumnType#TIMESTAMP_V2},
- * java.sql.Date: {@link ColumnType#DATE},
- * java.sql.Time: {@link ColumnType#TIME}, {@link ColumnType#TIME_V2},
- * byte[]: {@link ColumnType#BLOB},
+ * {@link ColumnType#TINY}: Integer
+ * {@link ColumnType#SHORT}: Integer
+ * {@link ColumnType#LONG}: Integer
+ * {@link ColumnType#INT24}: Integer
+ * {@link ColumnType#YEAR}: Integer
+ * {@link ColumnType#ENUM}: Integer
+ * {@link ColumnType#SET}: Integer
+ * {@link ColumnType#LONGLONG}: Long
+ * {@link ColumnType#FLOAT}: Float
+ * {@link ColumnType#DOUBLE}: Double
+ * {@link ColumnType#BIT}: java.util.BitSet
+ * {@link ColumnType#DATETIME}: java.util.Date
+ * {@link ColumnType#DATETIME_V2}: java.util.Date
+ * {@link ColumnType#NEWDECIMAL}: java.math.BigDecimal
+ * {@link ColumnType#TIMESTAMP}: java.sql.Timestamp
+ * {@link ColumnType#TIMESTAMP_V2}: java.sql.Timestamp
+ * {@link ColumnType#DATE}: java.sql.Date
+ * {@link ColumnType#TIME}: java.sql.Time
+ * {@link ColumnType#TIME_V2}: java.sql.Time
+ * {@link ColumnType#VARCHAR}: byte[]
+ * {@link ColumnType#VAR_STRING}: byte[]
+ * {@link ColumnType#STRING}: byte[]
+ * {@link ColumnType#BLOB}: byte[]
  * </pre>
  *
  * At the moment {@link ColumnType#GEOMETRY} is unsupported.
@@ -143,12 +153,15 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             case YEAR:
                 return 1900 + inputStream.readInteger(1);
             case STRING:
+                // CHAR or BINARY:
+                // because there is no charset info (read: a way to distinguish between these two)
+                // we are returning byte[] instead of an actual String
                 int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.readString(stringLength);
-            case VARCHAR:
+                return inputStream.read(stringLength);
+            case VARCHAR: // or VARBINARY
             case VAR_STRING:
                 int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.readString(varcharLength);
+                return inputStream.read(varcharLength);
             case BLOB:
                 int blobLength = inputStream.readInteger(meta);
                 return inputStream.read(blobLength);

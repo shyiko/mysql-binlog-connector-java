@@ -22,7 +22,7 @@ Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3
 <dependency>
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.2.1</version>
+    <version>0.2.2</version>
 </dependency>
 ```
 
@@ -33,7 +33,7 @@ The latest development version always available through Sonatype Snapshots repos
     <dependency>
         <groupId>com.github.shyiko</groupId>
         <artifactId>mysql-binlog-connector-java</artifactId>
-        <version>0.2.2-SNAPSHOT</version>
+        <version>0.2.3-SNAPSHOT</version>
     </dependency>
 </dependencies>
 
@@ -169,8 +169,9 @@ mvn # shows how to build, test, etc. project
 
 ## Used by
 
-* [rook](https://github.com/shyiko/rook) - Change Data Capture (CDC) toolkit for keeping system layers in sync with the database.
-* [mydit](https://github.com/ngocdaothanh/mydit) - MySQL to MongoDB Replicator.
+* [shyiko/rook](https://github.com/shyiko/rook) - Change Data Capture (CDC) toolkit for keeping system layers in sync with the database.
+* [ngocdaothanh/mydit](https://github.com/ngocdaothanh/mydit) - MySQL to MongoDB data replicator.
+* [mardambey/mypipe](https://github.com/mardambey/mypipe) - MySQL binary log consumer with the ability to act on changed rows and publish changes to different systems with emphasis on Apache Kafka.
 
 ## Contributing
 
