@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.BitSet;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
 
