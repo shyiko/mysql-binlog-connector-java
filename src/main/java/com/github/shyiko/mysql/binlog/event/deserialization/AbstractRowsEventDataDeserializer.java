@@ -78,7 +78,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         TableMapEventData tableMapEvent = tableMapEventByTableId.get(tableId);
         if (tableMapEvent == null) {
             throw new MissingTableMapEventException("No TableMapEventData has been found for table id:" + tableId +
-                ". Usually that means that you have started reading binary log 'within the logic group'" +
+                ". Usually that means that you have started reading binary log 'within the logical event group'" +
                 " (e.g. from WRITE_ROWS and not proceeding TABLE_MAP");
         }
         byte[] types = tableMapEvent.getColumnTypes();
