@@ -88,6 +88,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private long serverId = 65535;
     private volatile String binlogFilename;
     private volatile long binlogPosition = 4;
+    private volatile long connectionId;
 
     private GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
@@ -210,6 +211,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public void setBinlogPosition(long binlogPosition) {
         this.binlogPosition = binlogPosition;
+    }
+
+    /**
+     * @return thread id
+     */
+    public long getConnectionId() {
+        return connectionId;
     }
 
     /**
@@ -359,9 +367,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw e;
         }
         connected = true;
+        connectionId = greetingPacket.getThreadId();
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition +
-                " (sid:" + serverId + ", cid:" + greetingPacket.getThreadId() + ")");
+                " (sid:" + serverId + ", cid:" + connectionId + ")");
         }
         synchronized (lifecycleListeners) {
             for (LifecycleListener lifecycleListener : lifecycleListeners) {
