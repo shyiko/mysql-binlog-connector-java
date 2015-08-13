@@ -49,7 +49,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -327,21 +326,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (connected) {
             throw new IllegalStateException("BinaryLogClient is already connected");
         }
-        GreetingPacket greetingPacket;
         try {
-            try {
-                Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
-                socket.connect(new InetSocketAddress(hostname, port));
-                channel = new PacketChannel(socket);
-                if (channel.getInputStream().peek() == -1) {
-                    throw new EOFException();
-                }
-            } catch (IOException e) {
-                throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
-                    ". Please make sure it's running.", e);
-            }
-            greetingPacket = receiveGreeting();
+            establishConnection();
+            GreetingPacket greetingPacket = receiveGreeting();
             authenticate(greetingPacket.getScramble(), greetingPacket.getServerCollation());
+            connectionId = greetingPacket.getThreadId();
             if (binlogFilename == null) {
                 fetchBinlogFilenameAndPosition();
             }
@@ -363,7 +352,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw e;
         }
         connected = true;
-        connectionId = greetingPacket.getThreadId();
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition +
                 " (sid:" + serverId + ", cid:" + connectionId + ")");
@@ -385,13 +373,26 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         listenForEventPackets();
     }
 
+    private void establishConnection() throws IOException {
+        try {
+            Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
+            socket.connect(new InetSocketAddress(hostname, port));
+            channel = new PacketChannel(socket);
+            if (channel.getInputStream().peek() == -1) {
+                throw new EOFException();
+            }
+        } catch (IOException e) {
+            throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
+                ". Please make sure it's running.", e);
+        }
+    }
+
     private GreetingPacket receiveGreeting() throws IOException {
         byte[] initialHandshakePacket = channel.read();
-        if (initialHandshakePacket[0] == (byte) 0xFF /* error */) {
-            byte[] bytes = Arrays.copyOfRange(initialHandshakePacket, 1, initialHandshakePacket.length);
-            ErrorPacket errorPacket = new ErrorPacket(bytes);
+        if (initialHandshakePacket[0] == ErrorPacket.HEADER) {
+            ErrorPacket errorPacket = new ErrorPacket(initialHandshakePacket, 1);
             throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
-                    errorPacket.getSqlState());
+                errorPacket.getSqlState());
         }
         return new GreetingPacket(initialHandshakePacket);
     }
@@ -430,14 +431,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         authenticateCommand.setCollation(collation);
         channel.write(authenticateCommand);
         byte[] authenticationResult = channel.read();
-        if (authenticationResult[0] != (byte) 0x00 /* ok */) {
-            if (authenticationResult[0] == (byte) 0xFF /* error */) {
-                byte[] bytes = Arrays.copyOfRange(authenticationResult, 1, authenticationResult.length);
-                ErrorPacket errorPacket = new ErrorPacket(bytes);
-                throw new AuthenticationException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
-                    errorPacket.getSqlState());
-            }
-            throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
+        if (authenticationResult[0] == ErrorPacket.HEADER) {
+            ErrorPacket errorPacket = new ErrorPacket(authenticationResult, 1);
+            throw new AuthenticationException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                errorPacket.getSqlState());
         }
     }
 
@@ -578,11 +575,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void confirmSupportOfChecksum(ChecksumType checksumType) throws IOException {
         channel.write(new QueryCommand("set @master_binlog_checksum= @@global.binlog_checksum"));
         byte[] statementResult = channel.read();
-        if (statementResult[0] == (byte) 0xFF /* error */) {
-            byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
-            ErrorPacket errorPacket = new ErrorPacket(bytes);
+        if (statementResult[0] == ErrorPacket.HEADER) {
+            ErrorPacket errorPacket = new ErrorPacket(statementResult, 1);
             throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
-                errorPacket.getSqlState());
+                    errorPacket.getSqlState());
         }
         eventDeserializer.setChecksumType(checksumType);
     }
@@ -594,7 +590,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 int packetLength = inputStream.readInteger(3);
                 inputStream.skip(1); // 1 byte for sequence
                 int marker = inputStream.read();
-                if (marker == 0xFF) {
+                if (marker == ErrorPacket.HEADER) {
                     ErrorPacket errorPacket = new ErrorPacket(inputStream.read(packetLength - 1));
                     throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                         errorPacket.getSqlState());
@@ -680,14 +676,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private ResultSetRowPacket[] readResultSet() throws IOException {
         List<ResultSetRowPacket> resultSet = new LinkedList<ResultSetRowPacket>();
         byte[] statementResult = channel.read();
-        if (statementResult[0] == (byte) 0xFF /* error */) {
-            byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
-            ErrorPacket errorPacket = new ErrorPacket(bytes);
+        if (statementResult[0] == ErrorPacket.HEADER) {
+            ErrorPacket errorPacket = new ErrorPacket(statementResult, 1);
             throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                     errorPacket.getSqlState());
         }
-        while ((channel.read())[0] != (byte) 0xFE /* eof */) { /* skip */ }
-        for (byte[] bytes; (bytes = channel.read())[0] != (byte) 0xFE /* eof */; ) {
+        while ((channel.read())[0] != (byte) 0xFE) { /* skip */ }
+        for (byte[] bytes; (bytes = channel.read())[0] != (byte) 0xFE;) {
             resultSet.add(new ResultSetRowPacket(bytes));
         }
         return resultSet.toArray(new ResultSetRowPacket[resultSet.size()]);
