@@ -74,20 +74,14 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         this.tableMapEventByTableId = tableMapEventByTableId;
     }
 
-    protected Serializable[] deserializeRow(long tableId, BitSet includedColumns, ByteArrayInputStream inputStream)
-            throws IOException {
-        TableMapEventData tableMapEvent = tableMapEventByTableId.get(tableId);
-        if (tableMapEvent == null) {
-            throw new MissingTableMapEventException("No TableMapEventData has been found for table id:" + tableId +
-                ". Usually that means that you have started reading binary log 'within the logical event group'" +
-                " (e.g. from WRITE_ROWS and not proceeding TABLE_MAP");
-        }
+    protected Serializable[] deserializeRow(TableMapEventData tableMapEvent, ColumnSet columnSet,
+            ByteArrayInputStream inputStream) throws IOException {
         byte[] types = tableMapEvent.getColumnTypes();
         int[] metadata = tableMapEvent.getColumnMetadata();
-        Serializable[] result = new Serializable[numberOfBitsSet(includedColumns)];
+        Serializable[] result = new Serializable[columnSet.size()];
         BitSet nullColumns = inputStream.readBitSet(result.length, true);
         for (int i = 0, numberOfSkippedColumns = 0; i < types.length; i++) {
-            if (!includedColumns.get(i)) {
+            if (!columnSet.contains(i)) {
                 numberOfSkippedColumns++;
                 continue;
             }
@@ -116,6 +110,16 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             }
         }
         return result;
+    }
+
+    protected TableMapEventData getTableMapEventData(long tableId) throws MissingTableMapEventException {
+        TableMapEventData tableMapEvent = tableMapEventByTableId.get(tableId);
+        if (tableMapEvent == null) {
+            throw new MissingTableMapEventException("No TableMapEventData has been found for table id:" + tableId +
+                ". Usually that means that you have started reading binary log 'within the logical event group'" +
+                " (e.g. from WRITE_ROWS and not proceeding TABLE_MAP");
+        }
+        return tableMapEvent;
     }
 
     protected Serializable deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
@@ -344,14 +348,6 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return (int) (result & ((1 << numberOfBits) - 1));
     }
 
-    private static int numberOfBitsSet(BitSet bitSet) {
-        int result = 0;
-        for (int i = bitSet.nextSetBit(0); i >= 0; i = bitSet.nextSetBit(i + 1)) {
-            result++;
-        }
-        return result;
-    }
-
     private static int[] split(long value, int divider, int length) {
         int[] result = new int[length];
         for (int i = 0; i < length - 1; i++) {
@@ -413,6 +409,30 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             result = (result << 8) | (b >= 0 ? (int) b : (b + 256));
         }
         return result;
+    }
+
+    /**
+     * Set of columns to be deserialized.
+     */
+    static class ColumnSet {
+
+        private BitSet bitSet;
+        private int numberOfBitsSet;
+
+        public ColumnSet(BitSet bitSet) {
+            this.bitSet = bitSet;
+            for (int i = bitSet.nextSetBit(0); i >= 0; i = bitSet.nextSetBit(i + 1)) {
+                numberOfBitsSet++;
+            }
+        }
+
+        public boolean contains(int i) {
+            return bitSet.get(i);
+        }
+
+        public int size() {
+            return numberOfBitsSet;
+        }
     }
 
     /**
