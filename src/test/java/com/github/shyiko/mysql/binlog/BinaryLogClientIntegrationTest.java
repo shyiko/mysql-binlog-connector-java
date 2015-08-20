@@ -216,13 +216,13 @@ public class BinaryLogClientIntegrationTest {
             new Serializable[]{-8.9, 0.0, 8.9});
         // date & time types
         assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
-            new java.sql.Date(generateTime(1989, 3, 21, 0, 0, 0, 0))});
+            generateTime(1989, 3, 21, 0, 0, 0, 0)});
         assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000000'"), new Serializable[]{
-            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 0))});
+            generateTime(1989, 3, 21, 1, 2, 3, 0)});
         assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000000'"), new Serializable[]{
-            new java.sql.Timestamp(generateTime(1989, 3, 18, 1, 2, 3, 0))});
+            generateTime(1989, 3, 18, 1, 2, 3, 0)});
         assertEquals(writeAndCaptureRow("time", "'1:2:3.000000'"), new Serializable[]{
-            new java.sql.Time(generateTime(1970, 1, 1, 1, 2, 3, 0))});
+            generateTime(1970, 1, 1, 1, 2, 3, 0)});
         assertEquals(writeAndCaptureRow("year", "'69'"), new Serializable[]{2069});
         // string types
         assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q".getBytes()});
