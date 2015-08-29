@@ -35,6 +35,7 @@ import com.github.shyiko.mysql.binlog.network.ServerException;
 import com.github.shyiko.mysql.binlog.network.SocketFactory;
 import com.github.shyiko.mysql.binlog.network.protocol.ErrorPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
+import com.github.shyiko.mysql.binlog.network.protocol.Packet;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
 import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
@@ -597,7 +598,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
                 Event event;
                 try {
-                    event = eventDeserializer.nextEvent(inputStream);
+                    event = eventDeserializer.nextEvent(packetLength == Packet.MAX_LENGTH ?
+                        new ByteArrayInputStream(readPacketSplitInChunks(inputStream, packetLength - 1)) :
+                        inputStream);
                 } catch (Exception e) {
                     Throwable cause = e instanceof EventDataDeserializationException ? e.getCause() : e;
                     if (cause instanceof EOFException || cause instanceof SocketException) {
@@ -631,6 +634,25 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 disconnectChannel();
             }
         }
+    }
+
+    private byte[] readPacketSplitInChunks(ByteArrayInputStream inputStream, int packetLength) throws IOException {
+        List<byte[]> chunks = new LinkedList<byte[]>();
+        chunks.add(inputStream.read(packetLength));
+        int chunkLength;
+        do {
+            chunkLength = inputStream.readInteger(3);
+            inputStream.skip(1); // 1 byte for sequence
+            chunks.add(inputStream.read(chunkLength));
+            packetLength += chunkLength;
+        } while (chunkLength == Packet.MAX_LENGTH);
+        byte[] buffer = new byte[packetLength];
+        int offset = 0;
+        for (byte[] chunk : chunks) {
+            System.arraycopy(chunk, 0, buffer, offset, chunk.length);
+            offset += chunk.length;
+        }
+        return buffer;
     }
 
     private void updateClientBinlogFilenameAndPosition(Event event) {
