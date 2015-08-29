@@ -4,13 +4,19 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.2...HEAD)
 
+### Added
+ - Rudimentary support for GEOMETRY. 
+
 ### Changed
- - DATETIME/DATETIME_V2/TIMESTAMP/TIMESTAMP_V2/DATE/TIME/TIME_V2 deserialization to `long`s (Unix timestamp).
+ - DATETIME/DATETIME_V2/TIMESTAMP/TIMESTAMP_V2/DATE/TIME/TIME_V2 deserialization to `long`s (Unix timestamp).  
 This is **BACKWARD-INCOMPATIBLE** change.
 
 ### Fixed
  - BINARY/VARBINARY deserialization ([#56](https://github.com/shyiko/mysql-binlog-connector-java/issues/56)).  
 This is **BACKWARD-INCOMPATIBLE** change as CHAR/VARCHAR/BINARY/VARBINARY are now returned as `byte[]` (which you can obviously convert to String with `new String(byte[], Charset)` if needed).
+ - NPE if user attempts to read binary log 'within the logical event group' ([#60](https://github.com/shyiko/mysql-binlog-connector-java/issues/60)).
+ - Handling of DATE/DATETIME/TIMESTAMP's "zero" value (e.g. '0000-00-00').
+ - Handling of packets exceeding 16mb in size
 
 ## [0.2.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.1...0.2.2) - 2015-07-10
 
