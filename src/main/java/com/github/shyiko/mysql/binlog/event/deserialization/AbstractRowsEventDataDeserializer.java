@@ -56,9 +56,8 @@ import java.util.TimeZone;
  * {@link ColumnType#VAR_STRING}: byte[]
  * {@link ColumnType#STRING}: byte[]
  * {@link ColumnType#BLOB}: byte[]
+ * {@link ColumnType#GEOMETRY}: byte[]
  * </pre>
- *
- * At the moment {@link ColumnType#GEOMETRY} is unsupported.
  *
  * @param <T> event data this deserializer is responsible for
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
@@ -169,6 +168,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
                 return deserializeEnum(length, inputStream);
             case SET:
                 return deserializeSet(length, inputStream);
+            case GEOMETRY:
+                return deserializeGeometry(meta, inputStream);
             default:
                 throw new IOException("Unsupported type " + type);
         }
@@ -321,6 +322,11 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     protected Long deserializeSet(int length, ByteArrayInputStream inputStream) throws IOException {
         return inputStream.readLong(length);
+    }
+
+    protected byte[] deserializeGeometry(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int dataLength = inputStream.readInteger(meta);
+        return inputStream.read(dataLength);
     }
 
     private static int getFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {

@@ -182,55 +182,116 @@ public class BinaryLogClientIntegrationTest {
     }
 
     @Test
-    public void testDeserializationOfDifferentColumnTypes() throws Exception {
-        // numeric types
+    public void testDeserializationOfBIT() throws Exception {
         assertEquals(writeAndCaptureRow("bit(3)", "0", "1", "2", "3"),
             new Serializable[]{bitSet(), bitSet(0), bitSet(1), bitSet(0, 1)});
+    }
+
+    @Test
+    public void testDeserializationOfTINY() throws Exception {
         assertEquals(writeAndCaptureRow("tinyint unsigned", "0", "1", "255"),
             new Serializable[]{0, 1, -1});
         assertEquals(writeAndCaptureRow("tinyint", "-128", "-1", "0", "1", "127"),
             new Serializable[]{-128, -1, 0, 1, 127});
         assertEquals(writeAndCaptureRow("bool", "1"), new Serializable[]{1});
+    }
+
+    @Test
+    public void testDeserializationOfSHORT() throws Exception {
         assertEquals(writeAndCaptureRow("smallint unsigned", "0", "1", "65535"),
             new Serializable[]{0, 1, -1});
         assertEquals(writeAndCaptureRow("smallint", "-32768", "-1", "0", "1", "32767"),
             new Serializable[]{-32768, -1, 0, 1, 32767});
+    }
+
+    @Test
+    public void testDeserializationOfINT24() throws Exception {
         assertEquals(writeAndCaptureRow("mediumint unsigned", "0", "1", "16777215"),
             new Serializable[]{0, 1, -1});
         assertEquals(writeAndCaptureRow("mediumint", "-8388608", "-1", "0", "1", "8388607"),
             new Serializable[]{-8388608, -1, 0, 1, 8388607});
+    }
+
+    @Test
+    public void testDeserializationOfLONG() throws Exception {
         assertEquals(writeAndCaptureRow("int unsigned", "0", "1", "4294967295"),
             new Serializable[]{0, 1, -1});
         assertEquals(writeAndCaptureRow("int", "-2147483648", "-1", "0", "1", "2147483647"),
             new Serializable[]{-2147483648, -1, 0, 1, 2147483647});
+    }
+
+    @Test
+    public void testDeserializationOfLONGLONG() throws Exception {
         assertEquals(writeAndCaptureRow("bigint unsigned", "0", "1", "18446744073709551615"),
             new Serializable[]{0L, 1L, -1L});
         assertEquals(writeAndCaptureRow("bigint", "-9223372036854775808", "-1", "0", "1", "9223372036854775807"),
             new Serializable[]{-9223372036854775808L, -1L, 0L, 1L, 9223372036854775807L});
+    }
+
+    @Test
+    public void testDeserializationOfFLOAT() throws Exception {
+        assertEquals(writeAndCaptureRow("float", "-0.3", "0", "0.3"),
+            new Serializable[]{-0.3F, 0.0F, 0.3F});
+    }
+
+    @Test
+    public void testDeserializationOfDOUBLE() throws Exception {
+        assertEquals(writeAndCaptureRow("double", "-8.9", "0", "8.9"),
+            new Serializable[]{-8.9, 0.0, 8.9});
+    }
+
+    @Test
+    public void testDeserializationOfNEWDECIMAL() throws Exception {
         MathContext mc = new MathContext(2);
         assertEquals(writeAndCaptureRow("decimal(2,1)", "-2.12", "0", "2.12"),
             new Serializable[]{new BigDecimal(-2.1, mc), new BigDecimal(0).setScale(1), new BigDecimal(2.1, mc)});
-        assertEquals(writeAndCaptureRow("float", "-0.3", "0", "0.3"),
-            new Serializable[]{-0.3F, 0.0F, 0.3F});
-        assertEquals(writeAndCaptureRow("double", "-8.9", "0", "8.9"),
-            new Serializable[]{-8.9, 0.0, 8.9});
-        // date & time types
+    }
+
+    @Test
+    public void testDeserializationOfDATE() throws Exception {
         assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
             generateTime(1989, 3, 21, 0, 0, 0, 0)});
-        assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000000'"), new Serializable[]{
-            generateTime(1989, 3, 21, 1, 2, 3, 0)});
-        assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000000'"), new Serializable[]{
-            generateTime(1989, 3, 18, 1, 2, 3, 0)});
+    }
+
+    @Test
+    public void testDeserializationOfTIME() throws Exception {
         assertEquals(writeAndCaptureRow("time", "'1:2:3.000000'"), new Serializable[]{
             generateTime(1970, 1, 1, 1, 2, 3, 0)});
+    }
+
+    @Test
+    public void testDeserializationOfTIMESTAMP() throws Exception {
+        assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000000'"), new Serializable[]{
+            generateTime(1989, 3, 18, 1, 2, 3, 0)});
+    }
+
+    @Test
+    public void testDeserializationOfDATETIME() throws Exception {
+        assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000000'"), new Serializable[]{
+            generateTime(1989, 3, 21, 1, 2, 3, 0)});
+    }
+
+    @Test
+    public void testDeserializationOfYEAR() throws Exception {
         assertEquals(writeAndCaptureRow("year", "'69'"), new Serializable[]{2069});
-        // string types
+    }
+
+    @Test
+    public void testDeserializationOfSTRING() throws Exception {
         assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q".getBytes()});
-        assertEquals(writeAndCaptureRow("varchar(255)", "'we'"), new Serializable[]{"we".getBytes()});
         assertEquals(writeAndCaptureRow("binary", "'r'"), new Serializable[]{"r".getBytes()});
         assertEquals(writeAndCaptureRow("binary(16)", "unhex(md5(\"glob\"))"),
             new Serializable[]{DatatypeConverter.parseHexBinary("8684147451a6cc3b92142c6f4b78e61c")});
+    }
+
+    @Test
+    public void testDeserializationOfVARSTRING() throws Exception {
+        assertEquals(writeAndCaptureRow("varchar(255)", "'we'"), new Serializable[]{"we".getBytes()});
         assertEquals(writeAndCaptureRow("varbinary(255)", "'ty'"), new Serializable[]{"ty".getBytes()});
+    }
+
+    @Test
+    public void testDeserializationOfBLOB() throws Exception {
         assertEquals(writeAndCaptureRow("tinyblob", "'ui'"), new Serializable[]{"ui".getBytes()});
         assertEquals(writeAndCaptureRow("tinytext", "'op'"), new Serializable[]{"op".getBytes()});
         assertEquals(writeAndCaptureRow("blob", "'as'"), new Serializable[]{"as".getBytes()});
@@ -239,8 +300,23 @@ public class BinaryLogClientIntegrationTest {
         assertEquals(writeAndCaptureRow("mediumtext", "'jk'"), new Serializable[]{"jk".getBytes()});
         assertEquals(writeAndCaptureRow("longblob", "'lz'"), new Serializable[]{"lz".getBytes()});
         assertEquals(writeAndCaptureRow("longtext", "'xc'"), new Serializable[]{"xc".getBytes()});
+    }
+
+    @Test
+    public void testDeserializationOfENUM() throws Exception {
         assertEquals(writeAndCaptureRow("enum('a','b','c')", "'b'"), new Serializable[]{2});
+    }
+
+    @Test
+    public void testDeserializationOfSET() throws Exception {
         assertEquals(writeAndCaptureRow("set('a','b','c')", "'a,c'"), new Serializable[]{5L});
+    }
+
+    @Test
+    public void testDeserializationOfGEOMETRY() throws Exception {
+        assertEquals(writeAndCaptureRow("geometry", "GeomFromText('POINT(40.717957 -73.736501)')"),
+            new Serializable[]{new byte[] {0, 0, 0, 0, 1, 1, 0, 0, 0, -106, 119, -43, 3, -26, 91, 68,
+                64, 42, 30, 23, -43, 34, 111, 82, -64}});
     }
 
     private BitSet bitSet(int... bitsToSetTrue) {
@@ -297,7 +373,7 @@ public class BinaryLogClientIntegrationTest {
         return result;
     }
 
-    @Test
+    @Test(enabled = false)
     public void testUnsupportedColumnTypeDoesNotCauseClientToFail() throws Exception {
         BinaryLogClient.LifecycleListener lifecycleListenerMock = mock(BinaryLogClient.LifecycleListener.class);
         client.registerLifecycleListener(lifecycleListenerMock);
