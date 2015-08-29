@@ -251,6 +251,9 @@ public class BinaryLogClientIntegrationTest {
     public void testDeserializationOfDATE() throws Exception {
         assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
             generateTime(1989, 3, 21, 0, 0, 0, 0)});
+        assertEquals(writeAndCaptureRow("date", "'0000-03-21'"), new Serializable[]{null});
+        assertEquals(writeAndCaptureRow("date", "'1989-00-21'"), new Serializable[]{null});
+        assertEquals(writeAndCaptureRow("date", "'1989-03-00'"), new Serializable[]{null});
     }
 
     @Test

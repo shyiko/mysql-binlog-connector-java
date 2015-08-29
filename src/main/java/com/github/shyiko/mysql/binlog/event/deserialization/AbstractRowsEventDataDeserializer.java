@@ -222,13 +222,13 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         value >>>= 5;
         int month = value % 16;
         int year = value >> 4;
-        return UnixTime.from(year, month, day, 0, 0, 0, 0);
+        return asUnixTime(year, month, day, 0, 0, 0, 0);
     }
 
     protected Long deserializeTime(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
         int[] split = split(value, 100, 3);
-        return UnixTime.from(1970, 1, 1, split[2], split[1], split[0], 0);
+        return asUnixTime(1970, 1, 1, split[2], split[1], split[0], 0);
     }
 
     protected Long deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
@@ -246,7 +246,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             + fractional-seconds storage (size depends on meta)
         */
         long time = bigEndianLong(inputStream.read(3), 0, 3);
-        return UnixTime.from(1970, 1, 1,
+        return asUnixTime(1970, 1, 1,
             extractBits(time, 2, 10, 24),
             extractBits(time, 12, 6, 24),
             extractBits(time, 18, 6, 24),
@@ -264,7 +264,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     protected Long deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
         int[] split = split(inputStream.readLong(8), 100, 6);
-        return UnixTime.from(split[5], split[4], split[3], split[2], split[1], split[0], 0);
+        return asUnixTime(split[5], split[4], split[3], split[2], split[1], split[0], 0);
     }
 
     protected Long deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
@@ -284,7 +284,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         */
         long datetime = bigEndianLong(inputStream.read(5), 0, 5);
         int yearMonth = extractBits(datetime, 1, 17, 40);
-        return UnixTime.from(
+        return asUnixTime(
                 yearMonth / 13,
                 yearMonth % 13,
                 extractBits(datetime, 18, 5, 40),
@@ -327,6 +327,15 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     protected byte[] deserializeGeometry(int meta, ByteArrayInputStream inputStream) throws IOException {
         int dataLength = inputStream.readInteger(meta);
         return inputStream.read(dataLength);
+    }
+
+    // checkstyle, please ignore ParameterNumber for the next line
+    private static Long asUnixTime(int year, int month, int day, int hour, int minute, int second, int millis) {
+        // https://dev.mysql.com/doc/refman/5.0/en/datetime.html
+        if (year == 0 || month == 0 || day == 0) {
+            return null;
+        }
+        return UnixTime.from(year, month, day, hour, minute, second, millis);
     }
 
     private static int getFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
