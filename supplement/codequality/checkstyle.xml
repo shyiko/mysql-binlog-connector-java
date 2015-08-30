@@ -121,7 +121,7 @@
             <property name="protectedAllowed" value="true"/>
         </module>
         <module name="FinalClass"/>
-        <module name="InterfaceIsType"/>
+        <!--<module name="InterfaceIsType"/>-->
         <module name="HideUtilityClassConstructor"/>
         <module name="ThrowsCount">
             <property name="max" value="3"/>
