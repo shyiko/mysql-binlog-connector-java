@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -637,22 +638,15 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private byte[] readPacketSplitInChunks(ByteArrayInputStream inputStream, int packetLength) throws IOException {
-        List<byte[]> chunks = new LinkedList<byte[]>();
-        chunks.add(inputStream.read(packetLength));
+        byte[] result = inputStream.read(packetLength);
         int chunkLength;
         do {
             chunkLength = inputStream.readInteger(3);
             inputStream.skip(1); // 1 byte for sequence
-            chunks.add(inputStream.read(chunkLength));
-            packetLength += chunkLength;
+            result = Arrays.copyOf(result, result.length + chunkLength);
+            inputStream.fill(result, result.length - chunkLength, chunkLength);
         } while (chunkLength == Packet.MAX_LENGTH);
-        byte[] buffer = new byte[packetLength];
-        int offset = 0;
-        for (byte[] chunk : chunks) {
-            System.arraycopy(chunk, 0, buffer, offset, chunk.length);
-            offset += chunk.length;
-        }
-        return buffer;
+        return result;
     }
 
     private void updateClientBinlogFilenameAndPosition(Event event) {
