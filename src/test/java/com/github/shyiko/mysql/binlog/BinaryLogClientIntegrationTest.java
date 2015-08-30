@@ -51,6 +51,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.AbstractMap;
 import java.util.BitSet;
 import java.util.Calendar;
 import java.util.List;
@@ -60,6 +61,7 @@ import java.util.TimeZone;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -374,6 +376,53 @@ public class BinaryLogClientIntegrationTest {
             result[index++] = writtenRow[0];
         }
         return result;
+    }
+
+    @Test
+    public void testBinlogPositionPointsToTableMapEventUntilTheEndOfLogicalGroup() throws Exception {
+        final AtomicReference<Map.Entry<String, Long>> markHolder = new AtomicReference<Map.Entry<String, Long>>();
+        BinaryLogClient.EventListener markEventListener = new BinaryLogClient.EventListener() {
+
+            private int counter;
+
+            @Override
+            public void onEvent(Event event) {
+                if (EventType.isRowMutation(event.getHeader().getEventType()) && counter++ == 1) {
+                    // coordinates of second insert
+                    markHolder.set(new AbstractMap.SimpleEntry<String, Long>(client.getBinlogFilename(),
+                        client.getBinlogPosition()));
+                }
+            }
+        };
+        client.registerEventListener(markEventListener);
+        try {
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("insert into bikini_bottom values('SpongeBob')");
+                    statement.execute("insert into bikini_bottom values('Patrick')");
+                    statement.execute("insert into bikini_bottom values('Squidward')");
+                }
+            });
+            eventListener.waitFor(WriteRowsEventData.class, 3, DEFAULT_TIMEOUT);
+            final BinaryLogClient anotherClient = new BinaryLogClient(slave.hostname, slave.port,
+                slave.username, slave.password);
+            anotherClient.registerLifecycleListener(new TraceLifecycleListener());
+            CountDownEventListener anotherClientEventListener = new CountDownEventListener();
+            anotherClient.registerEventListener(anotherClientEventListener);
+            Map.Entry<String, Long> mark = markHolder.get();
+            anotherClient.setBinlogFilename(mark.getKey());
+            anotherClient.setBinlogPosition(mark.getValue());
+            anotherClient.connect(DEFAULT_TIMEOUT);
+            try {
+                // expecting Patrick & Squidward
+                anotherClientEventListener.waitFor(WriteRowsEventData.class, 2, DEFAULT_TIMEOUT);
+            } finally {
+                anotherClient.disconnect();
+            }
+        } finally {
+            client.unregisterEventListener(markEventListener);
+        }
     }
 
     @Test(enabled = false)
