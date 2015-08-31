@@ -35,6 +35,7 @@ import com.github.shyiko.mysql.binlog.network.ServerException;
 import com.github.shyiko.mysql.binlog.network.SocketFactory;
 import com.github.shyiko.mysql.binlog.network.protocol.ErrorPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
+import com.github.shyiko.mysql.binlog.network.protocol.Packet;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
 import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
@@ -72,6 +73,9 @@ import java.util.logging.Logger;
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class BinaryLogClient implements BinaryLogClientMXBean {
+
+    // https://dev.mysql.com/doc/internals/en/sending-more-than-16mbyte.html
+    private static final int MAX_PACKET_LENGTH = 16777215;
 
     private final Logger logger = Logger.getLogger(getClass().getName());
 
@@ -592,7 +596,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
                 Event event;
                 try {
-                    event = eventDeserializer.nextEvent(inputStream);
+                    event = eventDeserializer.nextEvent(packetLength == MAX_PACKET_LENGTH ?
+                        new ByteArrayInputStream(readPacketSplitInChunks(inputStream, packetLength - 1)) :
+                        inputStream);
                 } catch (Exception e) {
                     Throwable cause = e instanceof EventDataDeserializationException ? e.getCause() : e;
                     if (cause instanceof EOFException || cause instanceof SocketException) {
@@ -626,6 +632,18 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 disconnectChannel();
             }
         }
+    }
+
+    private byte[] readPacketSplitInChunks(ByteArrayInputStream inputStream, int packetLength) throws IOException {
+        byte[] result = inputStream.read(packetLength);
+        int chunkLength;
+        do {
+            chunkLength = inputStream.readInteger(3);
+            inputStream.skip(1); // 1 byte for sequence
+            result = Arrays.copyOf(result, result.length + chunkLength);
+            inputStream.fill(result, result.length - chunkLength, chunkLength);
+        } while (chunkLength == Packet.MAX_LENGTH);
+        return result;
     }
 
     private void updateClientBinlogFilenameAndPosition(Event event) {
