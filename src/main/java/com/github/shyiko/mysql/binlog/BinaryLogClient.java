@@ -591,7 +591,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             while (inputStream.peek() != -1) {
                 int packetLength = inputStream.readInteger(3);
                 inputStream.skip(1); // 1 byte for sequence
-                int marker = inputStream.read();
+                byte marker = (byte) inputStream.read();
                 if (marker == ErrorPacket.HEADER) {
                     ErrorPacket errorPacket = new ErrorPacket(inputStream.read(packetLength - 1));
                     throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
