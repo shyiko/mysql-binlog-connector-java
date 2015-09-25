@@ -34,13 +34,14 @@ public class GtidSetTest {
         gtidSet.add("00000000-0000-0000-0000-000000000001:9");
         gtidSet.add("00000000-0000-0000-0000-000000000000:0");
         assertEquals(gtidSet.toString(),
-            "00000000-0000-0000-0000-000000000000:0-1:2-6:7-8,00000000-0000-0000-0000-000000000001:9-10");
+            "00000000-0000-0000-0000-000000000000:0-0:2-5:7-7,00000000-0000-0000-0000-000000000001:9-9");
     }
 
     @Test
     public void testJoin() throws Exception {
-        GtidSet gtidSet = new GtidSet("00000000-0000-0000-0000-000000000000:3-5:6-7");
+        GtidSet gtidSet = new GtidSet("00000000-0000-0000-0000-000000000000:3-4:6-7");
         gtidSet.add("00000000-0000-0000-0000-000000000000:5");
+        assertEquals(gtidSet.getUUIDSets().iterator().next().getIntervals().iterator().next().getEnd(), 7);
         assertEquals(gtidSet.toString(), "00000000-0000-0000-0000-000000000000:3-7");
     }
 
