@@ -84,6 +84,8 @@ public class EventDeserializer {
                 new FormatDescriptionEventDataDeserializer());
         eventDataDeserializers.put(EventType.ROTATE,
                 new RotateEventDataDeserializer());
+        eventDataDeserializers.put(EventType.INTVAR,
+            new IntVarEventDataDeserializer());
         eventDataDeserializers.put(EventType.QUERY,
                 new QueryEventDataDeserializer());
         eventDataDeserializers.put(EventType.TABLE_MAP,
