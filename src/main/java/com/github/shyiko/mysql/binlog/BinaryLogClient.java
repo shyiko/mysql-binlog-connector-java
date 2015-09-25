@@ -85,6 +85,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private final String username;
     private final String password;
 
+    private boolean blocking = true;
     private long serverId = 65535;
     private volatile String binlogFilename;
     private volatile long binlogPosition = 4;
@@ -152,6 +153,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.schema = schema;
         this.username = username;
         this.password = password;
+    }
+
+    public boolean isBlocking() {
+        return blocking;
+    }
+
+    /**
+     * @param blocking blocking mode. If set to false - BinaryLogClient will disconnect after the last event.
+     */
+    public void setBlocking(boolean blocking) {
+        this.blocking = blocking;
     }
 
     /**
@@ -369,8 +381,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         connected = true;
         connectionId = greetingPacket.getThreadId();
         if (logger.isLoggable(Level.INFO)) {
-            logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition +
-                " (sid:" + serverId + ", cid:" + connectionId + ")");
+            String position;
+            synchronized (gtidSetAccessLock) {
+                position = gtidSet != null ? gtidSet.toString() : binlogFilename + "/" + binlogPosition;
+            }
+            logger.info("Connected to " + hostname + ":" + port + " at " + position +
+                " (" + (blocking ? "sid:" + serverId + ", " : "") + "cid:" + connectionId + ")");
         }
         synchronized (lifecycleListeners) {
             for (LifecycleListener lifecycleListener : lifecycleListeners) {
@@ -401,6 +417,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void requestBinaryLogStream() throws IOException {
+        long serverId = blocking ? this.serverId : 0; // http://bugs.mysql.com/bug.php?id=71178
         Command dumpBinaryLogCommand;
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
@@ -602,6 +619,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     ErrorPacket errorPacket = new ErrorPacket(inputStream.read(packetLength - 1));
                     throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                         errorPacket.getSqlState());
+                }
+                if (marker == (byte) 0xFE && !blocking) {
+                    break;
                 }
                 Event event;
                 try {
