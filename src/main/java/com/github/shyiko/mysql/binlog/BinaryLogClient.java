@@ -21,12 +21,14 @@ import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.GtidEventData;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
@@ -87,7 +89,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private volatile long binlogPosition = 4;
     private volatile long connectionId;
 
-    private GtidSet gtidSet;
+    private volatile GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
@@ -110,6 +112,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private long keepAliveThreadShutdownTimeout = TimeUnit.SECONDS.toMillis(6);
 
     private final Lock shutdownLock = new ReentrantLock();
+
+    private Event previousEvent;
+    private Event previousGtidEvent;
 
     /**
      * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
@@ -333,8 +338,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             GreetingPacket greetingPacket = receiveGreeting();
             authenticate(greetingPacket.getScramble(), greetingPacket.getServerCollation());
             connectionId = greetingPacket.getThreadId();
-            if (binlogFilename == null) {
-                fetchBinlogFilenameAndPosition();
+            if (binlogFilename == null && gtidSet == null) {
+                autoPosition();
             }
             if (binlogPosition < 4) {
                 if (logger.isLoggable(Level.WARNING)) {
@@ -355,7 +360,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
         connected = true;
         if (logger.isLoggable(Level.INFO)) {
-            logger.info("Connected to " + hostname + ":" + port + " at " + binlogFilename + "/" + binlogPosition +
+            String position;
+            synchronized (gtidSetAccessLock) {
+                position = gtidSet != null ? gtidSet.toString() : binlogFilename + "/" + binlogPosition;
+            }
+            logger.info("Connected to " + hostname + ":" + port + " at " + position +
                 " (sid:" + serverId + ", cid:" + connectionId + ")");
         }
         synchronized (lifecycleListeners) {
@@ -367,12 +376,16 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             spawnKeepAliveThread();
         }
         ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
-        synchronized (gtidSetAccessLock) {
-            if (gtidSet != null) {
-                ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
-            }
+        if (gtidSet != null) {
+            ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+            ensureEventDataDeserializer(EventType.QUERY, QueryEventDataDeserializer.class);
         }
+        reset();
         listenForEventPackets();
+    }
+
+    private void reset() {
+        previousEvent = previousGtidEvent = null;
     }
 
     private void establishConnection() throws IOException {
@@ -403,7 +416,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         Command dumpBinaryLogCommand;
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
-                dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
+                dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, "", 4, gtidSet);
             } else {
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
             }
@@ -553,16 +566,29 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return connected;
     }
 
-    private void fetchBinlogFilenameAndPosition() throws IOException {
+    private void autoPosition() throws IOException {
         ResultSetRowPacket[] resultSet;
         channel.write(new QueryCommand("show master status"));
         resultSet = readResultSet();
         if (resultSet.length == 0) {
-            throw new IOException("Failed to determine binlog filename/position");
+            throw new IOException("Failed to determine current binlog position");
         }
         ResultSetRowPacket resultSetRow = resultSet[0];
+        // File | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set
+        // see https://dev.mysql.com/doc/refman/5.6/en/show-master-status.html
         binlogFilename = resultSetRow.getValue(0);
         binlogPosition = Long.parseLong(resultSetRow.getValue(1));
+        if (isGtidModeOn()) {
+            synchronized (gtidSetAccessLock) {
+                gtidSet = new GtidSet(resultSetRow.getValue(4).replace("\n", ""));
+            }
+        }
+    }
+
+    private boolean isGtidModeOn() throws IOException  {
+        channel.write(new QueryCommand("show global variables like 'gtid_mode'"));
+        ResultSetRowPacket[] resultSet = readResultSet();
+        return resultSet.length > 0 && "ON".equalsIgnoreCase(resultSet[0].getValue(1));
     }
 
     private ChecksumType fetchBinlogChecksum() throws IOException {
@@ -618,8 +644,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
                 if (isConnected()) {
                     notifyEventListeners(event);
-                    updateClientBinlogFilenameAndPosition(event);
-                    updateGtidSet(event);
+                    updatePosition(event);
                 }
             }
         } catch (Exception e) {
@@ -649,17 +674,34 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return result;
     }
 
-    private void updateClientBinlogFilenameAndPosition(Event event) {
+    private void updatePosition(Event event) {
         EventHeader eventHeader = event.getHeader();
         EventType eventType = eventHeader.getEventType();
-        if (eventType == EventType.ROTATE) {
-            EventData eventData = event.getData();
-            RotateEventData rotateEventData;
-            if (eventData instanceof EventDeserializer.EventDataWrapper) {
-                rotateEventData = (RotateEventData) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
-            } else {
-                rotateEventData = (RotateEventData) eventData;
+        if (gtidSet != null && eventType == EventType.XID) {
+            advanceGTID();
+        } else
+        if (gtidSet != null && eventType == EventType.QUERY) {
+            QueryEventData queryEventData = getInternalEventData(event);
+            String query = queryEventData.getSql();
+            if ("COMMIT".equals(query) || "ROLLBACK".equals(query) ||
+                (previousEvent != null && previousEvent.getHeader().getEventType() == EventType.GTID &&
+                    !"BEGIN".equals(query))) {
+                advanceGTID();
             }
+        } else
+        if (gtidSet != null && eventType == EventType.GTID) {
+            if (previousGtidEvent != null) {
+                if (advanceGTID()) {
+                    if (logger.isLoggable(Level.WARNING)) {
+                        logger.log(Level.WARNING, "GtidSet wasn't synchronized before GTID. " +
+                            "Please submit a bug report to https://github.com/shyiko/mysql-binlog-connector-java");
+                    }
+                }
+            }
+            previousGtidEvent = event;
+        } else
+        if (eventType == EventType.ROTATE) {
+            RotateEventData rotateEventData = getInternalEventData(event);
             binlogFilename = rotateEventData.getBinlogFilename();
             binlogPosition = rotateEventData.getBinlogPosition();
         } else
@@ -672,23 +714,23 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 binlogPosition = nextBinlogPosition;
             }
         }
+        previousEvent = event;
     }
 
-    private void updateGtidSet(Event event) {
-        EventHeader eventHeader = event.getHeader();
-        if (eventHeader.getEventType() == EventType.GTID) {
-            synchronized (gtidSetAccessLock) {
-                if (gtidSet != null) {
-                    EventData eventData = event.getData();
-                    GtidEventData gtidEventData;
-                    if (eventData instanceof EventDeserializer.EventDataWrapper) {
-                        gtidEventData = (GtidEventData) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
-                    } else {
-                        gtidEventData = (GtidEventData) eventData;
-                    }
-                    gtidSet.add(gtidEventData.getGtid());
-                }
-            }
+    private boolean advanceGTID() {
+        GtidEventData gtidEventData = getInternalEventData(previousGtidEvent);
+        synchronized (gtidSetAccessLock) {
+            return gtidSet.add(gtidEventData.getGtid());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends EventData> T getInternalEventData(Event event) {
+        EventData eventData = event.getData();
+        if (eventData instanceof EventDeserializer.EventDataWrapper) {
+            return (T) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
+        } else {
+            return (T) eventData;
         }
     }
 
