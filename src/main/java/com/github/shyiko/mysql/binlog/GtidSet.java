@@ -164,7 +164,7 @@ public class GtidSet {
     /**
      * @see GtidSet
      */
-    public static class UUIDSet {
+    public static final class UUIDSet {
 
         private String uuid;
         private Collection<Interval> intervals;
@@ -186,7 +186,7 @@ public class GtidSet {
     /**
      * @see GtidSet
      */
-    public static class Interval implements Comparable<Interval> {
+    public static final class Interval implements Comparable<Interval> {
 
         private long start;
         private long end;
