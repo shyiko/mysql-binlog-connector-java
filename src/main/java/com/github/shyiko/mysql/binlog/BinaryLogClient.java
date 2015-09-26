@@ -30,6 +30,7 @@ import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
@@ -49,6 +50,7 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
@@ -75,6 +77,23 @@ import java.util.logging.Logger;
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class BinaryLogClient implements BinaryLogClientMXBean {
+
+    private static final SocketFactory DEFAULT_SOCKET_FACTORY = new SocketFactory() {
+
+        @Override
+        public Socket createSocket() throws SocketException {
+            return new Socket() {
+
+                private InputStream inputStream;
+
+                @Override
+                public synchronized InputStream getInputStream() throws IOException {
+                    return inputStream != null ? inputStream :
+                        (inputStream = new BufferedSocketInputStream(super.getInputStream()));
+                }
+            };
+        }
+    };
 
     private final Logger logger = Logger.getLogger(getClass().getName());
 
@@ -322,7 +341,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
-     * @param socketFactory custom socket factory. If not provided, socket will be created with "new Socket()".
+     * @param socketFactory custom socket factory
      */
     public void setSocketFactory(SocketFactory socketFactory) {
         this.socketFactory = socketFactory;
@@ -402,7 +421,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void establishConnection() throws IOException {
         try {
-            Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
+            SocketFactory socketFactory = this.socketFactory != null ? this.socketFactory : DEFAULT_SOCKET_FACTORY;
+            Socket socket = socketFactory.createSocket();
             socket.connect(new InetSocketAddress(hostname, port));
             channel = new PacketChannel(socket);
             if (channel.getInputStream().peek() == -1) {
