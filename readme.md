@@ -166,14 +166,18 @@ You can find JDBC snippet [here](https://github.com/shyiko/mysql-binlog-connecto
 
 ## Documentation
 
-BASICS: There are two entry points - [BinaryLogClient](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/BinaryLogClient.java) (which you can use to read binary logs from a MySQL server) and 
+#### API overview
+
+There are two entry points - [BinaryLogClient](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/BinaryLogClient.java) (which you can use to read binary logs from a MySQL server) and 
 [BinaryLogFileReader](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/BinaryLogFileReader.java) (for offline log processing). Both of them rely on [EventDeserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventDeserializer.java) to deserialize 
 stream of events. Each [Event](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/Event.java) consists of [EventHeader](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/EventHeader.java) (containing among other things reference to [EventType](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/EventType.java)) and 
 [EventData](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/EventData.java). The aforementioned EventDeserializer has one [EventHeaderDeserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventHeaderDeserializer.java) ([EventHeaderV4Deserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventHeaderV4Deserializer.java) by default) 
 and [a collection of EventDataDeserializer|s](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventDeserializer.java#L82). If there is no EventDataDeserializer registered for
 some particular type of Event - default EventDataDeserializer kicks in ([NullEventDataDeserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/NullEventDataDeserializer.java)).
 
-For the insight into the internals of MySQL look [here](https://dev.mysql.com/doc/internals/en/index.html). [MySQL Client/Server Protocol](http://dev.mysql.com/doc/internals/en/client-server-protocol.html) and [The Binary Log](http://dev.mysql.com/doc/internals/en/binary-log.html) sections are particularly useful as a reference documentation for the `com.**.mysql.binlog.network` and `com.**.mysql.binlog.event` packages.
+#### MySQL Internals Manual
+
+For the insight into the internals of MySQL look [here](https://dev.mysql.com/doc/internals/en/index.html). [MySQL Client/Server Protocol](http://dev.mysql.com/doc/internals/en/client-server-protocol.html) and [The Binary Log](http://dev.mysql.com/doc/internals/en/binary-log.html) sections are particularly useful as a reference documentation for the `**.binlog.network` and `**.binlog.event` packages.
 
 ## Real-world applications
 
