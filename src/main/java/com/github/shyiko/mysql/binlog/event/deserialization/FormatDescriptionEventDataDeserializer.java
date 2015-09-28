@@ -66,16 +66,16 @@ public class FormatDescriptionEventDataDeserializer implements EventDataDeserial
             if (ll > rl) {
                 return -1 * compare(r, l);
             }
-            for (di = 0, dc = 0; di < ll && (dc = l.charAt(di) - r.charAt(di)) == 0; di++);
+            for (di = 0, dc = 0; di < ll && (dc = l.charAt(di) - r.charAt(di)) == 0; di++) { }
             if (di == ll) {
                 return ll - rl;
             }
             if (Character.isDigit(l.charAt(di))) {
                 if (Character.isDigit(r.charAt(di))) {
                     int lnl = 0, rnl = 0;
-                    for (int j = di + 1; j < ll && Character.isDigit(l.charAt(j)); j++, lnl++);
+                    for (int j = di + 1; j < ll && Character.isDigit(l.charAt(j)); j++, lnl++) { }
                     for (int j = di + 1, e = Math.min(j + lnl + 1, rl);
-                         j < e && Character.isDigit(r.charAt(j)); j++, rnl++);
+                         j < e && Character.isDigit(r.charAt(j)); j++, rnl++) { }
                     return lnl == rnl ? dc : lnl - rnl;
                 }
                 return 1;

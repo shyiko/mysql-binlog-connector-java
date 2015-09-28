@@ -146,8 +146,11 @@ public class EventDeserializer {
     private <T> T newInstanceUnchecked(Class<T> eventDataDeserializerClass) {
         try {
             return eventDataDeserializerClass.newInstance();
-        } catch (InstantiationException e) { throw new RuntimeException(e); }
-          catch (IllegalAccessException e) { throw new RuntimeException(e); }
+        } catch (InstantiationException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -244,11 +247,7 @@ public class EventDeserializer {
 
         @Override
         public String toString() {
-            final StringBuilder sb = new StringBuilder("InternalEventData");
-            sb.append("{internal=").append(internal);
-            sb.append(", external=").append(external);
-            sb.append('}');
-            return sb.toString();
+            return "EventDataWrapper{" + "internal=" + internal + ", external=" + external + '}';
         }
 
         /**
