@@ -153,6 +153,10 @@ public class EventDeserializer {
         }
     }
 
+    public void setChecksumType(ChecksumType checksumType) {
+        this.checksumLength = checksumType.getLength();
+    }
+
     /**
      * @return deserialized event or null in case of end-of-stream
      */

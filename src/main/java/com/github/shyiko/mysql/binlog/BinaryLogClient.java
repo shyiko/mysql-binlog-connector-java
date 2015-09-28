@@ -380,7 +380,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             }
             ChecksumType checksumType = fetchBinlogChecksum();
             if (checksumType != ChecksumType.NONE) {
-                resetBinlogChecksum();
+                resetBinlogChecksumToNONE();
             }
             requestBinaryLogStream();
         } catch (IOException e) {
@@ -633,7 +633,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return ChecksumType.valueOf(resultSet[0].getValue(1).toUpperCase());
     }
 
-    private void resetBinlogChecksum() throws IOException {
+    private void resetBinlogChecksumToNONE() throws IOException {
         // letting MySQL server know that we are aware of binlog_checksum so that it would not terminate connection
         // saying "slave can not handle replication events with the checksum that master is configured to log; ..."
         channel.write(new QueryCommand("set @master_binlog_checksum='NONE'"));
@@ -643,6 +643,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                     errorPacket.getSqlState());
         }
+        // required because of the synthetic ROTATE event (not present in the actual binlog file) that precedes
+        // FORMAT_DESCRIPTION (later carries the checksum)
+        eventDeserializer.setChecksumType(ChecksumType.NONE);
     }
 
     private void listenForEventPackets() throws IOException {
