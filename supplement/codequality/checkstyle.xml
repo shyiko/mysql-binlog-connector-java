@@ -99,6 +99,7 @@
         <!-- http://checkstyle.sf.net/config_blocks.html -->
         <module name="EmptyBlock">
             <property name="option" value="text"/>
+            <property name="tokens" value="LITERAL_DO, LITERAL_ELSE, LITERAL_FINALLY, LITERAL_IF, LITERAL_TRY, LITERAL_WHILE, INSTANCE_INIT, STATIC_INIT, LITERAL_SWITCH, LITERAL_SYNCHRONIZED"/>
         </module>
         <module name="LeftCurly"/>
         <module name="NeedBraces"/>
