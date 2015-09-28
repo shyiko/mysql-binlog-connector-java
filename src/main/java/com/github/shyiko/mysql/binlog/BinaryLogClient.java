@@ -922,17 +922,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public static abstract class AbstractLifecycleListener implements LifecycleListener {
 
-        public void onConnect(BinaryLogClient client) {
-        }
+        public void onConnect(BinaryLogClient client) { }
 
-        public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
-        }
+        public void onCommunicationFailure(BinaryLogClient client, Exception ex) { }
 
-        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
-        }
+        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) { }
 
-        public void onDisconnect(BinaryLogClient client) {
-        }
+        public void onDisconnect(BinaryLogClient client) { }
 
     }
 
