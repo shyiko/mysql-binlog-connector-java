@@ -94,6 +94,9 @@ public class ByteArrayInputStream extends InputStream {
         int remaining = length;
         while (remaining != 0) {
             int read = read(bytes, offset + length - remaining, remaining);
+            if (read == -1) {
+                throw new EOFException();
+            }
             remaining -= read;
         }
     }
