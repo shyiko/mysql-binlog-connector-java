@@ -17,10 +17,15 @@ This is **BACKWARD-INCOMPATIBLE** change as CHAR/VARCHAR/BINARY/VARBINARY are no
  - NPE if user attempts to read binary log 'within the logical event group' ([#60](https://github.com/shyiko/mysql-binlog-connector-java/issues/60)).
  - Handling of DATE/DATETIME/TIMESTAMP's "zero" value (e.g. '0000-00-00').
 
+## [0.2.4](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.3...0.2.4) - 2015-09-09
+
+### Fixed
+ - Possible infinite loop in case of EOF in the middle of ByteArrayInputStream::fill.
+
 ## [0.2.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.2...0.2.3) - 2015-08-31
 
 ### Fixed
- - Handling of packets exceeding 16mb in size
+ - Handling of packets exceeding 16mb in size.
 
 ## [0.2.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.1...0.2.2) - 2015-07-10
 
