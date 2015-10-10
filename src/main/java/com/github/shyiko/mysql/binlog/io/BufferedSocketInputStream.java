@@ -52,4 +52,19 @@ public class BufferedSocketInputStream extends FilterInputStream {
         return limit != -1 ? buffer[offset++] & 0xff : -1;
     }
 
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+        if (offset >= limit) {
+            if (len >= buffer.length) {
+                return in.read(b, off, len);
+            }
+            offset = 0;
+            limit = in.read(buffer, 0, buffer.length);
+        }
+        int bytesRemainingInBuffer = Math.min(len, limit - offset);
+        System.arraycopy(buffer, offset, b, off, bytesRemainingInBuffer);
+        offset += bytesRemainingInBuffer;
+        return bytesRemainingInBuffer;
+    }
+
 }
