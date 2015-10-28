@@ -3,16 +3,15 @@ package com.github.shyiko.mysql.binlog.event.deserialization.maria;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.maria.MariaGtidEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
+
 import java.io.IOException;
 
 /**
  * @author <a href="http://github.com/wenerme">wener</a>
  */
-public class GtidDeserializer implements EventDataDeserializer<MariaGtidEventData>
-{
+public class GtidDeserializer implements EventDataDeserializer<MariaGtidEventData> {
     @Override
-    public MariaGtidEventData deserialize(ByteArrayInputStream is) throws IOException
-    {
+    public MariaGtidEventData deserialize(ByteArrayInputStream is) throws IOException {
         MariaGtidEventData e = new MariaGtidEventData();
         e.setSequenceNumber(is.readLong(8));
         e.setDomainId(is.readLong(4));
