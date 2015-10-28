@@ -172,7 +172,7 @@ public enum EventType {
      */
     EXT_WRITE_ROWS,
     /**
-     * Describes deleted rows (within a single table).
+     * Describes updated rows (within a single table).
      * Used in case of RBR (5.1.18+).
      */
     EXT_UPDATE_ROWS,
@@ -228,6 +228,12 @@ public enum EventType {
     public int get()
     {
         return v;
+    }
+
+    public static boolean isRowMutation(EventType eventType) {
+        return EventType.isWrite(eventType) ||
+               EventType.isUpdate(eventType) ||
+               EventType.isDelete(eventType);
     }
 
     public static boolean isWrite(EventType eventType) {

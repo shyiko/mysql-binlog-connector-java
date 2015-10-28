@@ -28,7 +28,7 @@ public enum ChecksumType {
 
     private int length;
 
-    private ChecksumType(int length) {
+    ChecksumType(int length) {
         this.length = length;
     }
 

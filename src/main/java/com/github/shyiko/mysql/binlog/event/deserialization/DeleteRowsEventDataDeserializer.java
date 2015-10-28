@@ -21,7 +21,6 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.BitSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -53,15 +52,17 @@ public class DeleteRowsEventDataDeserializer extends AbstractRowsEventDataDeseri
         }
         int numberOfColumns = inputStream.readPackedInteger();
         eventData.setIncludedColumns(inputStream.readBitSet(numberOfColumns, true));
-        eventData.setRows(deserializeRows(eventData.getTableId(), eventData.getIncludedColumns(), inputStream));
+        eventData.setRows(deserializeRows(eventData, inputStream));
         return eventData;
     }
 
-    private List<Serializable[]> deserializeRows(long tableId, BitSet includedColumns, ByteArrayInputStream inputStream)
+    private List<Serializable[]> deserializeRows(DeleteRowsEventData eventData, ByteArrayInputStream inputStream)
             throws IOException {
+        TableMapEventData tableMapEvent = getTableMapEventData(eventData.getTableId());
+        ColumnSet includedColumns = new ColumnSet(eventData.getIncludedColumns());
         List<Serializable[]> result = new LinkedList<Serializable[]>();
         while (inputStream.available() > 0) {
-            result.add(deserializeRow(tableId, includedColumns, inputStream));
+            result.add(deserializeRow(tableMapEvent, includedColumns, inputStream));
         }
         return result;
     }

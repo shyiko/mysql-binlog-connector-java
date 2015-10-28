@@ -15,7 +15,6 @@
  */
 package com.github.shyiko.mysql.binlog.network.protocol;
 
-import com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.io.ByteArrayOutputStream;
 import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
@@ -40,7 +39,7 @@ public class PacketChannel implements Channel {
 
     public PacketChannel(Socket socket) throws IOException {
         this.socket = socket;
-        this.inputStream = new ByteArrayInputStream(new BufferedSocketInputStream(socket.getInputStream()));
+        this.inputStream = new ByteArrayInputStream(socket.getInputStream());
         this.outputStream = new ByteArrayOutputStream(socket.getOutputStream());
     }
 

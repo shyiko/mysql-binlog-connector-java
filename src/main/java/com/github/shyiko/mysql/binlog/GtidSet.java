@@ -38,6 +38,9 @@ public class GtidSet {
 
     private final Map<String, UUIDSet> map = new LinkedHashMap<String, UUIDSet>();
 
+    /**
+     * @param gtidSet gtid set comprised of closed intervals (like MySQL's executed_gtid_set).
+     */
     public GtidSet(String gtidSet) {
         String[] uuidSets = gtidSet.isEmpty() ? new String[0] : gtidSet.split(",");
         for (String uuidSet : uuidSets) {
@@ -52,7 +55,7 @@ public class GtidSet {
                     split[i] = Long.parseLong(is[i]);
                 }
                 if (split.length == 1) {
-                    split = new long[] {split[0], split[0] + 1};
+                    split = new long[] {split[0], split[0]};
                 }
                 intervals.add(new Interval(split[0], split[1]));
             }
@@ -81,20 +84,20 @@ public class GtidSet {
         boolean addedToExisting = false;
         if (index < intervals.size()) {
             Interval interval = intervals.get(index);
-            if (interval.getStart() == transactionId + 1) {
+            if (interval.start == transactionId + 1) {
                 interval.start = transactionId;
                 addedToExisting = true;
             } else
-            if (interval.getEnd() == transactionId) {
-                interval.end = transactionId + 1;
+            if (interval.end + 1 == transactionId) {
+                interval.end = transactionId;
                 addedToExisting = true;
             } else
-            if (interval.getStart() <= transactionId && transactionId < interval.getEnd()) {
+            if (interval.start <= transactionId && transactionId <= interval.end) {
                 return false;
             }
         }
         if (!addedToExisting) {
-            intervals.add(index, new Interval(transactionId, transactionId + 1));
+            intervals.add(index, new Interval(transactionId, transactionId));
         }
         if (intervals.size() > 1) {
             joinAdjacentIntervals(intervals, index);
@@ -103,12 +106,12 @@ public class GtidSet {
     }
 
     /**
-     * Collapses intervals like a-b:b-c into a-c (only in index+-1 range).
+     * Collapses intervals like a-(b-1):b-c into a-c (only in index+-1 range).
      */
     private void joinAdjacentIntervals(List<Interval> intervals, int index) {
         for (int i = Math.min(index + 1, intervals.size() - 1), e = Math.max(index - 1, 0); i > e; i--) {
             Interval a = intervals.get(i - 1), b = intervals.get(i);
-            if (a.getEnd() == b.getStart()) {
+            if (a.end + 1 == b.start) {
                 a.end = b.end;
                 intervals.remove(i);
             }
@@ -132,16 +135,16 @@ public class GtidSet {
         while (l < r) {
             p = (l + r) / 2;
             Interval i = ii.get(p);
-            if (i.getEnd() < v) {
+            if (i.end < v) {
                 l = p + 1;
             } else
-            if (v < i.getStart()) {
+            if (v < i.start) {
                 r = p;
             } else {
                 return p;
             }
         }
-        if (!ii.isEmpty() && ii.get(p).getEnd() < v) {
+        if (!ii.isEmpty() && ii.get(p).end < v) {
             p++;
         }
         return p;
@@ -161,12 +164,12 @@ public class GtidSet {
     /**
      * @see GtidSet
      */
-    public static class UUIDSet {
+    public static final class UUIDSet {
 
         private String uuid;
         private Collection<Interval> intervals;
 
-        public UUIDSet(String uuid, Collection<Interval> intervals) {
+        private UUIDSet(String uuid, Collection<Interval> intervals) {
             this.uuid = uuid;
             this.intervals = intervals;
         }
@@ -183,12 +186,12 @@ public class GtidSet {
     /**
      * @see GtidSet
      */
-    public static class Interval implements Comparable<Interval> {
+    public static final class Interval implements Comparable<Interval> {
 
         private long start;
         private long end;
 
-        public Interval(long start, long end) {
+        private Interval(long start, long end) {
             this.start = start;
             this.end = end;
         }

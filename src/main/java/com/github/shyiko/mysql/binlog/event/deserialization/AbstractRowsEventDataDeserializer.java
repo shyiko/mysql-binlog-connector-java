@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Map;
+import java.util.TimeZone;
 
 /**
  * Whole class is basically a mix of <a href="https://code.google.com/p/open-replicator">open-replicator</a>'s
@@ -38,50 +39,48 @@ import java.util.Map;
  * {@link ColumnType#INT24}: Integer
  * {@link ColumnType#YEAR}: Integer
  * {@link ColumnType#ENUM}: Integer
- * {@link ColumnType#SET}: Integer
+ * {@link ColumnType#SET}: Long
  * {@link ColumnType#LONGLONG}: Long
  * {@link ColumnType#FLOAT}: Float
  * {@link ColumnType#DOUBLE}: Double
  * {@link ColumnType#BIT}: java.util.BitSet
- * {@link ColumnType#DATETIME}: java.util.Date
- * {@link ColumnType#DATETIME_V2}: java.util.Date
+ * {@link ColumnType#DATETIME}: Long
+ * {@link ColumnType#DATETIME_V2}: Long
  * {@link ColumnType#NEWDECIMAL}: java.math.BigDecimal
- * {@link ColumnType#TIMESTAMP}: java.sql.Timestamp
- * {@link ColumnType#TIMESTAMP_V2}: java.sql.Timestamp
- * {@link ColumnType#DATE}: java.sql.Date
- * {@link ColumnType#TIME}: java.sql.Time
- * {@link ColumnType#TIME_V2}: java.sql.Time
+ * {@link ColumnType#TIMESTAMP}: Long
+ * {@link ColumnType#TIMESTAMP_V2}: Long
+ * {@link ColumnType#DATE}: Long
+ * {@link ColumnType#TIME}: Long
+ * {@link ColumnType#TIME_V2}: Long
  * {@link ColumnType#VARCHAR}: byte[]
  * {@link ColumnType#VAR_STRING}: byte[]
  * {@link ColumnType#STRING}: byte[]
  * {@link ColumnType#BLOB}: byte[]
+ * {@link ColumnType#GEOMETRY}: byte[]
  * </pre>
- *
- * At the moment {@link ColumnType#GEOMETRY} is unsupported.
  *
  * @param <T> event data this deserializer is responsible for
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public abstract class AbstractRowsEventDataDeserializer<T extends EventData> implements EventDataDeserializer<T> {
 
-    private static final int DIG_PER_DEC = 9;
     private static final int[] DIG_TO_BYTES = {0, 1, 1, 2, 2, 3, 3, 4, 4, 4};
+    private static final int DIG_PER_DEC = 9;
 
-    private final Map<Long, TableMapEventData> tableMapEventByTableId;
+    protected final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     public AbstractRowsEventDataDeserializer(Map<Long, TableMapEventData> tableMapEventByTableId) {
         this.tableMapEventByTableId = tableMapEventByTableId;
     }
 
-    protected Serializable[] deserializeRow(long tableId, BitSet includedColumns, ByteArrayInputStream inputStream)
-            throws IOException {
-        TableMapEventData tableMapEvent = tableMapEventByTableId.get(tableId);
+    protected Serializable[] deserializeRow(TableMapEventData tableMapEvent, ColumnSet columnSet,
+            ByteArrayInputStream inputStream) throws IOException {
         byte[] types = tableMapEvent.getColumnTypes();
         int[] metadata = tableMapEvent.getColumnMetadata();
-        Serializable[] result = new Serializable[numberOfBitsSet(includedColumns)];
+        Serializable[] result = new Serializable[columnSet.size()];
         BitSet nullColumns = inputStream.readBitSet(result.length, true);
         for (int i = 0, numberOfSkippedColumns = 0; i < types.length; i++) {
-            if (!includedColumns.get(i)) {
+            if (!columnSet.contains(i)) {
                 numberOfSkippedColumns++;
                 continue;
             }
@@ -112,30 +111,37 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return result;
     }
 
-    private Serializable deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
+    protected TableMapEventData getTableMapEventData(long tableId) throws MissingTableMapEventException {
+        TableMapEventData tableMapEvent = tableMapEventByTableId.get(tableId);
+        if (tableMapEvent == null) {
+            throw new MissingTableMapEventException("No TableMapEventData has been found for table id:" + tableId +
+                ". Usually that means that you have started reading binary log 'within the logical event group'" +
+                " (e.g. from WRITE_ROWS and not proceeding TABLE_MAP");
+        }
+        return tableMapEvent;
+    }
+
+    protected Serializable deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
             throws IOException {
         switch (type) {
             case BIT:
-                int bitSetLength = (meta >> 8) * 8 + (meta & 0xFF);
-                return inputStream.readBitSet(bitSetLength, false);
+                return deserializeBit(meta, inputStream);
             case TINY:
-                return (int) ((byte) inputStream.readInteger(1));
+                return deserializeTiny(inputStream);
             case SHORT:
-                return (int) ((short) inputStream.readInteger(2));
+                return deserializeShort(inputStream);
             case INT24:
-                return (inputStream.readInteger(3) << 8) >> 8;
+                return deserializeInt24(inputStream);
             case LONG:
-                return inputStream.readInteger(4);
+                return deserializeLong(inputStream);
             case LONGLONG:
-                return inputStream.readLong(8);
+                return deserializeLongLong(inputStream);
             case FLOAT:
-                return Float.intBitsToFloat(inputStream.readInteger(4));
+                return deserializeFloat(inputStream);
             case DOUBLE:
-                return Double.longBitsToDouble(inputStream.readLong(8));
+                return deserializeDouble(inputStream);
             case NEWDECIMAL:
-                int precision = meta & 0xFF, scale = meta >> 8,
-                    decimalLength = determineDecimalLength(precision, scale);
-                return toDecimal(precision, scale, inputStream.read(decimalLength));
+                return deserializeNewDecimal(meta, inputStream);
             case DATE:
                 return deserializeDate(inputStream);
             case TIME:
@@ -151,108 +157,119 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             case DATETIME_V2:
                 return deserializeDatetimeV2(meta, inputStream);
             case YEAR:
-                return 1900 + inputStream.readInteger(1);
-            case STRING:
-                // CHAR or BINARY:
-                // because there is no charset info (read: a way to distinguish between these two)
-                // we are returning byte[] instead of an actual String
-                int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.read(stringLength);
-            case VARCHAR: // or VARBINARY
-            case VAR_STRING:
-                int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.read(varcharLength);
+                return deserializeYear(inputStream);
+            case STRING: // CHAR or BINARY
+                return deserializeString(length, inputStream);
+            case VARCHAR: case VAR_STRING: // VARCHAR or VARBINARY
+                return deserializeVarString(meta, inputStream);
             case BLOB:
-                int blobLength = inputStream.readInteger(meta);
-                return inputStream.read(blobLength);
+                return deserializeBlob(meta, inputStream);
             case ENUM:
-                return inputStream.readInteger(length);
+                return deserializeEnum(length, inputStream);
             case SET:
-                return inputStream.readLong(length);
+                return deserializeSet(length, inputStream);
+            case GEOMETRY:
+                return deserializeGeometry(meta, inputStream);
             default:
                 throw new IOException("Unsupported type " + type);
         }
     }
 
-    private java.sql.Date deserializeDate(ByteArrayInputStream inputStream) throws IOException {
+    protected BitSet deserializeBit(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int bitSetLength = (meta >> 8) * 8 + (meta & 0xFF);
+        return inputStream.readBitSet(bitSetLength, false);
+    }
+
+    protected Integer deserializeTiny(ByteArrayInputStream inputStream) throws IOException {
+        return (int) ((byte) inputStream.readInteger(1));
+    }
+
+    protected Integer deserializeShort(ByteArrayInputStream inputStream) throws IOException {
+        return (int) ((short) inputStream.readInteger(2));
+    }
+
+    protected Integer deserializeInt24(ByteArrayInputStream inputStream) throws IOException {
+        return (inputStream.readInteger(3) << 8) >> 8;
+    }
+
+    protected Integer deserializeLong(ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readInteger(4);
+    }
+
+    protected Long deserializeLongLong(ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readLong(8);
+    }
+
+    protected Float deserializeFloat(ByteArrayInputStream inputStream) throws IOException {
+        return Float.intBitsToFloat(inputStream.readInteger(4));
+    }
+
+    protected Double deserializeDouble(ByteArrayInputStream inputStream) throws IOException {
+        return Double.longBitsToDouble(inputStream.readLong(8));
+    }
+
+    protected BigDecimal deserializeNewDecimal(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int precision = meta & 0xFF, scale = meta >> 8, x = precision - scale;
+        int ipd = x / DIG_PER_DEC, fpd = scale / DIG_PER_DEC;
+        int decimalLength = (ipd << 2) + DIG_TO_BYTES[x - ipd * DIG_PER_DEC] +
+            (fpd << 2) + DIG_TO_BYTES[scale - fpd * DIG_PER_DEC];
+        return asBigDecimal(precision, scale, inputStream.read(decimalLength));
+    }
+
+    protected Long deserializeDate(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
         int day = value % 32;
         value >>>= 5;
         int month = value % 16;
         int year = value >> 4;
-        Calendar cal = Calendar.getInstance();
-        cal.clear();
-        cal.set(Calendar.YEAR, year);
-        cal.set(Calendar.MONTH, month - 1);
-        cal.set(Calendar.DATE, day);
-        return new java.sql.Date(cal.getTimeInMillis());
+        return asUnixTime(year, month, day, 0, 0, 0, 0);
     }
 
-    private static java.sql.Time deserializeTime(ByteArrayInputStream inputStream) throws IOException {
+    protected Long deserializeTime(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
         int[] split = split(value, 100, 3);
-        Calendar c = Calendar.getInstance();
-        c.clear();
-        c.set(Calendar.HOUR_OF_DAY, split[2]);
-        c.set(Calendar.MINUTE, split[1]);
-        c.set(Calendar.SECOND, split[0]);
-        return new java.sql.Time(c.getTimeInMillis());
+        return asUnixTime(1970, 1, 1, split[2], split[1], split[0], 0);
     }
 
-    private java.sql.Time deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+    protected Long deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         /*
-            in big endian:
+            (in big endian)
 
             1 bit sign (1= non-negative, 0= negative)
             1 bit unused (reserved for future extensions)
             10 bits hour (0-838)
             6 bits minute (0-59)
             6 bits second (0-59)
-            = (3 bytes in total)
-            +
-            fractional-seconds storage (size depends on meta)
+
+            (3 bytes in total)
+
+            + fractional-seconds storage (size depends on meta)
         */
         long time = bigEndianLong(inputStream.read(3), 0, 3);
-        Calendar c = Calendar.getInstance();
-        c.clear();
-        c.set(Calendar.HOUR_OF_DAY, extractBits(time, 2, 10, 24));
-        c.set(Calendar.MINUTE, extractBits(time, 12, 6, 24));
-        c.set(Calendar.SECOND, extractBits(time, 18, 6, 24));
-        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
-        return new java.sql.Time(c.getTimeInMillis());
+        return asUnixTime(1970, 1, 1,
+            extractBits(time, 2, 10, 24),
+            extractBits(time, 12, 6, 24),
+            extractBits(time, 18, 6, 24),
+            getFractionalSeconds(meta, inputStream)
+        );
     }
 
-    private java.sql.Timestamp deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
-        long value = inputStream.readLong(4);
-        return new java.sql.Timestamp(value * 1000L);
+    protected Long deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readLong(4) * 1000;
     }
 
-    private java.sql.Timestamp deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
-        // big endian
-        long timestamp = bigEndianLong(inputStream.read(4), 0, 4);
-        Calendar c = Calendar.getInstance();
-        c.setTimeInMillis(timestamp * 1000);
-        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
-        return new java.sql.Timestamp(c.getTimeInMillis());
+    protected Long deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+        return bigEndianLong(inputStream.read(4), 0, 4) * 1000 + getFractionalSeconds(meta, inputStream);
     }
 
-    private java.util.Date deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
-        long value = inputStream.readLong(8);
-        int[] split = split(value, 100, 6);
-        Calendar c = Calendar.getInstance();
-        c.set(Calendar.YEAR, split[5]);
-        c.set(Calendar.MONTH, split[4] - 1);
-        c.set(Calendar.DAY_OF_MONTH, split[3]);
-        c.set(Calendar.HOUR_OF_DAY, split[2]);
-        c.set(Calendar.MINUTE, split[1]);
-        c.set(Calendar.SECOND, split[0]);
-        c.set(Calendar.MILLISECOND, 0);
-        return c.getTime();
+    protected Long deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
+        int[] split = split(inputStream.readLong(8), 100, 6);
+        return asUnixTime(split[5], split[4], split[3], split[2], split[1], split[0], 0);
     }
 
-    private java.util.Date deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+    protected Long deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         /*
-            in big endian:
+            (in big endian)
 
             1 bit sign (1= non-negative, 0= negative)
             17 bits year*13+month (year 0-9999, month 0-12)
@@ -260,24 +277,68 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             5 bits hour (0-23)
             6 bits minute (0-59)
             6 bits second (0-59)
-            = (5 bytes in total)
-            +
-            fractional-seconds storage (size depends on meta)
+
+            (5 bytes in total)
+
+            + fractional-seconds storage (size depends on meta)
         */
         long datetime = bigEndianLong(inputStream.read(5), 0, 5);
         int yearMonth = extractBits(datetime, 1, 17, 40);
-        Calendar c = Calendar.getInstance();
-        c.set(Calendar.YEAR, yearMonth / 13);
-        c.set(Calendar.MONTH, yearMonth % 13 - 1);
-        c.set(Calendar.DAY_OF_MONTH, extractBits(datetime, 18, 5, 40));
-        c.set(Calendar.HOUR_OF_DAY, extractBits(datetime, 23, 5, 40));
-        c.set(Calendar.MINUTE, extractBits(datetime, 28, 6, 40));
-        c.set(Calendar.SECOND, extractBits(datetime, 34, 6, 40));
-        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
-        return c.getTime();
+        return asUnixTime(
+                yearMonth / 13,
+                yearMonth % 13,
+                extractBits(datetime, 18, 5, 40),
+                extractBits(datetime, 23, 5, 40),
+                extractBits(datetime, 28, 6, 40),
+                extractBits(datetime, 34, 6, 40),
+                getFractionalSeconds(meta, inputStream)
+        );
     }
 
-    private int getFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
+    protected Integer deserializeYear(ByteArrayInputStream inputStream) throws IOException {
+        return 1900 + inputStream.readInteger(1);
+    }
+
+    protected byte[] deserializeString(int length, ByteArrayInputStream inputStream) throws IOException {
+        // charset is not present in the binary log (meaning there is no way to distinguish between CHAR / BINARY)
+        // as a result - return byte[] instead of an actual String
+        int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
+        return inputStream.read(stringLength);
+    }
+
+    protected byte[] deserializeVarString(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
+        return inputStream.read(varcharLength);
+    }
+
+    protected byte[] deserializeBlob(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int blobLength = inputStream.readInteger(meta);
+        return inputStream.read(blobLength);
+    }
+
+    protected Integer deserializeEnum(int length, ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readInteger(length);
+    }
+
+    protected Long deserializeSet(int length, ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readLong(length);
+    }
+
+    protected byte[] deserializeGeometry(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int dataLength = inputStream.readInteger(meta);
+        return inputStream.read(dataLength);
+    }
+
+    // checkstyle, please ignore ParameterNumber for the next line
+    private static Long asUnixTime(int year, int month, int day, int hour, int minute, int second, int millis) {
+        // https://dev.mysql.com/doc/refman/5.0/en/datetime.html
+        if (year == 0 || month == 0 || day == 0) {
+            return null;
+        }
+        return UnixTime.from(year, month, day, hour, minute, second, millis);
+    }
+
+    private static int getFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
         int fractionalSecondsStorageSize = getFractionalSecondsStorageSize(meta);
         if (fractionalSecondsStorageSize > 0) {
             long fractionalSeconds = bigEndianLong(inputStream.read(fractionalSecondsStorageSize), 0,
@@ -291,32 +352,15 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     private static int getFractionalSecondsStorageSize(int fsp) {
-        switch (fsp) {
-            case 1:
-            case 2:
-                return 1;
-            case 3:
-            case 4:
-                return 2;
-            case 5:
-            case 6:
-                return 3;
-            default:
-                return 0;
-        }
+        if (fsp == 1 || fsp == 2) { return 1; }
+        if (fsp == 3 || fsp == 4) { return 2; }
+        if (fsp == 5 || fsp == 6) { return 3; }
+        return 0;
     }
 
     private static int extractBits(long value, int bitOffset, int numberOfBits, int payloadSize) {
         long result = value >> payloadSize - (bitOffset + numberOfBits);
         return (int) (result & ((1 << numberOfBits) - 1));
-    }
-
-    private static int numberOfBitsSet(BitSet bitSet) {
-        int result = 0;
-        for (int i = bitSet.nextSetBit(0); i >= 0; i = bitSet.nextSetBit(i + 1)) {
-            result++;
-        }
-        return result;
     }
 
     private static int[] split(long value, int divider, int length) {
@@ -329,19 +373,10 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return result;
     }
 
-    private static int determineDecimalLength(int precision, int scale) {
-        int x = precision - scale;
-        int ipDigits = x / DIG_PER_DEC;
-        int fpDigits = scale / DIG_PER_DEC;
-        int ipDigitsX = x - ipDigits * DIG_PER_DEC;
-        int fpDigitsX = scale - fpDigits * DIG_PER_DEC;
-        return (ipDigits << 2) + DIG_TO_BYTES[ipDigitsX] + (fpDigits << 2) + DIG_TO_BYTES[fpDigitsX];
-    }
-
     /**
      * see mysql/strings/decimal.c
      */
-    private static BigDecimal toDecimal(int precision, int scale, byte[] value) {
+    private static BigDecimal asBigDecimal(int precision, int scale, byte[] value) {
         boolean positive = (value[0] & 0x80) == 0x80;
         value[0] ^= 0x80;
         if (!positive) {
@@ -389,6 +424,101 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             result = (result << 8) | (b >= 0 ? (int) b : (b + 256));
         }
         return result;
+    }
+
+    /**
+     * Set of columns to be deserialized.
+     */
+    static class ColumnSet {
+
+        private BitSet bitSet;
+        private int numberOfBitsSet;
+
+        public ColumnSet(BitSet bitSet) {
+            this.bitSet = bitSet;
+            for (int i = bitSet.nextSetBit(0); i >= 0; i = bitSet.nextSetBit(i + 1)) {
+                numberOfBitsSet++;
+            }
+        }
+
+        public boolean contains(int i) {
+            return bitSet.get(i);
+        }
+
+        public int size() {
+            return numberOfBitsSet;
+        }
+    }
+
+    /**
+     * Class for working with Unix time.
+     */
+    static class UnixTime {
+
+        private static final int[] YEAR_DAYS_BY_MONTH = new int[] {
+            0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365
+        };
+        private static final int[] LEAP_YEAR_DAYS_BY_MONTH = new int[] {
+            0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366
+        };
+
+        /**
+         * Calendar::getTimeInMillis but magnitude faster for all dates starting from October 15, 1582
+         * (Gregorian Calendar cutover).
+         *
+         * @param year year
+         * @param month month [1..12]
+         * @param day day [1..)
+         * @param hour hour [0..23]
+         * @param minute [0..59]
+         * @param second [0..59]
+         * @param millis [0..999]
+         *
+         * @return Unix time (number of seconds that have elapsed since 00:00:00 (UTC), Thursday,
+         * 1 January 1970, not counting leap seconds)
+         */
+        // checkstyle, please ignore ParameterNumber for the next line
+        public static long from(int year, int month, int day, int hour, int minute, int second, int millis) {
+            if (year < 1582 || (year == 1582 && (month < 10 || (month == 10 && day < 15)))) {
+                return fallbackToGC(year, month, day, hour, minute, second, millis);
+            }
+            long timestamp = 0;
+            int numberOfLeapYears = leapYears(1970, year);
+            timestamp += 366L * 24 * 60 * 60 * numberOfLeapYears;
+            timestamp += 365L * 24 * 60 * 60 * (year - 1970 - numberOfLeapYears);
+            long daysUpToMonth = isLeapYear(year) ? LEAP_YEAR_DAYS_BY_MONTH[month - 1] : YEAR_DAYS_BY_MONTH[month - 1];
+            timestamp += ((daysUpToMonth + day - 1) * 24 * 60 * 60) +
+                    (hour * 60 * 60) + (minute * 60) + (second);
+            timestamp = timestamp * 1000 + millis;
+            return timestamp;
+        }
+
+        // checkstyle, please ignore ParameterNumber for the next line
+        private static long fallbackToGC(int year, int month, int dayOfMonth, int hourOfDay,
+                int minute, int second, int millis) {
+            Calendar c = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+            c.set(Calendar.YEAR, year);
+            c.set(Calendar.MONTH, month - 1);
+            c.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+            c.set(Calendar.HOUR_OF_DAY, hourOfDay);
+            c.set(Calendar.MINUTE, minute);
+            c.set(Calendar.SECOND, second);
+            c.set(Calendar.MILLISECOND, millis);
+            return c.getTimeInMillis();
+        }
+
+        private static int leapYears(int from, int end) {
+            return leapYearsBefore(end) - leapYearsBefore(from + 1);
+        }
+
+        private static int leapYearsBefore(int year) {
+            year--; return (year / 4) - (year / 100) + (year / 400);
+        }
+
+        private static boolean isLeapYear(int year) {
+            return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        }
+
     }
 
 }

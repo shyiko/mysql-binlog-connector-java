@@ -19,6 +19,7 @@ import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.FormatDescriptionEventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
@@ -41,6 +42,7 @@ public class EventDeserializer {
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     private EventDataDeserializer tableMapEventDataDeserializer;
+    private EventDataDeserializer formatDescriptionEventDataDeserializer;
 
     public EventDeserializer() {
         this(new EventHeaderV4Deserializer(), new NullEventDataDeserializer());
@@ -84,6 +86,8 @@ public class EventDeserializer {
                 new FormatDescriptionEventDataDeserializer());
         eventDataDeserializers.put(EventType.ROTATE,
                 new RotateEventDataDeserializer());
+        eventDataDeserializers.put(EventType.INTVAR,
+            new IntVarEventDataDeserializer());
         eventDataDeserializers.put(EventType.QUERY,
                 new QueryEventDataDeserializer());
         eventDataDeserializers.put(EventType.TABLE_MAP,
@@ -118,14 +122,34 @@ public class EventDeserializer {
 
     private void afterEventDataDeserializerSet(EventType eventType) {
         if (eventType == null || eventType == EventType.TABLE_MAP) {
-            EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(EventType.TABLE_MAP);
-            if (eventDataDeserializer.getClass() != TableMapEventDataDeserializer.class &&
-                eventDataDeserializer.getClass() != EventDataWrapper.Deserializer.class) {
-                tableMapEventDataDeserializer = new EventDataWrapper.Deserializer(
-                    new TableMapEventDataDeserializer(), eventDataDeserializer);
-            } else {
-                tableMapEventDataDeserializer = null;
-            }
+            tableMapEventDataDeserializer = wrapEventDataDeserializer(EventType.TABLE_MAP,
+                TableMapEventDataDeserializer.class);
+        }
+        if (eventType == null || eventType == EventType.FORMAT_DESCRIPTION) {
+            formatDescriptionEventDataDeserializer = wrapEventDataDeserializer(EventType.FORMAT_DESCRIPTION,
+                FormatDescriptionEventDataDeserializer.class);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends EventDataDeserializer> T wrapEventDataDeserializer(EventType eventType,
+            Class<T> eventDataDeserializerClass) {
+        EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventType);
+        if (eventDataDeserializer.getClass() != eventDataDeserializerClass &&
+            eventDataDeserializer.getClass() != EventDataWrapper.Deserializer.class) {
+            return (T) new EventDataWrapper.Deserializer(newInstanceUnchecked(eventDataDeserializerClass),
+                eventDataDeserializer);
+        }
+        return null;
+    }
+
+    private <T> T newInstanceUnchecked(Class<T> eventDataDeserializerClass) {
+        try {
+            return eventDataDeserializerClass.newInstance();
+        } catch (InstantiationException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -141,31 +165,43 @@ public class EventDeserializer {
             return null;
         }
         EventHeader eventHeader = eventHeaderDeserializer.deserialize(inputStream);
-        EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
-        if (eventHeader.getEventType() == EventType.TABLE_MAP && tableMapEventDataDeserializer != null) {
+        EventType eventType = eventHeader.getEventType();
+        EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventType);
+        if (eventType == EventType.TABLE_MAP && tableMapEventDataDeserializer != null) {
             eventDataDeserializer = tableMapEventDataDeserializer;
+        } else
+        if (eventType == EventType.FORMAT_DESCRIPTION && formatDescriptionEventDataDeserializer != null) {
+            eventDataDeserializer = formatDescriptionEventDataDeserializer;
         }
         EventData eventData = deserializeEventData(inputStream, eventHeader, eventDataDeserializer);
-        if (eventHeader.getEventType() == EventType.TABLE_MAP) {
-            TableMapEventData tableMapEvent;
-            if (eventData instanceof EventDataWrapper) {
-                EventDataWrapper eventDataWrapper = (EventDataWrapper) eventData;
-                tableMapEvent = (TableMapEventData) eventDataWrapper.getInternal();
-                if (tableMapEventDataDeserializer != null) {
-                    eventData = eventDataWrapper.getExternal();
-                }
-            } else {
-                tableMapEvent = (TableMapEventData) eventData;
+        if (eventType == EventType.TABLE_MAP) {
+            TableMapEventData tableMapEvent = getInternalEventData(eventData);
+            if (tableMapEventDataDeserializer != null) {
+                eventData = ((EventDataWrapper) eventData).getExternal();
             }
             tableMapEventByTableId.put(tableMapEvent.getTableId(), tableMapEvent);
+        } else
+        if (eventType == EventType.FORMAT_DESCRIPTION && formatDescriptionEventDataDeserializer != null) {
+            eventData = ((EventDataWrapper) eventData).getExternal();
         }
         return new Event(eventHeader, eventData);
     }
 
+    @SuppressWarnings("unchecked")
+    private <T extends EventData> T getInternalEventData(EventData eventData) {
+        if (eventData instanceof EventDataWrapper) {
+            return (T) ((EventDataWrapper) eventData).getInternal();
+        } else {
+            return (T) eventData;
+        }
+    }
+
     private EventData deserializeEventData(ByteArrayInputStream inputStream, EventHeader eventHeader,
             EventDataDeserializer eventDataDeserializer) throws EventDataDeserializationException {
-        // todo: use checksum algorithm descriptor from FormatDescriptionEvent
-        // (as per http://dev.mysql.com/worklog/task/?id=2540)
+        int checksumLength = this.checksumLength;
+        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
+            checksumLength = 0;
+        }
         int eventBodyLength = (int) eventHeader.getDataLength() - checksumLength;
         EventData eventData;
         try {
@@ -178,6 +214,10 @@ public class EventDeserializer {
             }
         } catch (IOException e) {
             throw new EventDataDeserializationException(eventHeader, e);
+        }
+        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
+            this.checksumLength = ((FormatDescriptionEventData) getInternalEventData(eventData)).
+                getChecksumType().getLength();
         }
         return eventData;
     }
@@ -211,11 +251,7 @@ public class EventDeserializer {
 
         @Override
         public String toString() {
-            final StringBuilder sb = new StringBuilder("InternalEventData");
-            sb.append("{internal=").append(internal);
-            sb.append(", external=").append(external);
-            sb.append('}');
-            return sb.toString();
+            return "EventDataWrapper{" + "internal=" + internal + ", external=" + external + '}';
         }
 
         /**
