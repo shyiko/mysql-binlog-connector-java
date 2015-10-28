@@ -15,38 +15,21 @@
  */
 package com.github.shyiko.mysql.binlog;
 
-import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventData;
-import com.github.shyiko.mysql.binlog.event.EventHeader;
-import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
-import com.github.shyiko.mysql.binlog.event.EventType;
-import com.github.shyiko.mysql.binlog.event.GtidEventData;
-import com.github.shyiko.mysql.binlog.event.QueryEventData;
-import com.github.shyiko.mysql.binlog.event.RotateEventData;
-import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.*;
+import com.github.shyiko.mysql.binlog.event.deserialization.*;
+import com.github.shyiko.mysql.binlog.event.deserialization.maria.BinlogCheckpointDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.maria.GtidDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.maria.GtidListDeserializer;
+import com.github.shyiko.mysql.binlog.event.maria.Gtid;
+import com.github.shyiko.mysql.binlog.event.maria.MariaGtidEventData;
 import com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.ServerException;
 import com.github.shyiko.mysql.binlog.network.SocketFactory;
-import com.github.shyiko.mysql.binlog.network.protocol.ErrorPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.Packet;
-import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
-import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.Command;
-import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogGtidCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.PingCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
+import com.github.shyiko.mysql.binlog.network.protocol.*;
+import com.github.shyiko.mysql.binlog.network.protocol.command.*;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -54,17 +37,8 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -135,6 +109,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private Event previousEvent;
     private Event previousGtidEvent;
+
+    // MariaDB
+    private Gtid mariaGtid;
+    private String gtid;
+    private boolean mariaDB;
 
     /**
      * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
@@ -382,6 +361,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             if (checksumType != ChecksumType.NONE) {
                 resetBinlogChecksumToNONE();
             }
+            if (isMariaDB() || greetingPacket.getServerVersion().contains("MariaDB")) {
+                mariaDB = true;
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("Switch to mariadb mode,server version is " + greetingPacket.getServerVersion());
+                }
+            }
             requestBinaryLogStream();
         } catch (IOException e) {
             if (channel != null && channel.isOpen()) {
@@ -450,6 +435,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
                 dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, "", 4, gtidSet);
+            } else if (gtid != null || mariaDB) {
+                dumpBinaryLogCommand = requestMariaBinaryLogStream();
             } else {
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
             }
@@ -745,6 +732,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             binlogFilename = rotateEventData.getBinlogFilename();
             binlogPosition = rotateEventData.getBinlogPosition();
         } else
+        if (eventType == EventType.MARIA_GTID_EVENT){
+            updateMariaGTID(event);
+        }
         // do not update binlogPosition on TABLE_MAP so that in case of reconnect (using a different instance of
         // client) table mapping cache could be reconstructed before hitting row mutation event
         if (eventType != EventType.TABLE_MAP && eventHeader instanceof EventHeaderV4) {
@@ -939,6 +929,101 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    /**
+     * @return Note that this value changes with each received GTID event (provided client is in GTID mode).
+     */
+    public String getGtid() {
+        synchronized (gtidSetAccessLock) {
+            if (gtidSet != null) {
+                return gtidSet.toString();
+            }
+            return gtid;
+        }
+    }
+
+    /**
+     * @param gtid For MySQL this is GTID set format, for MariaDB the format is domainId-serverId-sequenceNumber(can be an empty string).
+     *             <p>NOTE #1: Any value but null will switch BinaryLogClient into a GTID mode (in which case GTID set will be
+     *             updated with each incoming GTID event) as well as set binlogFilename to "" (empty string) (meaning
+     *             BinaryLogClient will request events "outside of the set" <u>starting from the oldest known binlog</u>).
+     *             <p>NOTE #2: {@link #setBinlogFilename(String)} and {@link #setBinlogPosition(long)} can be used to specify the
+     *             exact position from which MySQL server should start streaming events (taking into account GTID set).
+     * @see #getGtid()
+     */
+    public BinaryLogClient setGtid(String gtid) {
+        if (gtid != null && this.binlogFilename == null) {
+            this.binlogFilename = "";
+        }
+        synchronized (gtidSetAccessLock) {
+            this.gtid = gtid;
+        }
+        return this;
+    }
+
+    // region MariaDB
+    public boolean isMariaDB() {
+        return mariaDB;
+    }
+
+    private void updateMariaGTID(Event event) {
+        EventHeader eventHeader = event.getHeader();
+        if (eventHeader.getEventType() == EventType.MARIA_GTID_EVENT) {
+            synchronized (gtidSetAccessLock) {
+                if (mariaGtid != null) {
+                    MariaGtidEventData eventData = event.getData();
+                    mariaGtid.setDomainId(eventData.getDomainId());
+                    mariaGtid.setSequenceNumber(eventData.getSequenceNumber());
+                    gtid = mariaGtid.toString();
+                }
+            }
+        }
+    }
+
+    private DumpBinaryLogCommand requestMariaBinaryLogStream() throws IOException {
+        if ("gtid_current_pos".equals(gtid) || "".equals(gtid)) {
+            channel.write(new QueryCommand("select @@gtid_current_pos"));
+            ResultSetRowPacket[] rs = readResultSet();
+            gtid = rs[0].getValue(0);
+            logger.fine("Use server current gtid position "+gtid);
+        }
+
+        // update server id
+        channel.write(new QueryCommand("SHOW VARIABLES LIKE 'SERVER_ID'"));
+        ResultSetRowPacket[] rs = readResultSet();
+        long serverId = Long.parseLong(rs[0].getValue(1));
+        // If we got multi gtid, chose the gtid for current server
+        String[] split = gtid.split(",");
+        for (String s : split) {
+            Gtid g = new Gtid(s);
+            if (g.getServerId() == serverId) {
+                mariaGtid = g;
+                gtid = mariaGtid.toString();
+                logger.fine("Chose gtid "+gtid+" for this server");
+            }
+        }
+
+        // set up gtid
+        channel.write(new QueryCommand("SET @mariadb_slave_capability = 4"));// support GTID
+        channel.read();// ignore
+        channel.write(new QueryCommand("SET @slave_connect_state = '" + gtid + "'"));
+        channel.read();// ignore
+        channel.write(new QueryCommand("SET @slave_gtid_strict_mode = 0"));
+        channel.read();// ignore
+        channel.write(new QueryCommand("SET @slave_gtid_ignore_duplicates = 0"));
+        channel.read();// ignore
+        // Register First
+        Command command = new RegisterSlaveCommand(serverId, "", "", "", 0, 0, 0);
+        channel.write(command);
+        channel.read();// ignore
+
+        // MariaDB Event
+        eventDeserializer.setEventDataDeserializer(EventType.MARIA_GTID_EVENT, new GtidDeserializer());
+        eventDeserializer.setEventDataDeserializer(EventType.MARIA_GTID_LIST_EVENT, new GtidListDeserializer());
+        eventDeserializer.setEventDataDeserializer(EventType.MARIA_BINLOG_CHECKPOINT_EVENT, new BinlogCheckpointDeserializer());
+
+        return new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
+    }
+    // endregion
     /**
      * {@link BinaryLogClient}'s event listener.
      */

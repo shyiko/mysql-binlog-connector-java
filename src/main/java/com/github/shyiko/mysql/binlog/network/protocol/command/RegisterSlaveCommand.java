@@ -1,13 +1,13 @@
 package com.github.shyiko.mysql.binlog.network.protocol.command;
 
 import com.github.shyiko.mysql.binlog.io.ByteArrayOutputStream;
+
 import java.io.IOException;
 
 /**
  * @author <a href="http://github.com/wenerme">wener</a>
  */
-public class RegisterSlaveCommand implements Command
-{
+public class RegisterSlaveCommand implements Command {
     private long serverId;
     private String slaveHostname;
     private String slaveUser;
@@ -16,8 +16,7 @@ public class RegisterSlaveCommand implements Command
     private long replicationRank;
     private long masterId;
 
-    public RegisterSlaveCommand(long serverId, String slaveHostname, String slaveUser, String slavePassword, int slavePort, long replicationRank, long masterId)
-    {
+    public RegisterSlaveCommand(long serverId, String slaveHostname, String slaveUser, String slavePassword, int slavePort, long replicationRank, long masterId) {
         this.serverId = serverId;
         this.slaveHostname = slaveHostname;
         this.slaveUser = slaveUser;
@@ -28,8 +27,7 @@ public class RegisterSlaveCommand implements Command
     }
 
     @Override
-    public byte[] toByteArray() throws IOException
-    {
+    public byte[] toByteArray() throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         buffer.write(CommandType.REGISTER_SLAVE.ordinal());
         buffer.writeLong(serverId, 4);

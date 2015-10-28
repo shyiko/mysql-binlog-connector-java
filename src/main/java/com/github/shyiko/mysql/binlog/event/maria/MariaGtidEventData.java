@@ -3,12 +3,6 @@ package com.github.shyiko.mysql.binlog.event.maria;
 import com.github.shyiko.mysql.binlog.event.EventData;
 
 public class MariaGtidEventData implements EventData {
-    private long sequenceNumber;//8
-    private long domainId;// 4
-    private int flags;// 1
-
-    /* Flags. */
-
     /**
      * FL_STANDALONE is set when there is no terminating COMMIT event.
      */
@@ -23,6 +17,8 @@ public class MariaGtidEventData implements EventData {
      * (no MyISAM, eg.).
      */
     public static final int FL_TRANSACTIONAL = 4;
+
+    /* Flags. */
     /**
      * FL_ALLOW_PARALLEL reflects the (negation of the) value of @@SESSION.skip_parallel_replication at the time of commit.
      */
@@ -36,6 +32,9 @@ public class MariaGtidEventData implements EventData {
      * FL_DDL is set for event group containing DDL.
      */
     public static final int FL_DDL = 32;
+    private long sequenceNumber;//8
+    private long domainId;// 4
+    private int flags;// 1
 
     public long getSequenceNumber() {
         return sequenceNumber;

@@ -27,22 +27,22 @@ public class Gtid {
         return domainId;
     }
 
-    public long getServerId() {
-        return serverId;
-    }
-
-    public long getSequenceNumber() {
-        return sequenceNumber;
-    }
-
     public Gtid setDomainId(long domainId) {
         this.domainId = domainId;
         return this;
     }
 
+    public long getServerId() {
+        return serverId;
+    }
+
     public Gtid setServerId(long serverId) {
         this.serverId = serverId;
         return this;
+    }
+
+    public long getSequenceNumber() {
+        return sequenceNumber;
     }
 
     public Gtid setSequenceNumber(long sequenceNumber) {
