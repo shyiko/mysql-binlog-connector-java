@@ -876,9 +876,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 try {
                     eventListener.onEvent(event);
                 } catch (Exception e) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.log(Level.WARNING, eventListener + " choked on " + event, e);
-                    }
+                    throw new RuntimeException("Binlog event listener " + eventListener +
+                                               " choked on " + event, e);
                 }
             }
         }
