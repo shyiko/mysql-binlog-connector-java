@@ -81,16 +81,8 @@ import java.util.logging.Logger;
 import static com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.CompatibilityMode;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.only;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
@@ -99,7 +91,7 @@ public class BinaryLogClientIntegrationTest {
 
     private static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
 
-    private final Logger logger = Logger.getLogger(getClass().getSimpleName());
+    private final Logger logger = Logger.getLogger("donkey");
 
     {
         logger.setLevel(Level.FINEST);

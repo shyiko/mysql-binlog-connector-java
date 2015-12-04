@@ -23,7 +23,7 @@ import java.util.logging.Logger;
  */
 public class TraceLifecycleListener implements BinaryLogClient.LifecycleListener {
 
-    private final Logger logger = Logger.getLogger(getClass().getSimpleName());
+    private final Logger logger = Logger.getLogger("donkey");
 
     @Override
     public void onConnect(BinaryLogClient client) {

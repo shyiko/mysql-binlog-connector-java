@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  */
 public class TCPReverseProxy {
 
-    private final Logger logger = Logger.getLogger(getClass().getSimpleName());
+    private final Logger logger = Logger.getLogger("donkey");
 
     private final int port;
     private final String targetHost;
