@@ -20,13 +20,18 @@ This is **BACKWARD-INCOMPATIBLE** change as CHAR/VARCHAR/BINARY/VARBINARY are no
  - Handling of DATE/DATETIME/TIMESTAMP's "zero" value (e.g. '0000-00-00').
  - GTID set "rollover". 
 
+## [0.3.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.0...0.3.1) - 2016-01-15
+
+### Fixed
+- Broken "non blocking" mode backport from master.
+
 ## [0.3.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.4...0.3.0) - 2016-01-15
 
 ### Added
-- Support for "non blocking" mode (equivalent to running `mysqlbinlog` without --stop-never)
+ - Support for "non blocking" mode (equivalent to running `mysqlbinlog` without --stop-never)
 
 ### Fixed
-- NPE if user attempts to read binary log 'within the logical event group' ([#60](https://github.com/shyiko/mysql-binlog-connector-java/issues/60)).
+ - NPE if user attempts to read binary log 'within the logical event group' ([#60](https://github.com/shyiko/mysql-binlog-connector-java/issues/60)).
 
 ## [0.2.4](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.3...0.2.4) - 2015-09-09
 
