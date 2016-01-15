@@ -610,6 +610,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void listenForEventPackets() throws IOException {
         ByteArrayInputStream inputStream = channel.getInputStream();
+        boolean completeShutdown = false;
         try {
             while (inputStream.peek() != -1) {
                 int packetLength = inputStream.readInteger(3);
@@ -621,6 +622,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         errorPacket.getSqlState());
                 }
                 if (marker == (byte) 0xFE && !blocking) {
+                    completeShutdown = true;
                     break;
                 }
                 Event event;
@@ -658,7 +660,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             }
         } finally {
             if (isConnected()) {
-                disconnectChannel();
+                if (completeShutdown) {
+                    disconnect(); // initiate complete shutdown sequence (which includes keep alive thread)
+                } else {
+                    disconnectChannel();
+                }
             }
         }
     }
