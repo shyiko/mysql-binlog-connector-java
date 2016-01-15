@@ -2,11 +2,14 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.4...HEAD)
+## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.0...HEAD)
 
 ### Added
- - Rudimentary support for GEOMETRY. 
-
+ - Rudimentary support for GEOMETRY.
+ - INTVAR deserializer.
+ - A way to control Socket i/s buffering (using BinaryLogClient::setSocketFactory()). 
+ - GTID auto positioning. 
+ 
 ### Changed
  - DATETIME/DATETIME_V2/TIMESTAMP/TIMESTAMP_V2/DATE/TIME/TIME_V2 deserialization to `long`s (Unix timestamp).  
 This is **BACKWARD-INCOMPATIBLE** change.
@@ -14,14 +17,22 @@ This is **BACKWARD-INCOMPATIBLE** change.
 ### Fixed
  - BINARY/VARBINARY deserialization ([#56](https://github.com/shyiko/mysql-binlog-connector-java/issues/56)).  
 This is **BACKWARD-INCOMPATIBLE** change as CHAR/VARCHAR/BINARY/VARBINARY are now returned as `byte[]` (which you can obviously convert to String with `new String(byte[], Charset)` if needed).
- - NPE if user attempts to read binary log 'within the logical event group' ([#60](https://github.com/shyiko/mysql-binlog-connector-java/issues/60)).
  - Handling of DATE/DATETIME/TIMESTAMP's "zero" value (e.g. '0000-00-00').
+ - GTID set "rollover". 
+
+## [0.3.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.4...0.3.0) - 2016-01-15
+
+### Added
+- Support for "non blocking" mode (equivalent to running `mysqlbinlog` without --stop-never)
+
+### Fixed
+- NPE if user attempts to read binary log 'within the logical event group' ([#60](https://github.com/shyiko/mysql-binlog-connector-java/issues/60)).
 
 ## [0.2.4](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.3...0.2.4) - 2015-09-09
 
 ### Fixed
  - Possible infinite loop in case of EOF in the middle of ByteArrayInputStream::fill.
-
+ 
 ## [0.2.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.2...0.2.3) - 2015-08-31
 
 ### Fixed
