@@ -621,7 +621,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                         errorPacket.getSqlState());
                 }
-                if (marker == (byte) 0xFE && !blocking) {
+                if (marker == 0xFE && !blocking) {
                     completeShutdown = true;
                     break;
                 }
