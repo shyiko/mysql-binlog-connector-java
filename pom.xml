@@ -28,18 +28,6 @@
             <name>Stanley Shyiko</name>
         </developer>
     </developers>
-    <distributionManagement>
-        <repository>
-            <id>sonatype-nexus-staging</id>
-            <name>Sonatype Nexus Staging</name>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-        </repository>
-        <snapshotRepository>
-            <id>sonatype-nexus-snapshots</id>
-            <name>Sonatype Nexus Snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -167,72 +155,12 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>2.9.1</version>
-                <configuration>
-                    <failsOnError>true</failsOnError>
-                    <configLocation>supplement/codequality/checkstyle.xml</configLocation>
-                    <headerLocation>supplement/codequality/license.header</headerLocation>
-                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
-                    <consoleOutput>true</consoleOutput>
-                </configuration>
-                <executions>
-                    <execution>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>checkstyle</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.github.shyiko</groupId>
-                        <artifactId>checkstyle-nonstandard</artifactId>
-                        <version>0.1.0</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-            <plugin>
-                <groupId>com.github.shyiko.usage-maven-plugin</groupId>
-                <artifactId>usage-maven-plugin</artifactId>
-                <version>1.0.0</version>
-                <configuration>
-                    <usage>
-                        # build everything (append "-DskipTests=true" if you wish to skip tests)
-                        mvn clean install
-
-                        # run unit + integration tests, validate codebase using checkstyle
-                        mvn -P coverage clean verify
-                        # use -Dvagrant.integration.box= to switch between MySQL sandboxes
-
-                        # for aggregated coverage over different mysql releases use
-                        mvn clean
-                        mvn -P coverage verify \
-                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.5.27-sandbox-prepackaged
-                        mvn -P coverage verify \
-                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.6.12-sandbox-prepackaged
-                        mvn -P coverage verify \
-                        -Dvagrant.integration.box=supplement/vagrant/mysql-5.7.15-sandbox-prepackaged
-
-                        # submit coverage report to coveralls
-                        mvn -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
-
-                        # deploy snapshots into nexus
-                        mvn -P with-sources-and-javadocs -Ddeploy=snapshot
-
-                        # sign release build and deploy into nexus
-                        mvn -P with-sources-and-javadocs -Ddeploy=release
-                    </usage>
-                </configuration>
-            </plugin>
         </plugins>
         <extensions>
             <extension>
-                <groupId>com.github.shyiko.usage-maven-plugin</groupId>
-                <artifactId>usage-maven-plugin</artifactId>
-                <version>1.0.0</version>
+                <groupId>org.springframework.build</groupId>
+                <artifactId>aws-maven</artifactId>
+                <version>5.0.0.RELEASE</version>
             </extension>
         </extensions>
     </build>
@@ -361,5 +289,21 @@
             </build>
         </profile>
     </profiles>
+
+    <!-- You need ~/.m2/settings.xml for aws-maven to work -->
+    <distributionManagement>
+        <repository>
+            <id>fivetran-maven-release</id>
+            <url>s3://fivetran-maven/public/release</url>
+        </repository>
+    </distributionManagement>
+
+    <repositories>
+        <repository>
+            <id>aws-public-release</id>
+            <name>AWS Public Release Repository</name>
+            <url>https://s3.amazonaws.com/fivetran-maven/public/release</url>
+        </repository>
+    </repositories>
 
 </project>
