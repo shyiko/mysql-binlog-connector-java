@@ -1,4 +1,4 @@
-# mysql-binlog-connector-java [![Build Status](https://travis-ci.org/shyiko/mysql-binlog-connector-java.png?branch=master)](https://travis-ci.org/shyiko/mysql-binlog-connector-java) [![Coverage Status](https://coveralls.io/repos/shyiko/mysql-binlog-connector-java/badge.png?branch=master)](https://coveralls.io/r/shyiko/mysql-binlog-connector-java?branch=master)
+# mysql-binlog-connector-java [![Build Status](https://travis-ci.org/shyiko/mysql-binlog-connector-java.svg?branch=master)](https://travis-ci.org/shyiko/mysql-binlog-connector-java) [![Coverage Status](https://coveralls.io/repos/shyiko/mysql-binlog-connector-java/badge.svg?branch=master)](https://coveralls.io/r/shyiko/mysql-binlog-connector-java?branch=master) [![Maven Central](http://img.shields.io/badge/maven_central-0.3.1-blue.svg?style=flat)](http://mvnrepository.com/artifact/com.github.shyiko/mysql-binlog-connector-java/)
 
 MySQL Binary Log connector.
 
@@ -26,7 +26,7 @@ Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3
 <dependency>
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.2.4</version>
+    <version>0.3.1</version>
 </dependency>
 ```
 
@@ -37,7 +37,7 @@ The latest development version always available through Sonatype Snapshots repos
     <dependency>
         <groupId>com.github.shyiko</groupId>
         <artifactId>mysql-binlog-connector-java</artifactId>
-        <version>0.2.5-SNAPSHOT</version>
+        <version>0.3.2-SNAPSHOT</version>
     </dependency>
 </dependencies>
 
