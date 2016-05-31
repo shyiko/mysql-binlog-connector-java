@@ -4,7 +4,7 @@
 
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.3.2-SNAPSHOT</version>
+    <version>0.3.2.0</version>
 
     <name>mysql-binlog-connector-java</name>
     <description>MySQL Binary Log connector</description>
@@ -16,11 +16,11 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
-    <scm>
+    <!--<scm>
         <connection>scm:git:git@github.com:shyiko/mysql-binlog-connector-java.git</connection>
         <developerConnection>scm:git:git@github.com:shyiko/mysql-binlog-connector-java.git</developerConnection>
         <url>git@github.com:shyiko/mysql-binlog-connector-java.git</url>
-    </scm>
+    </scm>-->
     <developers>
         <developer>
             <id>sshyiko</id>
@@ -28,7 +28,7 @@
             <name>Stanley Shyiko</name>
         </developer>
     </developers>
-    <distributionManagement>
+    <!--<distributionManagement>
         <repository>
             <id>sonatype-nexus-staging</id>
             <name>Sonatype Nexus Staging</name>
@@ -40,7 +40,7 @@
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </snapshotRepository>
     </distributionManagement>
-
+-->
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -68,19 +68,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
+<!--
     <reporting>
         <plugins>
             <plugin>
-                <!-- added to suppress "[WARNING] Unable to locate Source XRef to link to - DISABLED" -->
+                &lt;!&ndash; added to suppress "[WARNING] Unable to locate Source XRef to link to - DISABLED" &ndash;&gt;
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jxr-plugin</artifactId>
                 <version>2.3</version>
             </plugin>
         </plugins>
-    </reporting>
+    </reporting>-->
 
-    <build>
+    <!--<build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -119,10 +119,10 @@
                     </execution>
                 </executions>
             </plugin>
-            <!--
+            &lt;!&ndash;
                 unfortunately net.ju-n.maven.plugins:vagrant-maven-plugin does not support vagrant 1.1+
                 at the moment, so I'm gonna use exec-maven-plugin instead
-            -->
+            &ndash;&gt;
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -154,7 +154,7 @@
                             <executable>${vagrant.bin}</executable>
                             <arguments>
                                 <argument>destroy</argument>
-                                <argument>--force</argument>
+                                <argument>-force</argument>-
                             </arguments>
                             <skip>${skipTests}</skip>
                         </configuration>
@@ -227,7 +227,7 @@
                 <version>1.0.0</version>
             </extension>
         </extensions>
-    </build>
+    </build>-->
 
     <profiles>
         <profile>
@@ -314,6 +314,89 @@
             </activation>
             <build>
                 <defaultGoal>clean deploy</defaultGoal>
+            </build>
+        </profile>
+        <profile>
+            <id>testing</id>
+            <build>
+                <finalName>mysql-binlog-connector-java</finalName>
+                <resources>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                        <includes>
+                            <include>*.*</include>
+                            <include>**/*.*</include>
+                        </includes>
+                    </resource>
+                </resources>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.cargo</groupId>
+                        <artifactId>cargo-maven2-plugin</artifactId>
+                        <version>1.1.2</version>
+                        <configuration>
+                            <container>
+                                <containerId>tomcat7x</containerId>
+                                <type>remote</type>
+                            </container>
+                            <configuration>
+                                <type>runtime</type>
+                                <deployables>
+                                    <deployable>
+                                        <groupId>${project.groupId}</groupId>
+                                        <artifactId>${project.artifactId}</artifactId>
+                                        <type>jar</type>
+                                        <properties>
+                                            <context>${project.name}</context>
+                                        </properties>
+                                    </deployable>
+                                </deployables>
+                            </configuration>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.mortbay.jetty</groupId>
+                        <artifactId>maven-jetty-plugin</artifactId>
+                        <version>6.1.10</version>
+                        <configuration>
+                            <scanIntervalSeconds>10</scanIntervalSeconds>
+                            <stopKey>foo</stopKey>
+                            <stopPort>9999</stopPort>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <source>1.8</source>
+                            <target>1.8</target>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-jar-plugin</artifactId>
+                        <version>2.2</version>
+                        <!-- nothing here -->
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>2.2-beta-4</version>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
             </build>
         </profile>
         <profile>

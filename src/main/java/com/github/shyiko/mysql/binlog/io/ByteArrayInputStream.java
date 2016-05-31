@@ -63,7 +63,7 @@ public class ByteArrayInputStream extends InputStream {
      * Read fixed length string.
      */
     public String readString(int length) throws IOException {
-        return new String(read(length));
+        return readDirtyString(length);
     }
 
     /**
@@ -99,6 +99,44 @@ public class ByteArrayInputStream extends InputStream {
             }
             remaining -= read;
         }
+    }
+
+    public String readDirtyString(int length) throws IOException {
+        StringBuilder stringBuilder = new StringBuilder();
+        int remaining = length;
+        while (remaining != 0) {
+            int read = readByCharacter(stringBuilder, length - remaining, remaining);
+            if (read == -1) {
+                throw new EOFException();
+            }
+            remaining -= read;
+        }
+        return stringBuilder.toString();
+    }
+
+    public int readByCharacter(StringBuilder stringBuilder, int off, int len) throws IOException {
+        if (len == 0) {
+            return 0;
+        }
+
+        int c = read();
+        if (c == -1) {
+            return -1;
+        }
+        stringBuilder.append((char)c);
+
+        int i = 1;
+        try {
+            for (; i < len ; i++) {
+                c = read();
+                if (c == -1) {
+                    break;
+                }
+                stringBuilder.append((char)c);
+            }
+        } catch (IOException ee) {
+        }
+        return i;
     }
 
     public BitSet readBitSet(int length, boolean bigEndian) throws IOException {
