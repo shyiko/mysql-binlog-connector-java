@@ -283,28 +283,30 @@ public class BinaryLogClientIntegrationTest {
 
     @Test
     public void testDeserializationOfSTRING() throws Exception {
-        assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q".getBytes()});
-        assertEquals(writeAndCaptureRow("binary", "'r'"), new Serializable[]{"r".getBytes()});
+        assertEquals(writeAndCaptureRow("char", "'q'"), new Serializable[]{"q".getBytes("UTF-8")});
+        assertEquals(writeAndCaptureRow("char", "'Â'"), new Serializable[]{"Â".getBytes("UTF-8")});
+        assertEquals(writeAndCaptureRow("binary", "x'01'"), new Serializable[]{new byte[] {1}});
+        assertEquals(writeAndCaptureRow("binary", "x'FF'"), new Serializable[]{new byte[] {-1}});
         assertEquals(writeAndCaptureRow("binary(16)", "unhex(md5(\"glob\"))"),
             new Serializable[]{DatatypeConverter.parseHexBinary("8684147451a6cc3b92142c6f4b78e61c")});
     }
 
     @Test
     public void testDeserializationOfVARSTRING() throws Exception {
-        assertEquals(writeAndCaptureRow("varchar(255)", "'we'"), new Serializable[]{"we".getBytes()});
-        assertEquals(writeAndCaptureRow("varbinary(255)", "'ty'"), new Serializable[]{"ty".getBytes()});
+        assertEquals(writeAndCaptureRow("varchar(255)", "'weÂ'"), new Serializable[]{"weÂ".getBytes("UTF-8")});
+        assertEquals(writeAndCaptureRow("varbinary(255)", "x'01FF'"), new Serializable[]{new byte[] {1, -1}});
     }
 
     @Test
     public void testDeserializationOfBLOB() throws Exception {
-        assertEquals(writeAndCaptureRow("tinyblob", "'ui'"), new Serializable[]{"ui".getBytes()});
-        assertEquals(writeAndCaptureRow("tinytext", "'op'"), new Serializable[]{"op".getBytes()});
-        assertEquals(writeAndCaptureRow("blob", "'as'"), new Serializable[]{"as".getBytes()});
-        assertEquals(writeAndCaptureRow("text", "'df'"), new Serializable[]{"df".getBytes()});
-        assertEquals(writeAndCaptureRow("mediumblob", "'gh'"), new Serializable[]{"gh".getBytes()});
-        assertEquals(writeAndCaptureRow("mediumtext", "'jk'"), new Serializable[]{"jk".getBytes()});
-        assertEquals(writeAndCaptureRow("longblob", "'lz'"), new Serializable[]{"lz".getBytes()});
-        assertEquals(writeAndCaptureRow("longtext", "'xc'"), new Serializable[]{"xc".getBytes()});
+        assertEquals(writeAndCaptureRow("tinyblob", "x'01FF'"), new Serializable[]{new byte[] {1, -1}});
+        assertEquals(writeAndCaptureRow("tinytext", "'opÂ'"), new Serializable[]{"opÂ".getBytes("UTF-8")});
+        assertEquals(writeAndCaptureRow("blob", "x'01FF'"), new Serializable[]{new byte[] {1, -1}});
+        assertEquals(writeAndCaptureRow("text", "'dfÂ'"), new Serializable[]{"dfÂ".getBytes("UTF-8")});
+        assertEquals(writeAndCaptureRow("mediumblob", "x'01FF'"), new Serializable[]{new byte[] {1, -1}});
+        assertEquals(writeAndCaptureRow("mediumtext", "'jkÂ'"), new Serializable[]{"jkÂ".getBytes("UTF-8")});
+        assertEquals(writeAndCaptureRow("longblob", "x'01FF'"), new Serializable[]{new byte[] {1, -1}});
+        assertEquals(writeAndCaptureRow("longtext", "'xcÂ'"), new Serializable[]{"xcÂ".getBytes("UTF-8")});
     }
 
     @Test
@@ -354,7 +356,8 @@ public class BinaryLogClientIntegrationTest {
                 @Override
                 public void execute(Statement statement) throws SQLException {
                     statement.execute("drop table if exists data_type_hell");
-                    statement.execute("create table data_type_hell (column_ " + columnDefinition + ")");
+                    statement.execute("create table data_type_hell (column_ " + columnDefinition +
+                        ") CHARACTER SET utf8");
                     StringBuilder insertQueryBuilder = new StringBuilder("insert into data_type_hell values");
                     for (String value : values) {
                         insertQueryBuilder.append("(").append(value).append("), ");
