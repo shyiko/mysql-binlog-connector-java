@@ -182,9 +182,10 @@ For the insight into the internals of MySQL look [here](https://dev.mysql.com/do
 ## Real-world applications
 
 Some of the OSS built on top of mysql-binlog-conector-java: 
-[shyiko/rook](https://github.com/shyiko/rook) (generic Change Data Capture (CDC) toolkit), 
+[debezium.io](https://github.com/debezium/debezium) (distributed platform for change data capture),
 [mardambey/mypipe](https://github.com/mardambey/mypipe) (MySQL to Apache Kafka replicator),
 [ngocdaothanh/mydit](https://github.com/ngocdaothanh/mydit) (MySQL to MongoDB replicator),
+[shyiko/rook](https://github.com/shyiko/rook) (generic Change Data Capture (CDC) toolkit).
 
 It's also used [on a large scale](https://twitter.com/atwinmutt/status/626816601078300672) in MailChimp. You can read about it [here](http://devs.mailchimp.com/blog/powering-mailchimp-pro-reporting/).  
 
