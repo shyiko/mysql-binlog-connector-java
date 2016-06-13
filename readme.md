@@ -182,7 +182,7 @@ For the insight into the internals of MySQL look [here](https://dev.mysql.com/do
 ## Real-world applications
 
 Some of the OSS built on top of mysql-binlog-conector-java: 
-[debezium.io](https://github.com/debezium/debezium) (distributed platform for change data capture),
+[debezium](https://github.com/debezium/debezium) (distributed platform for change data capture),
 [mardambey/mypipe](https://github.com/mardambey/mypipe) (MySQL to Apache Kafka replicator),
 [ngocdaothanh/mydit](https://github.com/ngocdaothanh/mydit) (MySQL to MongoDB replicator),
 [shyiko/rook](https://github.com/shyiko/rook) (generic Change Data Capture (CDC) toolkit).
