@@ -17,6 +17,8 @@ package com.github.shyiko.mysql.binlog;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +44,7 @@ public class GtidSet {
      * @param gtidSet gtid set comprised of closed intervals (like MySQL's executed_gtid_set).
      */
     public GtidSet(String gtidSet) {
-        String[] uuidSets = gtidSet.isEmpty() ? new String[0] : gtidSet.split(",");
+        String[] uuidSets = (gtidSet == null || gtidSet.isEmpty()) ? new String[0] : gtidSet.split(",");
         for (String uuidSet : uuidSets) {
             int uuidSeparatorIndex = uuidSet.indexOf(":");
             String sourceId = uuidSet.substring(0, uuidSeparatorIndex);
@@ -63,8 +65,12 @@ public class GtidSet {
         }
     }
 
+    /**
+     * Get an immutable collection of the {@link UUIDSet range of GTIDs for a single server}.
+     * @return the {@link UUIDSet GTID ranges for each server}; never null
+     */
     public Collection<UUIDSet> getUUIDSets() {
-        return map.values();
+        return Collections.unmodifiableCollection(map.values());
     }
 
     /**
@@ -79,43 +85,59 @@ public class GtidSet {
         if (uuidSet == null) {
             map.put(sourceId, uuidSet = new UUIDSet(sourceId, new ArrayList<Interval>()));
         }
-        List<Interval> intervals = (List<Interval>) uuidSet.intervals;
-        int index = findInterval(intervals, transactionId);
-        boolean addedToExisting = false;
-        if (index < intervals.size()) {
-            Interval interval = intervals.get(index);
-            if (interval.start == transactionId + 1) {
-                interval.start = transactionId;
-                addedToExisting = true;
-            } else
-            if (interval.end + 1 == transactionId) {
-                interval.end = transactionId;
-                addedToExisting = true;
-            } else
-            if (interval.start <= transactionId && transactionId <= interval.end) {
+        return uuidSet.add(transactionId);
+    }
+
+    /**
+     * Find the {@link UUIDSet} for the server with the specified UUID.
+     * @param uuid the UUID of the server
+     * @return the {@link UUIDSet} for the identified server, or {@code null} if there are no GTIDs from that server.
+     */
+    public UUIDSet forServerWithId(String uuid) {
+        return map.get(uuid);
+    }
+
+    /**
+     * Determine if the GTIDs represented by this object are contained completely within the supplied set of GTIDs.
+     * Note that if two {@link GtidSet}s are equal, then they both are subsets of the other.
+     * @param other the other set of GTIDs; may be null
+     * @return {@code true} if all of the GTIDs in this set are equal to or completely contained within the supplied
+     *         set of GTIDs, or {@code false} otherwise
+     */
+    public boolean isContainedWithin(GtidSet other) {
+        if (other == null) {
+            return false;
+        }
+        if (this == other) {
+            return true;
+        }
+        if (this.equals(other)) {
+            return true;
+        }
+        for (UUIDSet uuidSet : map.values()) {
+            UUIDSet thatSet = other.forServerWithId(uuidSet.getUUID());
+            if (!uuidSet.isContainedWithin(thatSet)) {
                 return false;
             }
-        }
-        if (!addedToExisting) {
-            intervals.add(index, new Interval(transactionId, transactionId));
-        }
-        if (intervals.size() > 1) {
-            joinAdjacentIntervals(intervals, index);
         }
         return true;
     }
 
-    /**
-     * Collapses intervals like a-(b-1):b-c into a-c (only in index+-1 range).
-     */
-    private void joinAdjacentIntervals(List<Interval> intervals, int index) {
-        for (int i = Math.min(index + 1, intervals.size() - 1), e = Math.max(index - 1, 0); i > e; i--) {
-            Interval a = intervals.get(i - 1), b = intervals.get(i);
-            if (a.end + 1 == b.start) {
-                a.end = b.end;
-                intervals.remove(i);
-            }
+    @Override
+    public int hashCode() {
+        return map.keySet().hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
         }
+        if (obj instanceof GtidSet) {
+            GtidSet that = (GtidSet) obj;
+            return this.map.equals(that.map);
+        }
+        return false;
     }
 
     @Override
@@ -127,30 +149,7 @@ public class GtidSet {
         return join(gtids, ",");
     }
 
-    /**
-     * @return index which is either a pointer to the interval containing v or a position at which v can be added
-     */
-    private static int findInterval(List<Interval> ii, long v) {
-        int l = 0, p = 0, r = ii.size();
-        while (l < r) {
-            p = (l + r) / 2;
-            Interval i = ii.get(p);
-            if (i.end < v) {
-                l = p + 1;
-            } else
-            if (v < i.start) {
-                r = p;
-            } else {
-                return p;
-            }
-        }
-        if (!ii.isEmpty() && ii.get(p).end < v) {
-            p++;
-        }
-        return p;
-    }
-
-    private String join(Collection o, String delimiter) {
+    private static String join(Collection<?> o, String delimiter) {
         if (o.isEmpty()) {
             return "";
         }
@@ -162,28 +161,179 @@ public class GtidSet {
     }
 
     /**
+     * A range of GTIDs for a single server with a specific UUID.
      * @see GtidSet
      */
     public static final class UUIDSet {
 
         private String uuid;
-        private Collection<Interval> intervals;
+        private List<Interval> intervals;
 
-        private UUIDSet(String uuid, Collection<Interval> intervals) {
+        private UUIDSet(String uuid, List<Interval> intervals) {
             this.uuid = uuid;
             this.intervals = intervals;
+            if (intervals.size() > 1) {
+                joinAdjacentIntervals(0);
+            }
         }
 
+        protected boolean add(long transactionId) {
+            int index = findInterval(transactionId);
+            boolean addedToExisting = false;
+            if (index < intervals.size()) {
+                Interval interval = intervals.get(index);
+                if (interval.start == transactionId + 1) {
+                    interval.start = transactionId;
+                    addedToExisting = true;
+                } else
+                if (interval.end + 1 == transactionId) {
+                    interval.end = transactionId;
+                    addedToExisting = true;
+                } else
+                if (interval.start <= transactionId && transactionId <= interval.end) {
+                    return false;
+                }
+            }
+            if (!addedToExisting) {
+                intervals.add(index, new Interval(transactionId, transactionId));
+            }
+            if (intervals.size() > 1) {
+                joinAdjacentIntervals(index);
+            }
+            return true;
+        }
+
+        /**
+         * Collapses intervals like a-(b-1):b-c into a-c (only in index+-1 range).
+         */
+        private void joinAdjacentIntervals(int index) {
+            for (int i = Math.min(index + 1, intervals.size() - 1), e = Math.max(index - 1, 0); i > e; i--) {
+                Interval a = intervals.get(i - 1), b = intervals.get(i);
+                if (a.end + 1 == b.start) {
+                    a.end = b.end;
+                    intervals.remove(i);
+                }
+            }
+        }
+
+        /**
+         * @return index which is either a pointer to the interval containing v or a position at which v can be added
+         */
+        private int findInterval(long v) {
+            int l = 0, p = 0, r = intervals.size();
+            while (l < r) {
+                p = (l + r) / 2;
+                Interval i = intervals.get(p);
+                if (i.end < v) {
+                    l = p + 1;
+                } else
+                if (v < i.start) {
+                    r = p;
+                } else {
+                    return p;
+                }
+            }
+            if (!intervals.isEmpty() && intervals.get(p).end < v) {
+                p++;
+            }
+            return p;
+        }
+
+        /**
+         * Get the UUID for the server that generated the GTIDs.
+         * @return the server's UUID; never null
+         */
         public String getUUID() {
             return uuid;
         }
 
-        public Collection<Interval> getIntervals() {
-            return intervals;
+        /**
+         * Get the intervals of transaction numbers.
+         * @return the immutable transaction intervals; never null
+         */
+        public List<Interval> getIntervals() {
+            return Collections.unmodifiableList(intervals);
+        }
+
+        /**
+         * Determine if the set of transaction numbers from this server is completely within the set of transaction
+         * numbers from the set of transaction numbers in the supplied set.
+         * @param other the set to compare with this set
+         * @return {@code true} if this server's transaction numbers are equal to or a subset of the transaction
+         *         numbers of the supplied set, or false otherwise
+         */
+        public boolean isContainedWithin(UUIDSet other) {
+            if (other == null) {
+                return false;
+            }
+            if (!this.getUUID().equalsIgnoreCase(other.getUUID())) {
+                // Not even the same server ...
+                return false;
+            }
+            if (this.intervals.isEmpty()) {
+                return true;
+            }
+            if (other.intervals.isEmpty()) {
+                return false;
+            }
+            assert this.intervals.size() > 0;
+            assert other.intervals.size() > 0;
+
+            // Every interval in this must be within an interval of the other ...
+            for (Interval thisInterval : this.intervals) {
+                boolean found = false;
+                for (Interval otherInterval : other.intervals) {
+                    if (thisInterval.isContainedWithin(otherInterval)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    return false; // didn't find a match
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            return uuid.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            if (obj instanceof UUIDSet) {
+                UUIDSet that = (UUIDSet) obj;
+                return this.getUUID().equalsIgnoreCase(that.getUUID()) &&
+                        this.getIntervals().equals(that.getIntervals());
+            }
+            return super.equals(obj);
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            if (sb.length() != 0) {
+                sb.append(',');
+            }
+            sb.append(uuid).append(':');
+            Iterator<Interval> iter = intervals.iterator();
+            if (iter.hasNext()) {
+                sb.append(iter.next());
+            }
+            while (iter.hasNext()) {
+                sb.append(':');
+                sb.append(iter.next());
+            }
+            return sb.toString();
         }
     }
 
     /**
+     * An interval of contiguous transaction identifiers.
      * @see GtidSet
      */
     public static final class Interval implements Comparable<Interval> {
@@ -196,12 +346,54 @@ public class GtidSet {
             this.end = end;
         }
 
+        /**
+         * Get the starting transaction number in this interval.
+         * @return this interval's first transaction number
+         */
         public long getStart() {
             return start;
         }
 
+        /**
+         * Get the ending transaction number in this interval.
+         * @return this interval's last transaction number
+         */
         public long getEnd() {
             return end;
+        }
+
+        /**
+         * Determine if this interval is completely within the supplied interval.
+         * @param other the interval to compare with
+         * @return {@code true} if the {@link #getStart() start} is greater than or equal to the supplied interval's
+         *         {@link #getStart() start} and the {@link #getEnd() end} is less than or equal to the supplied
+         *         interval's {@link #getEnd() end}, or {@code false} otherwise
+         */
+        public boolean isContainedWithin(Interval other) {
+            if (other == this) {
+                return true;
+            }
+            if (other == null) {
+                return false;
+            }
+            return this.getStart() >= other.getStart() && this.getEnd() <= other.getEnd();
+        }
+
+        @Override
+        public int hashCode() {
+            return (int) getStart();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj instanceof Interval) {
+                Interval that = (Interval) obj;
+                return this.getStart() == that.getStart() && this.getEnd() == that.getEnd();
+            }
+            return false;
         }
 
         @Override
