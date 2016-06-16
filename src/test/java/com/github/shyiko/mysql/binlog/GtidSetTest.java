@@ -102,7 +102,7 @@ public class GtidSetTest {
     @Test
     public void testSingleInterval() {
         GtidSet gtidSet = new GtidSet(UUID + ":1-191");
-        UUIDSet uuidSet = gtidSet.forServerWithId(UUID);
+        UUIDSet uuidSet = gtidSet.getUUIDSet(UUID);
         assertEquals(uuidSet.getIntervals().size(), 1);
         assertTrue(uuidSet.getIntervals().contains(new Interval(1, 191)));
         assertEquals(uuidSet.getIntervals().iterator().next(), new Interval(1, 191));
@@ -113,7 +113,7 @@ public class GtidSetTest {
     @Test
     public void testCollapseAdjacentIntervals() {
         GtidSet gtidSet = new GtidSet(UUID + ":1-191:192-199");
-        UUIDSet uuidSet = gtidSet.forServerWithId(UUID);
+        UUIDSet uuidSet = gtidSet.getUUIDSet(UUID);
         assertEquals(uuidSet.getIntervals().size(), 1);
         assertTrue(uuidSet.getIntervals().contains(new Interval(1, 199)));
         assertEquals(uuidSet.getIntervals().iterator().next(), new Interval(1, 199));
@@ -124,7 +124,7 @@ public class GtidSetTest {
     @Test
     public void testNotCollapseNonAdjacentIntervals() {
         GtidSet gtidSet = new GtidSet(UUID + ":1-191:193-199");
-        UUIDSet uuidSet = gtidSet.forServerWithId(UUID);
+        UUIDSet uuidSet = gtidSet.getUUIDSet(UUID);
         assertEquals(uuidSet.getIntervals().size(), 2);
         assertEquals(uuidSet.getIntervals().iterator().next(), new Interval(1, 191));
         assertEquals(new LinkedList<Interval>(uuidSet.getIntervals()).getLast(), new Interval(193, 199));
@@ -134,7 +134,7 @@ public class GtidSetTest {
     @Test
     public void testMultipleIntervals() {
         GtidSet set = new GtidSet(UUID + ":1-191:193-199:1000-1033");
-        UUIDSet uuidSet = set.forServerWithId(UUID);
+        UUIDSet uuidSet = set.getUUIDSet(UUID);
         assertEquals(uuidSet.getIntervals().size(), 3);
         assertTrue(uuidSet.getIntervals().contains(new Interval(193, 199)));
         assertEquals(uuidSet.getIntervals().iterator().next(), new Interval(1, 191));
@@ -145,7 +145,7 @@ public class GtidSetTest {
     @Test
     public void testMultipleIntervalsThatMayBeAdjacent() {
         GtidSet gtidSet = new GtidSet(UUID + ":1-191:192-199:1000-1033:1035-1036:1038-1039");
-        UUIDSet uuidSet = gtidSet.forServerWithId(UUID);
+        UUIDSet uuidSet = gtidSet.getUUIDSet(UUID);
         assertEquals(uuidSet.getIntervals().size(), 4);
         assertTrue(uuidSet.getIntervals().contains(new Interval(1000, 1033)));
         assertTrue(uuidSet.getIntervals().contains(new Interval(1035, 1036)));

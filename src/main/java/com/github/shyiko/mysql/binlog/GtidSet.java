@@ -74,6 +74,15 @@ public class GtidSet {
     }
 
     /**
+     * Find the {@link UUIDSet} for the server with the specified UUID.
+     * @param uuid the UUID of the server
+     * @return the {@link UUIDSet} for the identified server, or {@code null} if there are no GTIDs from that server.
+     */
+    public UUIDSet getUUIDSet(String uuid) {
+        return map.get(uuid);
+    }
+
+    /**
      * @param gtid GTID ("source_id:transaction_id")
      * @return whether or not gtid was added to the set (false if it was already there)
      */
@@ -86,15 +95,6 @@ public class GtidSet {
             map.put(sourceId, uuidSet = new UUIDSet(sourceId, new ArrayList<Interval>()));
         }
         return uuidSet.add(transactionId);
-    }
-
-    /**
-     * Find the {@link UUIDSet} for the server with the specified UUID.
-     * @param uuid the UUID of the server
-     * @return the {@link UUIDSet} for the identified server, or {@code null} if there are no GTIDs from that server.
-     */
-    public UUIDSet forServerWithId(String uuid) {
-        return map.get(uuid);
     }
 
     /**
@@ -115,7 +115,7 @@ public class GtidSet {
             return true;
         }
         for (UUIDSet uuidSet : map.values()) {
-            UUIDSet thatSet = other.forServerWithId(uuidSet.getUUID());
+            UUIDSet thatSet = other.getUUIDSet(uuidSet.getUUID());
             if (!uuidSet.isContainedWithin(thatSet)) {
                 return false;
             }
