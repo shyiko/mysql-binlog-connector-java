@@ -102,7 +102,7 @@ public class GtidSet {
      * Note that if two {@link GtidSet}s are equal, then they both are subsets of the other.
      * @param other the other set of GTIDs; may be null
      * @return {@code true} if all of the GTIDs in this set are equal to or completely contained within the supplied
-     *         set of GTIDs, or {@code false} otherwise
+     * set of GTIDs, or {@code false} otherwise
      */
     public boolean isContainedWithin(GtidSet other) {
         if (other == null) {
@@ -169,7 +169,7 @@ public class GtidSet {
         private String uuid;
         private List<Interval> intervals;
 
-        private UUIDSet(String uuid, List<Interval> intervals) {
+        UUIDSet(String uuid, List<Interval> intervals) {
             this.uuid = uuid;
             this.intervals = intervals;
             if (intervals.size() > 1) {
@@ -177,7 +177,7 @@ public class GtidSet {
             }
         }
 
-        protected boolean add(long transactionId) {
+        private boolean add(long transactionId) {
             int index = findInterval(transactionId);
             boolean addedToExisting = false;
             if (index < intervals.size()) {
@@ -260,14 +260,14 @@ public class GtidSet {
          * numbers from the set of transaction numbers in the supplied set.
          * @param other the set to compare with this set
          * @return {@code true} if this server's transaction numbers are equal to or a subset of the transaction
-         *         numbers of the supplied set, or false otherwise
+         * numbers of the supplied set, or false otherwise
          */
         public boolean isContainedWithin(UUIDSet other) {
             if (other == null) {
                 return false;
             }
             if (!this.getUUID().equalsIgnoreCase(other.getUUID())) {
-                // Not even the same server ...
+                // not even the same server ...
                 return false;
             }
             if (this.intervals.isEmpty()) {
@@ -276,10 +276,7 @@ public class GtidSet {
             if (other.intervals.isEmpty()) {
                 return false;
             }
-            assert this.intervals.size() > 0;
-            assert other.intervals.size() > 0;
-
-            // Every interval in this must be within an interval of the other ...
+            // every interval in this must be within an interval of the other ...
             for (Interval thisInterval : this.intervals) {
                 boolean found = false;
                 for (Interval otherInterval : other.intervals) {
@@ -308,7 +305,7 @@ public class GtidSet {
             if (obj instanceof UUIDSet) {
                 UUIDSet that = (UUIDSet) obj;
                 return this.getUUID().equalsIgnoreCase(that.getUUID()) &&
-                        this.getIntervals().equals(that.getIntervals());
+                    this.getIntervals().equals(that.getIntervals());
             }
             return super.equals(obj);
         }
@@ -341,7 +338,7 @@ public class GtidSet {
         private long start;
         private long end;
 
-        private Interval(long start, long end) {
+        Interval(long start, long end) {
             this.start = start;
             this.end = end;
         }
@@ -366,8 +363,8 @@ public class GtidSet {
          * Determine if this interval is completely within the supplied interval.
          * @param other the interval to compare with
          * @return {@code true} if the {@link #getStart() start} is greater than or equal to the supplied interval's
-         *         {@link #getStart() start} and the {@link #getEnd() end} is less than or equal to the supplied
-         *         interval's {@link #getEnd() end}, or {@code false} otherwise
+         * {@link #getStart() start} and the {@link #getEnd() end} is less than or equal to the supplied
+         * interval's {@link #getEnd() end}, or {@code false} otherwise
          */
         public boolean isContainedWithin(Interval other) {
             if (other == this) {
