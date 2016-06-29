@@ -17,9 +17,12 @@ package com.github.shyiko.mysql.binlog.network.protocol;
 
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.io.ByteArrayOutputStream;
-import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
+import com.github.shyiko.mysql.binlog.network.IdentityVerificationException;
+import com.github.shyiko.mysql.binlog.network.SSLSocketFactory;
 import com.github.shyiko.mysql.binlog.network.protocol.command.Command;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.channels.Channel;
@@ -57,14 +60,31 @@ public class PacketChannel implements Channel {
         return inputStream.read(length);
     }
 
-    public void write(Command command) throws IOException {
+    public void write(Command command, int packetNumber) throws IOException {
         byte[] body = command.toByteArray();
         outputStream.writeInteger(body.length, 3); // packet length
-        outputStream.writeInteger(command instanceof AuthenticateCommand ? 1 : 0, 1); // packet number
+        outputStream.writeInteger(packetNumber, 1);
         outputStream.write(body, 0, body.length);
         // though it has no effect in case of default (underlying) output stream (SocketOutputStream),
         // it may be necessary in case of non-default one
         outputStream.flush();
+    }
+
+    public void write(Command command) throws IOException {
+        write(command, 0);
+    }
+
+    public void upgradeToSSL(SSLSocketFactory sslSocketFactory, HostnameVerifier hostnameVerifier) throws IOException {
+        SSLSocket sslSocket = sslSocketFactory.createSocket(this.socket);
+        sslSocket.startHandshake();
+        socket = sslSocket;
+        inputStream = new ByteArrayInputStream(sslSocket.getInputStream());
+        outputStream = new ByteArrayOutputStream(sslSocket.getOutputStream());
+        if (hostnameVerifier != null && !hostnameVerifier.verify(sslSocket.getInetAddress().getHostName(),
+                sslSocket.getSession())) {
+            throw new IdentityVerificationException("\"" + sslSocket.getInetAddress().getHostName() +
+                "\" identity was not confirmed");
+        }
     }
 
     @Override

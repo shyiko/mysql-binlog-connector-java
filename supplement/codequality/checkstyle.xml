@@ -61,7 +61,8 @@
         <!-- checks for imports -->
         <!-- http://checkstyle.sf.net/config_imports.html -->
         <module name="AvoidStarImport"/>
-        <module name="IllegalImport"/> <!-- defaults to sun.* packages -->
+        <!-- defaults to sun.* packages -->
+        <!--<module name="IllegalImport"/> -->
         <module name="RedundantImport"/>
         <module name="UnusedImports"/>
 

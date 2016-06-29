@@ -8,10 +8,12 @@ but ended up as a complete rewrite. Key differences/features:
 - automatic binlog filename/position | GTID resolution
 - resumable disconnects
 - plugable failover strategies
-- JMX exposure (optionally with statistics)
+- binlog_checksum=CRC32 support (for MySQL 5.6.2+ users)
+- secure communication over the TLS
+- JMX-friendly
+- real-time stats
 - availability in Maven Central
 - no third-party dependencies
-- binlog_checksum=CRC32 support (for MySQL 5.6.2+ users)
 - test suite over different versions of MySQL releases
 
 > If you are looking for something similar in other languages - check out 
@@ -30,32 +32,7 @@ Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3
 </dependency>
 ```
 
-The latest development version always available through Sonatype Snapshots repository (as shown below).
-
-```xml
-<dependencies>
-    <dependency>
-        <groupId>com.github.shyiko</groupId>
-        <artifactId>mysql-binlog-connector-java</artifactId>
-        <version>0.3.2-SNAPSHOT</version>
-    </dependency>
-</dependencies>
-
-<repositories>
-    <repository>
-        <id>sonatype-snapshots</id>
-        <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        <snapshots>
-            <enabled>true</enabled>
-        </snapshots>
-        <releases>
-            <enabled>false</enabled>
-        </releases>
-    </repository>
-</repositories>
-```
-
-### Reading binary log file
+#### Reading binary log file
 
 ```java
 File binlogFile = ...
@@ -69,7 +46,7 @@ try {
 }
 ```
 
-### Tapping into MySQL replication stream
+#### Tapping into MySQL replication stream
 
 > PREREQUISITES: Whichever user you plan to use for the BinaryLogClient, he MUST have [REPLICATION SLAVE](http://dev.mysql.com/doc/refman/5.5/en/privileges-provided.html#priv_replication-slave) privilege. Unless you specify binlogFilename/binlogPosition yourself (in which case automatic resolution won't kick in), you'll need [REPLICATION CLIENT](http://dev.mysql.com/doc/refman/5.5/en/privileges-provided.html#priv_replication-client) granted as well.
 
@@ -91,7 +68,7 @@ kick off from a specific filename or position, use `client.setBinlogFilename(fil
 > `client.connect()` is blocking (meaning that client will listen for events in the current thread). 
 `client.connect(timeout)`, on the other hand, spawns a separate thread.  
 
-### Controlling event deserialization
+#### Controlling event deserialization
 
 > You might need it for several reasons: 
 you don't want to waste time deserializing events you won't need; 
@@ -120,7 +97,7 @@ BinaryLogClient client = ...
 client.setEventDeserializer(eventDeserializer);
 ```
 
-### Exposing BinaryLogClient with JMX
+#### Exposing BinaryLogClient through JMX
 
 ```java
 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
@@ -136,10 +113,32 @@ ObjectName statsObjectName = new ObjectName("mysql.binlog:type=BinaryLogClientSt
 mBeanServer.registerMBean(stats, statsObjectName);
 ```
 
+#### Using SSL
+
+> Introduced in 1.0.0.
+
+TLSv1.1 & TLSv1.2 require [JDK 7](http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6916074)+.  
+Prior to MySQL 5.7.10, MySQL supported only TLSv1 
+(see [Secure Connection Protocols and Ciphers](http://dev.mysql.com/doc/refman/5.7/en/secure-connection-protocols-ciphers.html)). 
+
+> To check that MySQL server is [properly configured with SSL support](http://dev.mysql.com/doc/refman/5.7/en/using-secure-connections.html) -
+`mysql -h host -u root -ptypeyourpasswordmaybe -e "show global variables like 'have_%ssl';"` ("Value" 
+should be "YES"). State of the current session can be determined using `\s` ("SSL" should not be blank).
+
+```java
+System.setProperty("javax.net.ssl.keyStore", "/path/to/keystore.jks");
+System.setProperty("javax.net.ssl.keyStorePassword", "keystore.password");
+System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore.jks");
+System.setProperty("javax.net.ssl.trustStorePassword","truststore.password");
+
+BinaryLogClient client = ...
+client.setSSLMode(SSLMode.REQUIRED);
+```
+
 ## Implementation notes
 
-- data of numeric types (tinyint, etc) always returned signed(!) regardless of whether column definition includes "unsigned" keyword or not
-- data of var\*/\*text/\*blob types always returned as a byte array (for var\* this is true starting from mysql-binlog-connector-java@1.0.0). 
+- data of numeric types (tinyint, etc) always returned signed(!) regardless of whether column definition includes "unsigned" keyword or not.
+- data of var\*/\*text/\*blob types always returned as a byte array (for var\* this is true starting from 1.0.0). 
 
 ## Frequently Asked Questions
 
