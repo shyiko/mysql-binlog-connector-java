@@ -54,11 +54,17 @@ import com.github.shyiko.mysql.binlog.network.protocol.command.PingCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.QueryCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.SSLRequestCommand;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.GeneralSecurityException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -84,7 +90,30 @@ import java.util.logging.Logger;
 public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private static final SocketFactory DEFAULT_SOCKET_FACTORY = new DefaultSocketFactory();
-    private static final SSLSocketFactory DEFAULT_SSL_SOCKET_FACTORY = new DefaultSSLSocketFactory();
+    private static final SSLSocketFactory DEFAULT_REQUIRED_SSL_MODE_SOCKET_FACTORY = new DefaultSSLSocketFactory() {
+
+        @Override
+        protected void initSSLContext(SSLContext sc) throws GeneralSecurityException {
+            sc.init(null, new TrustManager[]{
+                new X509TrustManager() {
+
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
+                        throws CertificateException { }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] x509Certificates, String s)
+                        throws CertificateException { }
+
+                    @Override
+                    public X509Certificate[] getAcceptedIssuers() {
+                        return new X509Certificate[0];
+                    }
+                }
+            }, null);
+        }
+    };
+    private static final SSLSocketFactory DEFAULT_VERIFY_CA_SSL_MODE_SOCKET_FACTORY = new DefaultSSLSocketFactory();
 
     private final Logger logger = Logger.getLogger(getClass().getName());
 
@@ -499,7 +528,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 sslRequestCommand.setCollation(collation);
                 channel.write(sslRequestCommand, packetNumber++);
                 SSLSocketFactory sslSocketFactory = this.sslSocketFactory != null ? this.sslSocketFactory :
-                    DEFAULT_SSL_SOCKET_FACTORY;
+                    sslMode == SSLMode.REQUIRED ? DEFAULT_REQUIRED_SSL_MODE_SOCKET_FACTORY :
+                        DEFAULT_VERIFY_CA_SSL_MODE_SOCKET_FACTORY;
                 channel.upgradeToSSL(sslSocketFactory,
                     sslMode == SSLMode.VERIFY_IDENTITY ? new TLSHostnameVerifier() : null);
             }

@@ -126,13 +126,13 @@ Prior to MySQL 5.7.10, MySQL supported only TLSv1
 should be "YES"). State of the current session can be determined using `\s` ("SSL" should not be blank).
 
 ```java
-System.setProperty("javax.net.ssl.keyStore", "/path/to/keystore.jks");
-System.setProperty("javax.net.ssl.keyStorePassword", "keystore.password");
 System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore.jks");
 System.setProperty("javax.net.ssl.trustStorePassword","truststore.password");
+System.setProperty("javax.net.ssl.keyStore", "/path/to/keystore.jks");
+System.setProperty("javax.net.ssl.keyStorePassword", "keystore.password");
 
 BinaryLogClient client = ...
-client.setSSLMode(SSLMode.REQUIRED);
+client.setSSLMode(SSLMode.VERIFY_IDENTITY);
 ```
 
 ## Implementation notes
