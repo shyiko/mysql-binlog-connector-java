@@ -33,6 +33,7 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.ServerException;
 import org.mockito.InOrder;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -49,6 +50,7 @@ import java.net.SocketException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
 import java.sql.Statement;
 import java.util.BitSet;
 import java.util.Calendar;
@@ -238,6 +240,36 @@ public class BinaryLogClientIntegrationTest {
         assertEquals(writeAndCaptureRow("longtext", "'xc'"), new Serializable[]{"xc".getBytes()});
         assertEquals(writeAndCaptureRow("enum('a','b','c')", "'b'"), new Serializable[]{2});
         assertEquals(writeAndCaptureRow("set('a','b','c')", "'a,c'"), new Serializable[]{5L});
+    }
+
+    @Test
+    public void testFSP() throws Exception {
+        try {
+            master.execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("create table fsp_check (column_ datetime(0))");
+                }
+            });
+        } catch (SQLSyntaxErrorException e) {
+            throw new SkipException("MySQL < 5.6.4+");
+        }
+        assertEquals(writeAndCaptureRow("datetime(0)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 4, 0))});
+        assertEquals(writeAndCaptureRow("datetime(1)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 800))});
+        assertEquals(writeAndCaptureRow("datetime(2)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 780))});
+        assertEquals(writeAndCaptureRow("datetime(3)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 778))});
+        assertEquals(writeAndCaptureRow("datetime(3)", "'1989-03-21 01:02:03.777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 777))});
+        assertEquals(writeAndCaptureRow("datetime(4)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 777))});
+        assertEquals(writeAndCaptureRow("datetime(5)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 777))});
+        assertEquals(writeAndCaptureRow("datetime(6)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+            new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 777))});
     }
 
     private BitSet bitSet(int... bitsToSetTrue) {

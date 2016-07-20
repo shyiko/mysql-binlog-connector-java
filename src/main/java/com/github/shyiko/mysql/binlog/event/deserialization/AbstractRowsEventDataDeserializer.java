@@ -270,32 +270,12 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     private int getFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
-        int fractionalSecondsStorageSize = getFractionalSecondsStorageSize(meta);
-        if (fractionalSecondsStorageSize > 0) {
-            long fractionalSeconds = bigEndianLong(inputStream.read(fractionalSecondsStorageSize), 0,
-                    fractionalSecondsStorageSize);
-            if (meta % 2 == 1) {
-                fractionalSeconds /= 10;
-            }
-            return (int) (fractionalSeconds / 1000);
+        int length = (meta + 1) / 2;
+        if (length > 0) {
+            long fraction = bigEndianLong(inputStream.read(length), 0, length);
+            return (int) (fraction / (0.1 * Math.pow(100, length - 1)));
         }
         return 0;
-    }
-
-    private static int getFractionalSecondsStorageSize(int fsp) {
-        switch (fsp) {
-            case 1:
-            case 2:
-                return 1;
-            case 3:
-            case 4:
-                return 2;
-            case 5:
-            case 6:
-                return 3;
-            default:
-                return 0;
-        }
     }
 
     private static int extractBits(long value, int bitOffset, int numberOfBits, int payloadSize) {
