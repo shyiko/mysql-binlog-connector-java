@@ -2,11 +2,9 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.2...HEAD)
+## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.3...HEAD)
 
 ### Added
- - Rudimentary support for GEOMETRY.
- - INTVAR deserializer.
  - A way to control Socket i/s buffering (using BinaryLogClient::setSocketFactory()). 
  - GTID auto positioning. 
  
@@ -17,8 +15,16 @@ This is **BACKWARD-INCOMPATIBLE** change.
 ### Fixed
  - BINARY/VARBINARY deserialization ([#56](https://github.com/shyiko/mysql-binlog-connector-java/issues/56)).  
 This is **BACKWARD-INCOMPATIBLE** change as CHAR/VARCHAR/BINARY/VARBINARY are now returned as `byte[]` (which you can obviously convert to String with `new String(byte[], Charset)` if needed).
- - Handling of DATE/DATETIME/TIMESTAMP's "zero" value (e.g. '0000-00-00').
  - GTID set "rollover". 
+
+## [0.3.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.2...0.3.3) - 2016-08-08
+
+### Added
+ - INTVAR deserializer.
+ - Rudimentary support for GEOMETRY.
+
+### Fixed
+ - Handling of DATE/DATETIME/TIMESTAMP's "zero" value (e.g. '0000-00-00').
 
 ## [0.3.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.1...0.3.2) - 2016-07-19
 
