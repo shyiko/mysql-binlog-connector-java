@@ -2,7 +2,42 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.2...HEAD)
+## [0.3.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.2...0.3.3) - 2016-08-08
+
+### Added
+ - INTVAR deserializer.
+ - Rudimentary support for GEOMETRY.
+
+### Fixed
+ - Handling of DATE/DATETIME/TIMESTAMP's "zero" value (e.g. '0000-00-00').
+
+## [0.3.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.1...0.3.2) - 2016-07-19
+
+### Fixed
+- Fractional seconds deserialization on MySQL 5.6.4+ ([#103](https://github.com/shyiko/mysql-binlog-connector-java/issues/103)).
+
+## [0.3.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.0...0.3.1) - 2016-01-15
+
+### Fixed
+- Broken "non blocking" mode backport from master.
+
+## [0.3.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.4...0.3.0) - 2016-01-15
+
+### Added
+ - Support for "non blocking" mode (equivalent to running `mysqlbinlog` without --stop-never)
+
+### Fixed
+ - NPE if user attempts to read binary log 'within the logical event group' ([#60](https://github.com/shyiko/mysql-binlog-connector-java/issues/60)).
+
+## [0.2.4](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.3...0.2.4) - 2015-09-09
+
+### Fixed
+ - Possible infinite loop in case of EOF in the middle of ByteArrayInputStream::fill.
+ 
+## [0.2.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.2...0.2.3) - 2015-08-31
+
+### Fixed
+ - Handling of packets exceeding 16mb in size.
 
 ## [0.2.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.1...0.2.2) - 2015-07-10
 
