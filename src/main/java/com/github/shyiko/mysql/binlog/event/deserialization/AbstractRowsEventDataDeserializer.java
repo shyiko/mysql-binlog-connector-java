@@ -107,30 +107,27 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return result;
     }
 
-    private Serializable deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
+    protected Serializable deserializeCell(ColumnType type, int meta, int length, ByteArrayInputStream inputStream)
             throws IOException {
         switch (type) {
             case BIT:
-                int bitSetLength = (meta >> 8) * 8 + (meta & 0xFF);
-                return inputStream.readBitSet(bitSetLength, false);
+                return deserializeBit(meta, inputStream);
             case TINY:
-                return (int) ((byte) inputStream.readInteger(1));
+                return deserializeTiny(inputStream);
             case SHORT:
-                return (int) ((short) inputStream.readInteger(2));
+                return deserializeShort(inputStream);
             case INT24:
-                return (inputStream.readInteger(3) << 8) >> 8;
+                return deserializeInt24(inputStream);
             case LONG:
-                return inputStream.readInteger(4);
+                return deserializeLong(inputStream);
             case LONGLONG:
-                return inputStream.readLong(8);
+                return deserializeLongLong(inputStream);
             case FLOAT:
-                return Float.intBitsToFloat(inputStream.readInteger(4));
+                return deserializeFloat(inputStream);
             case DOUBLE:
-                return Double.longBitsToDouble(inputStream.readLong(8));
+                return deserializeDouble(inputStream);
             case NEWDECIMAL:
-                int precision = meta & 0xFF, scale = meta >> 8,
-                    decimalLength = determineDecimalLength(precision, scale);
-                return toDecimal(precision, scale, inputStream.read(decimalLength));
+                return deserializeNewDecimal(meta, inputStream);
             case DATE:
                 return deserializeDate(inputStream);
             case TIME:
@@ -146,27 +143,64 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             case DATETIME_V2:
                 return deserializeDatetimeV2(meta, inputStream);
             case YEAR:
-                return 1900 + inputStream.readInteger(1);
-            case STRING:
-                int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.readString(stringLength);
-            case VARCHAR:
-            case VAR_STRING:
-                int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-                return inputStream.readString(varcharLength);
+                return deserializeYear(inputStream);
+            case STRING: // CHAR or BINARY
+                return deserializeString(length, inputStream);
+            case VARCHAR: case VAR_STRING: // VARCHAR or VARBINARY
+                return deserializeVarString(meta, inputStream);
             case BLOB:
-                int blobLength = inputStream.readInteger(meta);
-                return inputStream.read(blobLength);
+                return deserializeBlob(meta, inputStream);
             case ENUM:
-                return inputStream.readInteger(length);
+                return deserializeEnum(length, inputStream);
             case SET:
-                return inputStream.readLong(length);
+                return deserializeSet(length, inputStream);
             default:
                 throw new IOException("Unsupported type " + type);
         }
     }
 
-    private java.sql.Date deserializeDate(ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeBit(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int bitSetLength = (meta >> 8) * 8 + (meta & 0xFF);
+        return inputStream.readBitSet(bitSetLength, false);
+    }
+
+    protected Serializable deserializeTiny(ByteArrayInputStream inputStream) throws IOException {
+        return (int) ((byte) inputStream.readInteger(1));
+    }
+
+    protected Serializable deserializeShort(ByteArrayInputStream inputStream) throws IOException {
+        return (int) ((short) inputStream.readInteger(2));
+    }
+
+    protected Serializable deserializeInt24(ByteArrayInputStream inputStream) throws IOException {
+        return (inputStream.readInteger(3) << 8) >> 8;
+    }
+
+    protected Serializable deserializeLong(ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readInteger(4);
+    }
+
+    protected Serializable deserializeLongLong(ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readLong(8);
+    }
+
+    protected Serializable deserializeFloat(ByteArrayInputStream inputStream) throws IOException {
+        return Float.intBitsToFloat(inputStream.readInteger(4));
+    }
+
+    protected Serializable deserializeDouble(ByteArrayInputStream inputStream) throws IOException {
+        return Double.longBitsToDouble(inputStream.readLong(8));
+    }
+
+    protected Serializable deserializeNewDecimal(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int precision = meta & 0xFF, scale = meta >> 8, x = precision - scale;
+        int ipd = x / DIG_PER_DEC, fpd = scale / DIG_PER_DEC;
+        int decimalLength = (ipd << 2) + DIG_TO_BYTES[x - ipd * DIG_PER_DEC] +
+            (fpd << 2) + DIG_TO_BYTES[scale - fpd * DIG_PER_DEC];
+        return asBigDecimal(precision, scale, inputStream.read(decimalLength));
+    }
+
+    protected Serializable deserializeDate(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
         int day = value % 32;
         value >>>= 5;
@@ -180,7 +214,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return new java.sql.Date(cal.getTimeInMillis());
     }
 
-    private static java.sql.Time deserializeTime(ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeTime(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
         int[] split = split(value, 100, 3);
         Calendar c = Calendar.getInstance();
@@ -191,7 +225,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return new java.sql.Time(c.getTimeInMillis());
     }
 
-    private java.sql.Time deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         /*
             in big endian:
 
@@ -210,25 +244,25 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         c.set(Calendar.HOUR_OF_DAY, extractBits(time, 2, 10, 24));
         c.set(Calendar.MINUTE, extractBits(time, 12, 6, 24));
         c.set(Calendar.SECOND, extractBits(time, 18, 6, 24));
-        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
+        c.set(Calendar.MILLISECOND, deserializeFractionalSeconds(meta, inputStream));
         return new java.sql.Time(c.getTimeInMillis());
     }
 
-    private java.sql.Timestamp deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
         long value = inputStream.readLong(4);
         return new java.sql.Timestamp(value * 1000L);
     }
 
-    private java.sql.Timestamp deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         // big endian
         long timestamp = bigEndianLong(inputStream.read(4), 0, 4);
         Calendar c = Calendar.getInstance();
         c.setTimeInMillis(timestamp * 1000);
-        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
+        c.set(Calendar.MILLISECOND, deserializeFractionalSeconds(meta, inputStream));
         return new java.sql.Timestamp(c.getTimeInMillis());
     }
 
-    private java.util.Date deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
         long value = inputStream.readLong(8);
         int[] split = split(value, 100, 6);
         Calendar c = Calendar.getInstance();
@@ -242,7 +276,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return c.getTime();
     }
 
-    private java.util.Date deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         /*
             in big endian:
 
@@ -265,11 +299,40 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         c.set(Calendar.HOUR_OF_DAY, extractBits(datetime, 23, 5, 40));
         c.set(Calendar.MINUTE, extractBits(datetime, 28, 6, 40));
         c.set(Calendar.SECOND, extractBits(datetime, 34, 6, 40));
-        c.set(Calendar.MILLISECOND, getFractionalSeconds(meta, inputStream));
+        c.set(Calendar.MILLISECOND, deserializeFractionalSeconds(meta, inputStream));
         return c.getTime();
     }
 
-    private int getFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
+    protected Serializable deserializeYear(ByteArrayInputStream inputStream) throws IOException {
+        return 1900 + inputStream.readInteger(1);
+    }
+
+    protected Serializable deserializeString(int length, ByteArrayInputStream inputStream) throws IOException {
+        // charset is not present in the binary log (meaning there is no way to distinguish between CHAR / BINARY)
+        // as a result - return byte[] instead of an actual String
+        int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
+        return inputStream.readString(stringLength);
+    }
+
+    protected Serializable deserializeVarString(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
+        return inputStream.readString(varcharLength);
+    }
+
+    protected Serializable deserializeBlob(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int blobLength = inputStream.readInteger(meta);
+        return inputStream.read(blobLength);
+    }
+
+    protected Serializable deserializeEnum(int length, ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readInteger(length);
+    }
+
+    protected Serializable deserializeSet(int length, ByteArrayInputStream inputStream) throws IOException {
+        return inputStream.readLong(length);
+    }
+
+    protected int deserializeFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
         int length = (meta + 1) / 2;
         if (length > 0) {
             long fraction = bigEndianLong(inputStream.read(length), 0, length);
@@ -301,19 +364,10 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return result;
     }
 
-    private static int determineDecimalLength(int precision, int scale) {
-        int x = precision - scale;
-        int ipDigits = x / DIG_PER_DEC;
-        int fpDigits = scale / DIG_PER_DEC;
-        int ipDigitsX = x - ipDigits * DIG_PER_DEC;
-        int fpDigitsX = scale - fpDigits * DIG_PER_DEC;
-        return (ipDigits << 2) + DIG_TO_BYTES[ipDigitsX] + (fpDigits << 2) + DIG_TO_BYTES[fpDigitsX];
-    }
-
     /**
      * see mysql/strings/decimal.c
      */
-    private static BigDecimal toDecimal(int precision, int scale, byte[] value) {
+    private static BigDecimal asBigDecimal(int precision, int scale, byte[] value) {
         boolean positive = (value[0] & 0x80) == 0x80;
         value[0] ^= 0x80;
         if (!positive) {
