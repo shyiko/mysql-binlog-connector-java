@@ -48,6 +48,7 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
                 case FLOAT:
                 case DOUBLE:
                 case BLOB:
+                case GEOMETRY:
                     metadata[i] = inputStream.readInteger(1);
                     break;
                 case BIT:

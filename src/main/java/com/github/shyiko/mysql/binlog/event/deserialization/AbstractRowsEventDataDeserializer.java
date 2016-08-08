@@ -154,6 +154,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
                 return deserializeEnum(length, inputStream);
             case SET:
                 return deserializeSet(length, inputStream);
+            case GEOMETRY:
+                return deserializeGeometry(meta, inputStream);
             default:
                 throw new IOException("Unsupported type " + type);
         }
@@ -330,6 +332,11 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     protected Serializable deserializeSet(int length, ByteArrayInputStream inputStream) throws IOException {
         return inputStream.readLong(length);
+    }
+
+    protected Serializable deserializeGeometry(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int dataLength = inputStream.readInteger(meta);
+        return inputStream.read(dataLength);
     }
 
     protected int deserializeFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
