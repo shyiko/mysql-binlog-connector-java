@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Map;
+import java.util.TimeZone;
 
 /**
  * Whole class is basically a mix of <a href="https://code.google.com/p/open-replicator">open-replicator</a>'s
@@ -32,19 +33,30 @@ import java.util.Map;
  *
  * Current {@link ColumnType} to java type mapping is following:
  * <pre>
- * Integer: {@link ColumnType#TINY}, {@link ColumnType#SHORT}, {@link ColumnType#LONG}, {@link ColumnType#INT24},
- * {@link ColumnType#YEAR}, {@link ColumnType#ENUM}, {@link ColumnType#SET},
- * Long: {@link ColumnType#LONGLONG},
- * Float: {@link ColumnType#FLOAT},
- * Double: {@link ColumnType#DOUBLE},
- * String: {@link ColumnType#VARCHAR}, {@link ColumnType#VAR_STRING}, {@link ColumnType#STRING},
- * java.util.BitSet: {@link ColumnType#BIT},
- * java.util.Date: {@link ColumnType#DATETIME}, {@link ColumnType#DATETIME_V2},
- * java.math.BigDecimal: {@link ColumnType#NEWDECIMAL},
- * java.sql.Timestamp: {@link ColumnType#TIMESTAMP}, {@link ColumnType#TIMESTAMP_V2},
- * java.sql.Date: {@link ColumnType#DATE},
- * java.sql.Time: {@link ColumnType#TIME}, {@link ColumnType#TIME_V2},
- * byte[]: {@link ColumnType#BLOB},
+ * {@link ColumnType#TINY}: Integer
+ * {@link ColumnType#SHORT}: Integer
+ * {@link ColumnType#LONG}: Integer
+ * {@link ColumnType#INT24}: Integer
+ * {@link ColumnType#YEAR}: Integer
+ * {@link ColumnType#ENUM}: Integer
+ * {@link ColumnType#SET}: Long
+ * {@link ColumnType#LONGLONG}: Long
+ * {@link ColumnType#FLOAT}: Float
+ * {@link ColumnType#DOUBLE}: Double
+ * {@link ColumnType#BIT}: java.util.BitSet
+ * {@link ColumnType#DATETIME}: java.util.Date
+ * {@link ColumnType#DATETIME_V2}: java.util.Date
+ * {@link ColumnType#NEWDECIMAL}: java.math.BigDecimal
+ * {@link ColumnType#TIMESTAMP}: java.sql.Timestamp
+ * {@link ColumnType#TIMESTAMP_V2}: java.sql.Timestamp
+ * {@link ColumnType#DATE}: java.sql.Date
+ * {@link ColumnType#TIME}: java.sql.Time
+ * {@link ColumnType#TIME_V2}: java.sql.Time
+ * {@link ColumnType#VARCHAR}: String
+ * {@link ColumnType#VAR_STRING}: String
+ * {@link ColumnType#STRING}: String
+ * {@link ColumnType#BLOB}: byte[]
+ * {@link ColumnType#GEOMETRY}: byte[]
  * </pre>
  *
  * At the moment {@link ColumnType#GEOMETRY} is unsupported.
@@ -208,79 +220,59 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         value >>>= 5;
         int month = value % 16;
         int year = value >> 4;
-        Calendar cal = Calendar.getInstance();
-        cal.clear();
-        cal.set(Calendar.YEAR, year);
-        cal.set(Calendar.MONTH, month - 1);
-        cal.set(Calendar.DATE, day);
-        return new java.sql.Date(cal.getTimeInMillis());
+        Long timestamp = asUnixTime(year, month, day, 0, 0, 0, 0);
+        return timestamp != null ? new java.sql.Date(timestamp) : null;
     }
 
     protected Serializable deserializeTime(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
         int[] split = split(value, 100, 3);
-        Calendar c = Calendar.getInstance();
-        c.clear();
-        c.set(Calendar.HOUR_OF_DAY, split[2]);
-        c.set(Calendar.MINUTE, split[1]);
-        c.set(Calendar.SECOND, split[0]);
-        return new java.sql.Time(c.getTimeInMillis());
+        Long timestamp = asUnixTime(1970, 1, 1, split[2], split[1], split[0], 0);
+        return timestamp != null ? new java.sql.Time(timestamp) : null;
     }
 
     protected Serializable deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         /*
-            in big endian:
+            (in big endian)
 
             1 bit sign (1= non-negative, 0= negative)
             1 bit unused (reserved for future extensions)
             10 bits hour (0-838)
             6 bits minute (0-59)
             6 bits second (0-59)
-            = (3 bytes in total)
-            +
-            fractional-seconds storage (size depends on meta)
+
+            (3 bytes in total)
+
+            + fractional-seconds storage (size depends on meta)
         */
         long time = bigEndianLong(inputStream.read(3), 0, 3);
-        Calendar c = Calendar.getInstance();
-        c.clear();
-        c.set(Calendar.HOUR_OF_DAY, extractBits(time, 2, 10, 24));
-        c.set(Calendar.MINUTE, extractBits(time, 12, 6, 24));
-        c.set(Calendar.SECOND, extractBits(time, 18, 6, 24));
-        c.set(Calendar.MILLISECOND, deserializeFractionalSeconds(meta, inputStream));
-        return new java.sql.Time(c.getTimeInMillis());
+        Long timestamp = asUnixTime(1970, 1, 1,
+            bitSlice(time, 2, 10, 24),
+            bitSlice(time, 12, 6, 24),
+            bitSlice(time, 18, 6, 24),
+            deserializeFractionalSeconds(meta, inputStream)
+        );
+        return timestamp != null ? new java.sql.Time(timestamp) : null;
     }
 
     protected Serializable deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
-        long value = inputStream.readLong(4);
-        return new java.sql.Timestamp(value * 1000L);
+        return new java.sql.Timestamp(inputStream.readLong(4) * 1000);
     }
 
     protected Serializable deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
-        // big endian
-        long timestamp = bigEndianLong(inputStream.read(4), 0, 4);
-        Calendar c = Calendar.getInstance();
-        c.setTimeInMillis(timestamp * 1000);
-        c.set(Calendar.MILLISECOND, deserializeFractionalSeconds(meta, inputStream));
-        return new java.sql.Timestamp(c.getTimeInMillis());
+        return new java.sql.Timestamp(bigEndianLong(inputStream.read(4), 0, 4) * 1000 +
+            deserializeFractionalSeconds(meta, inputStream));
     }
 
     protected Serializable deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
-        long value = inputStream.readLong(8);
-        int[] split = split(value, 100, 6);
-        Calendar c = Calendar.getInstance();
-        c.set(Calendar.YEAR, split[5]);
-        c.set(Calendar.MONTH, split[4] - 1);
-        c.set(Calendar.DAY_OF_MONTH, split[3]);
-        c.set(Calendar.HOUR_OF_DAY, split[2]);
-        c.set(Calendar.MINUTE, split[1]);
-        c.set(Calendar.SECOND, split[0]);
-        c.set(Calendar.MILLISECOND, 0);
-        return c.getTime();
+        int[] split = split(inputStream.readLong(8), 100, 6);
+        Long timestamp = asUnixTime(split[5], split[4], split[3], split[2], split[1], split[0], 0);
+        return timestamp != null ? new java.util.Date(timestamp) : null;
     }
 
     protected Serializable deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         /*
-            in big endian:
+            (in big endian)
 
             1 bit sign (1= non-negative, 0= negative)
             17 bits year*13+month (year 0-9999, month 0-12)
@@ -288,21 +280,23 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             5 bits hour (0-23)
             6 bits minute (0-59)
             6 bits second (0-59)
-            = (5 bytes in total)
-            +
-            fractional-seconds storage (size depends on meta)
+
+            (5 bytes in total)
+
+            + fractional-seconds storage (size depends on meta)
         */
         long datetime = bigEndianLong(inputStream.read(5), 0, 5);
-        int yearMonth = extractBits(datetime, 1, 17, 40);
-        Calendar c = Calendar.getInstance();
-        c.set(Calendar.YEAR, yearMonth / 13);
-        c.set(Calendar.MONTH, yearMonth % 13 - 1);
-        c.set(Calendar.DAY_OF_MONTH, extractBits(datetime, 18, 5, 40));
-        c.set(Calendar.HOUR_OF_DAY, extractBits(datetime, 23, 5, 40));
-        c.set(Calendar.MINUTE, extractBits(datetime, 28, 6, 40));
-        c.set(Calendar.SECOND, extractBits(datetime, 34, 6, 40));
-        c.set(Calendar.MILLISECOND, deserializeFractionalSeconds(meta, inputStream));
-        return c.getTime();
+        int yearMonth = bitSlice(datetime, 1, 17, 40);
+        Long timestamp = asUnixTime(
+            yearMonth / 13,
+            yearMonth % 13,
+            bitSlice(datetime, 18, 5, 40),
+            bitSlice(datetime, 23, 5, 40),
+            bitSlice(datetime, 28, 6, 40),
+            bitSlice(datetime, 34, 6, 40),
+            deserializeFractionalSeconds(meta, inputStream)
+        );
+        return timestamp != null ? new java.util.Date(timestamp) : null;
     }
 
     protected Serializable deserializeYear(ByteArrayInputStream inputStream) throws IOException {
@@ -339,6 +333,15 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return inputStream.read(dataLength);
     }
 
+    // checkstyle, please ignore ParameterNumber for the next line
+    protected Long asUnixTime(int year, int month, int day, int hour, int minute, int second, int millis) {
+        // https://dev.mysql.com/doc/refman/5.0/en/datetime.html
+        if (year == 0 || month == 0 || day == 0) {
+            return null;
+        }
+        return UnixTime.from(year, month, day, hour, minute, second, millis);
+    }
+
     protected int deserializeFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
         int length = (meta + 1) / 2;
         if (length > 0) {
@@ -348,7 +351,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return 0;
     }
 
-    private static int extractBits(long value, int bitOffset, int numberOfBits, int payloadSize) {
+    private static int bitSlice(long value, int bitOffset, int numberOfBits, int payloadSize) {
         long result = value >> payloadSize - (bitOffset + numberOfBits);
         return (int) (result & ((1 << numberOfBits) - 1));
     }
@@ -422,6 +425,77 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             result = (result << 8) | (b >= 0 ? (int) b : (b + 256));
         }
         return result;
+    }
+
+    /**
+     * Class for working with Unix time.
+     */
+    static class UnixTime {
+
+        private static final int[] YEAR_DAYS_BY_MONTH = new int[] {
+            0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365
+        };
+        private static final int[] LEAP_YEAR_DAYS_BY_MONTH = new int[] {
+            0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366
+        };
+
+        /**
+         * Calendar::getTimeInMillis but magnitude faster for all dates starting from October 15, 1582
+         * (Gregorian Calendar cutover).
+         *
+         * @param year year
+         * @param month month [1..12]
+         * @param day day [1..)
+         * @param hour hour [0..23]
+         * @param minute [0..59]
+         * @param second [0..59]
+         * @param millis [0..999]
+         *
+         * @return Unix time (number of seconds that have elapsed since 00:00:00 (UTC), Thursday,
+         * 1 January 1970, not counting leap seconds)
+         */
+        // checkstyle, please ignore ParameterNumber for the next line
+        public static long from(int year, int month, int day, int hour, int minute, int second, int millis) {
+            if (year < 1582 || (year == 1582 && (month < 10 || (month == 10 && day < 15)))) {
+                return fallbackToGC(year, month, day, hour, minute, second, millis);
+            }
+            long timestamp = 0;
+            int numberOfLeapYears = leapYears(1970, year);
+            timestamp += 366L * 24 * 60 * 60 * numberOfLeapYears;
+            timestamp += 365L * 24 * 60 * 60 * (year - 1970 - numberOfLeapYears);
+            long daysUpToMonth = isLeapYear(year) ? LEAP_YEAR_DAYS_BY_MONTH[month - 1] : YEAR_DAYS_BY_MONTH[month - 1];
+            timestamp += ((daysUpToMonth + day - 1) * 24 * 60 * 60) +
+                (hour * 60 * 60) + (minute * 60) + (second);
+            timestamp = timestamp * 1000 + millis;
+            return timestamp;
+        }
+
+        // checkstyle, please ignore ParameterNumber for the next line
+        private static long fallbackToGC(int year, int month, int dayOfMonth, int hourOfDay,
+                                         int minute, int second, int millis) {
+            Calendar c = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+            c.set(Calendar.YEAR, year);
+            c.set(Calendar.MONTH, month - 1);
+            c.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+            c.set(Calendar.HOUR_OF_DAY, hourOfDay);
+            c.set(Calendar.MINUTE, minute);
+            c.set(Calendar.SECOND, second);
+            c.set(Calendar.MILLISECOND, millis);
+            return c.getTimeInMillis();
+        }
+
+        private static int leapYears(int from, int end) {
+            return leapYearsBefore(end) - leapYearsBefore(from + 1);
+        }
+
+        private static int leapYearsBefore(int year) {
+            year--; return (year / 4) - (year / 100) + (year / 400);
+        }
+
+        private static boolean isLeapYear(int year) {
+            return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        }
+
     }
 
 }
