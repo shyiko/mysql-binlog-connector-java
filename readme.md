@@ -115,7 +115,7 @@ mBeanServer.registerMBean(stats, statsObjectName);
 
 #### Using SSL
 
-> Introduced in 1.0.0.
+> Introduced in 0.4.0.
 
 TLSv1.1 & TLSv1.2 require [JDK 7](http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6916074)+.  
 Prior to MySQL 5.7.10, MySQL supported only TLSv1 
