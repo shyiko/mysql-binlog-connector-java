@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.4.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.4.0...0.4.1) - 2016-08-31
+
+### Fixed
+ - GTID "rollover".
+ - binlog position tracking (`binaryLogClient.binlogPosition` is no longer updated on TABLE_MAP so that in case of 
+ reconnect (using a different instance of client) table mapping (used by *RowsEventDataDeserializer|s) could be 
+ reconstructed before hitting *RowsEvent. 
+
 ## [0.4.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.3.3...0.4.0) - 2016-08-15
 
 ### Added
