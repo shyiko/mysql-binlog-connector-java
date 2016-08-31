@@ -61,7 +61,7 @@ public class DumpBinaryLogGtidCommand implements Command {
             buffer.writeLong(intervals.size(), 8);
             for (GtidSet.Interval interval : intervals) {
                 buffer.writeLong(interval.getStart(), 8);
-                buffer.writeLong(interval.getEnd(), 8);
+                buffer.writeLong(interval.getEnd() + 1 /* right-open */, 8);
             }
         }
         return buffer.toByteArray();
