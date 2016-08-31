@@ -673,7 +673,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         binlogPosition = Long.parseLong(resultSetRow.getValue(1));
         if (isGtidModeOn()) {
             synchronized (gtidSetAccessLock) {
-                gtidSet = new GtidSet(resultSetRow.getValue(4).replace("\n", ""));
+                gtidSet = new GtidSet(resultSetRow.getValue(4));
             }
         }
     }

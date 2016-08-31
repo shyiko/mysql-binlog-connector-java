@@ -44,7 +44,8 @@ public class GtidSet {
      * @param gtidSet gtid set comprised of closed intervals (like MySQL's executed_gtid_set).
      */
     public GtidSet(String gtidSet) {
-        String[] uuidSets = (gtidSet == null || gtidSet.isEmpty()) ? new String[0] : gtidSet.split(",");
+        String[] uuidSets = (gtidSet == null || gtidSet.isEmpty()) ? new String[0] :
+            gtidSet.replace("\n", "").split(",");
         for (String uuidSet : uuidSets) {
             int uuidSeparatorIndex = uuidSet.indexOf(":");
             String sourceId = uuidSet.substring(0, uuidSeparatorIndex);
