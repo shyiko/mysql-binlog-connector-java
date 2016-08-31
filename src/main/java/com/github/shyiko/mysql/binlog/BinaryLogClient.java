@@ -760,7 +760,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void updateClientBinlogFilenameAndPosition(Event event) {
         EventHeader eventHeader = event.getHeader();
-        if (eventHeader.getEventType() == EventType.ROTATE) {
+        EventType eventType = eventHeader.getEventType();
+        if (eventType == EventType.ROTATE) {
             EventData eventData = event.getData();
             RotateEventData rotateEventData;
             if (eventData instanceof EventDeserializer.EventDataWrapper) {
@@ -771,7 +772,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             binlogFilename = rotateEventData.getBinlogFilename();
             binlogPosition = rotateEventData.getBinlogPosition();
         } else
-        if (eventHeader instanceof EventHeaderV4) {
+        // do not update binlogPosition on TABLE_MAP so that in case of reconnect (using a different instance of
+        // client) table mapping cache could be reconstructed before hitting row mutation event
+        if (eventType != EventType.TABLE_MAP && eventHeader instanceof EventHeaderV4) {
             EventHeaderV4 trackableEventHeader = (EventHeaderV4) eventHeader;
             long nextBinlogPosition = trackableEventHeader.getNextPosition();
             if (nextBinlogPosition > 0) {
