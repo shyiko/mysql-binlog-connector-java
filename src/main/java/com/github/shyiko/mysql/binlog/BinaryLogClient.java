@@ -140,7 +140,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private SocketFactory socketFactory;
     private SSLSocketFactory sslSocketFactory;
 
-    private PacketChannel channel;
+    private volatile PacketChannel channel;
     private volatile boolean connected;
 
     private ThreadFactory threadFactory;
@@ -150,9 +150,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private long keepAliveConnectTimeout = TimeUnit.SECONDS.toMillis(3);
 
     private volatile ExecutorService keepAliveThreadExecutor;
-    private long keepAliveThreadShutdownTimeout = TimeUnit.SECONDS.toMillis(6);
 
-    private final Lock shutdownLock = new ReentrantLock();
+    private final Lock connectLock = new ReentrantLock();
 
     /**
      * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
@@ -397,69 +396,84 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * @throws IOException if anything goes wrong while trying to connect
      */
     public void connect() throws IOException {
-        if (connected) {
+        if (!connectLock.tryLock()) {
             throw new IllegalStateException("BinaryLogClient is already connected");
         }
-        GreetingPacket greetingPacket;
+        boolean notifyWhenDisconnected = false;
         try {
             try {
-                Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
-                socket.connect(new InetSocketAddress(hostname, port));
-                channel = new PacketChannel(socket);
-                if (channel.getInputStream().peek() == -1) {
-                    throw new EOFException();
+                channel = openChannel();
+                GreetingPacket greetingPacket = receiveGreeting();
+                authenticate(greetingPacket);
+                connectionId = greetingPacket.getThreadId();
+                if (binlogFilename == null) {
+                    fetchBinlogFilenameAndPosition();
                 }
+                if (binlogPosition < 4) {
+                    if (logger.isLoggable(Level.WARNING)) {
+                        logger.warning("Binary log position adjusted from " + binlogPosition + " to " + 4);
+                    }
+                    binlogPosition = 4;
+                }
+                ChecksumType checksumType = fetchBinlogChecksum();
+                if (checksumType != ChecksumType.NONE) {
+                    confirmSupportOfChecksum(checksumType);
+                }
+                requestBinaryLogStream();
             } catch (IOException e) {
-                throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
-                    ". Please make sure it's running.", e);
+                disconnectChannel();
+                throw e;
             }
-            greetingPacket = receiveGreeting();
-            authenticate(greetingPacket);
-            if (binlogFilename == null) {
-                fetchBinlogFilenameAndPosition();
-            }
-            if (binlogPosition < 4) {
-                if (logger.isLoggable(Level.WARNING)) {
-                    logger.warning("Binary log position adjusted from " + binlogPosition + " to " + 4);
+            connected = true;
+            notifyWhenDisconnected = true;
+            if (logger.isLoggable(Level.INFO)) {
+                String position;
+                synchronized (gtidSetAccessLock) {
+                    position = gtidSet != null ? gtidSet.toString() : binlogFilename + "/" + binlogPosition;
                 }
-                binlogPosition = 4;
+                logger.info("Connected to " + hostname + ":" + port + " at " + position +
+                    " (" + (blocking ? "sid:" + serverId + ", " : "") + "cid:" + connectionId + ")");
             }
-            ChecksumType checksumType = fetchBinlogChecksum();
-            if (checksumType != ChecksumType.NONE) {
-                confirmSupportOfChecksum(checksumType);
+            synchronized (lifecycleListeners) {
+                for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                    lifecycleListener.onConnect(this);
+                }
             }
-            requestBinaryLogStream();
-        } catch (IOException e) {
-            if (channel != null && channel.isOpen()) {
-                channel.close();
+            if (keepAlive && !isKeepAliveThreadRunning()) {
+                spawnKeepAliveThread();
             }
-            throw e;
-        }
-        connected = true;
-        connectionId = greetingPacket.getThreadId();
-        if (logger.isLoggable(Level.INFO)) {
-            String position;
+            ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
             synchronized (gtidSetAccessLock) {
-                position = gtidSet != null ? gtidSet.toString() : binlogFilename + "/" + binlogPosition;
+                if (gtidSet != null) {
+                    ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+                }
             }
-            logger.info("Connected to " + hostname + ":" + port + " at " + position +
-                " (" + (blocking ? "sid:" + serverId + ", " : "") + "cid:" + connectionId + ")");
-        }
-        synchronized (lifecycleListeners) {
-            for (LifecycleListener lifecycleListener : lifecycleListeners) {
-                lifecycleListener.onConnect(this);
-            }
-        }
-        if (keepAlive && !isKeepAliveThreadRunning()) {
-            spawnKeepAliveThread();
-        }
-        ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
-        synchronized (gtidSetAccessLock) {
-            if (gtidSet != null) {
-                ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+            listenForEventPackets();
+        } finally {
+            connectLock.unlock();
+            if (notifyWhenDisconnected) {
+                synchronized (lifecycleListeners) {
+                    for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                        lifecycleListener.onDisconnect(this);
+                    }
+                }
             }
         }
-        listenForEventPackets();
+    }
+
+    private PacketChannel openChannel() throws IOException {
+        try {
+            Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
+            socket.connect(new InetSocketAddress(hostname, port));
+            PacketChannel channel = new PacketChannel(socket);
+            if (channel.getInputStream().peek() == -1) {
+                throw new EOFException();
+            }
+            return channel;
+        } catch (IOException e) {
+            throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
+                ". Please make sure it's running.", e);
+        }
     }
 
     private GreetingPacket receiveGreeting() throws IOException {
@@ -540,51 +554,46 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void spawnKeepAliveThread() {
-        keepAliveThreadExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+        final ExecutorService threadExecutor =
+            Executors.newSingleThreadExecutor(new ThreadFactory() {
 
-            @Override
-            public Thread newThread(Runnable runnable) {
-                return newNamedThread(runnable, "blc-keepalive-" + hostname + ":" + port);
-            }
-        });
-        keepAliveThreadExecutor.submit(new Runnable() {
+                @Override
+                public Thread newThread(Runnable runnable) {
+                    return newNamedThread(runnable, "blc-keepalive-" + hostname + ":" + port);
+                }
+            });
+        threadExecutor.submit(new Runnable() {
             @Override
             public void run() {
-                while (true) {
+                while (!threadExecutor.isShutdown()) {
                     try {
                         Thread.sleep(keepAliveInterval);
                     } catch (InterruptedException e) {
                         // expected in case of disconnect
                     }
-                    shutdownLock.lock();
+                    if (threadExecutor.isShutdown()) {
+                        return;
+                    }
                     try {
-                        if (keepAliveThreadExecutor.isShutdown()) {
-                            return;
+                        channel.write(new PingCommand());
+                    } catch (IOException e) {
+                        if (logger.isLoggable(Level.INFO)) {
+                            logger.info("Trying to restore lost connection to " + hostname + ":" + port);
                         }
                         try {
-                            channel.write(new PingCommand());
-                        } catch (IOException e) {
-                            if (logger.isLoggable(Level.INFO)) {
-                                logger.info("Trying to restore lost connection to " + hostname + ":" + port);
-                            }
-                            try {
-                                if (isConnected()) {
-                                    disconnectChannel();
-                                }
-                                connect(keepAliveConnectTimeout);
-                            } catch (Exception ce) {
-                                if (logger.isLoggable(Level.WARNING)) {
-                                    logger.warning("Failed to restore connection to " + hostname + ":" + port +
-                                        ". Next attempt in " + keepAliveInterval + "ms");
-                                }
+                            terminateConnect();
+                            connect(keepAliveConnectTimeout);
+                        } catch (Exception ce) {
+                            if (logger.isLoggable(Level.WARNING)) {
+                                logger.warning("Failed to restore connection to " + hostname + ":" + port +
+                                    ". Next attempt in " + keepAliveInterval + "ms");
                             }
                         }
-                    } finally {
-                        shutdownLock.unlock();
                     }
                 }
             }
         });
+        keepAliveThreadExecutor = threadExecutor;
     }
 
     private Thread newNamedThread(Runnable runnable, String threadName) {
@@ -895,7 +904,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     /**
      * Unregister all lifecycle listener of specific type.
      */
-    public synchronized void unregisterLifecycleListener(Class<? extends LifecycleListener> listenerClass) {
+    public void unregisterLifecycleListener(Class<? extends LifecycleListener> listenerClass) {
         synchronized (lifecycleListeners) {
             Iterator<LifecycleListener> iterator = lifecycleListeners.iterator();
             while (iterator.hasNext()) {
@@ -910,7 +919,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     /**
      * Unregister single lifecycle listener.
      */
-    public synchronized void unregisterLifecycleListener(LifecycleListener eventListener) {
+    public void unregisterLifecycleListener(LifecycleListener eventListener) {
         synchronized (lifecycleListeners) {
             lifecycleListeners.remove(eventListener);
         }
@@ -922,48 +931,49 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * As the result following {@link #connect()} resumes client from where it left off.
      */
     public void disconnect() throws IOException {
-        shutdownLock.lock();
-        try {
-            if (isKeepAliveThreadRunning()) {
-                keepAliveThreadExecutor.shutdownNow();
-            }
-            disconnectChannel();
-        } finally {
-            shutdownLock.unlock();
+        terminateKeepAliveThread();
+        terminateConnect();
+    }
+
+    private void terminateKeepAliveThread() {
+        ExecutorService keepAliveThreadExecutor = this.keepAliveThreadExecutor;
+        if (keepAliveThreadExecutor == null) {
+            return;
         }
-        if (isKeepAliveThreadRunning()) {
-            waitForKeepAliveThreadToBeTerminated();
+        keepAliveThreadExecutor.shutdownNow();
+        while (!awaitTerminationInterruptibly(keepAliveThreadExecutor,
+            Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
+            // ignore
         }
     }
 
-    private void waitForKeepAliveThreadToBeTerminated() {
-        boolean terminated = false;
+    private static boolean awaitTerminationInterruptibly(ExecutorService executorService, long timeout, TimeUnit unit) {
         try {
-            terminated = keepAliveThreadExecutor.awaitTermination(keepAliveThreadShutdownTimeout,
-                TimeUnit.MILLISECONDS);
+            return executorService.awaitTermination(timeout, unit);
         } catch (InterruptedException e) {
-            if (logger.isLoggable(Level.WARNING)) {
-                logger.log(Level.WARNING, e.getMessage());
-            }
+            return false;
         }
-        if (!terminated) {
-            throw new IllegalStateException("BinaryLogClient was unable to shut keep alive thread down in " +
-                keepAliveThreadShutdownTimeout + "ms");
+    }
+
+    private void terminateConnect() throws IOException {
+        do {
+            disconnectChannel();
+        } while (!tryLockInterruptibly(connectLock, 1000, TimeUnit.MILLISECONDS));
+        connectLock.unlock();
+    }
+
+    private static boolean tryLockInterruptibly(Lock lock, long time, TimeUnit unit) {
+        try {
+            return lock.tryLock(time, unit);
+        } catch (InterruptedException e) {
+            return false;
         }
     }
 
     private void disconnectChannel() throws IOException {
-        try {
-            connected = false;
-            if (channel != null && channel.isOpen()) {
-                channel.close();
-            }
-        } finally {
-            synchronized (lifecycleListeners) {
-                for (LifecycleListener lifecycleListener : lifecycleListeners) {
-                    lifecycleListener.onDisconnect(this);
-                }
-            }
+        connected = false;
+        if (channel != null && channel.isOpen()) {
+            channel.close();
         }
     }
 

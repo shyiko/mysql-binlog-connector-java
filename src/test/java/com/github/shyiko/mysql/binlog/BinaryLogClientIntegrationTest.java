@@ -29,9 +29,11 @@ import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializa
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventHeaderV4Deserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.ServerException;
+import com.github.shyiko.mysql.binlog.network.SocketFactory;
 import org.mockito.InOrder;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -42,10 +44,15 @@ import org.testng.annotations.Test;
 
 import java.io.Closeable;
 import java.io.EOFException;
+import java.io.FilterInputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.net.Socket;
 import java.net.SocketException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -62,7 +69,10 @@ import java.util.TimeZone;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -751,6 +761,106 @@ public class BinaryLogClientIntegrationTest {
             isolatedEventListener.waitFor(WriteRowsEventData.class, 2, DEFAULT_TIMEOUT);
         } finally {
             isolatedClient.disconnect();
+        }
+    }
+
+    @Test
+    public void testReconnectRaceCondition() throws Exception {
+        // this test relies on SO_RCVBUF (sysctl -a | grep rcvbuf)
+        // a more reliable way would be to use buffered 2-level concurrent filter input stream
+        try {
+            client.disconnect();
+            final BinaryLogClient binaryLogClient =
+                new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password);
+            final Lock inputStreamLock = new ReentrantLock();
+            final AtomicBoolean breakOutputStream = new AtomicBoolean();
+            binaryLogClient.setSocketFactory(new SocketFactory() {
+
+                @Override
+                public Socket createSocket() throws SocketException {
+                    return new Socket() {
+
+                        @Override
+                        public InputStream getInputStream() throws IOException {
+                            return new FilterInputStream(new BufferedSocketInputStream(super.getInputStream())) {
+
+                                @Override
+                                public int read(byte[] b, int off, int len) throws IOException {
+                                    int read = super.read(b, off, len);
+                                    inputStreamLock.lock();
+                                    inputStreamLock.unlock();
+                                    return read;
+                                }
+                            };
+                        }
+
+                        @Override
+                        public OutputStream getOutputStream() throws IOException {
+                            return new FilterOutputStream(super.getOutputStream()) {
+
+                                @Override
+                                public void write(int b) throws IOException {
+                                    if (breakOutputStream.get()) {
+                                        binaryLogClient.setSocketFactory(null);
+                                        throw new IOException();
+                                    }
+                                    super.write(b);
+                                }
+                            };
+                        }
+                    };
+                }
+            });
+            binaryLogClient.registerEventListener(eventListener);
+            binaryLogClient.setKeepAliveInterval(TimeUnit.MILLISECONDS.toMillis(100));
+            binaryLogClient.connect(DEFAULT_TIMEOUT);
+            try {
+                eventListener.waitFor(EventType.FORMAT_DESCRIPTION, 1, DEFAULT_TIMEOUT);
+                master.execute(new Callback<Statement>() {
+                    @Override
+                    public void execute(Statement statement) throws SQLException {
+                        statement.execute("insert into bikini_bottom values('SpongeBob')");
+                    }
+                });
+                eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+                // lock input stream
+                inputStreamLock.lock();
+                // fill input stream buffer
+                master.execute(new Callback<Statement>() {
+                    @Override
+                    public void execute(Statement statement) throws SQLException {
+                        statement.execute("insert into bikini_bottom values('Patrick')");
+                        statement.execute("insert into bikini_bottom values('Rocky')");
+                    }
+                });
+                // trigger reconnect
+                final CountDownLatch reconnect = new CountDownLatch(1);
+                binaryLogClient.registerLifecycleListener(new BinaryLogClient.AbstractLifecycleListener() {
+
+                    @Override
+                    public void onConnect(BinaryLogClient client) {
+                        reconnect.countDown();
+                    }
+                });
+                breakOutputStream.set(true);
+                // wait for connection to be reestablished
+                reconnect.await(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS);
+                // unlock input stream (from previous connection)
+                inputStreamLock.unlock();
+                master.execute(new Callback<Statement>() {
+                    @Override
+                    public void execute(Statement statement) throws SQLException {
+                        statement.execute("delete from bikini_bottom where name = 'Patrick'");
+                    }
+                });
+                eventListener.waitFor(DeleteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+                // assert that no events were delivered twice
+                eventListener.waitFor(WriteRowsEventData.class, 2, DEFAULT_TIMEOUT);
+            } finally {
+                binaryLogClient.disconnect();
+            }
+        } finally {
+            client.connect(DEFAULT_TIMEOUT);
         }
     }
 
