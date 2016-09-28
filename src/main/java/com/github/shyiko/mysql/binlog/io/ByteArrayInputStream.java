@@ -171,7 +171,7 @@ public class ByteArrayInputStream extends InputStream {
     }
 
     public int peek() throws IOException {
-        if (peek == null) {
+        if (peek == null || peek == -1) {
             peek = readWithinBlockBoundaries();
         }
         return peek;
@@ -180,7 +180,7 @@ public class ByteArrayInputStream extends InputStream {
     @Override
     public int read() throws IOException {
         int result;
-        if (peek == null) {
+        if (peek == null || peek == -1) {
             result = readWithinBlockBoundaries();
         } else {
             result = peek;
