@@ -2,5 +2,5 @@ language: java
 script: 'if [[ $TRAVIS_REPO_SLUG == "shyiko/mysql-binlog-connector-java" && $TRAVIS_BRANCH == "master" && $TRAVIS_PULL_REQUEST == "false" ]]; then mvn -P with-sources-and-javadocs -Ddeploy=snapshot -DskipTests=true -s .travis.settings.xml; fi'
 env:
   global: 
-  - secure: QI6w4d/W9Sjckgcdwc/K5Rb+UFa6PxDbhiilv70fEZCXg0P4GMBFGD/zbpsfTlLbA9rgKBotrSm7EXRtQM94dluW0kS9jQiJfw33l9WbfMAJL4797xq+7ekvIvPBf7xVfwGsAcCcB5DcPBTKroX2s8tJEY3CQTienkW4pT7/zh0=
-  - secure: b/7SnPmS2BUrzc167F5sbI8ILNBqo3ODz9ZtuOOcXQ/9uJVgaLrB3KmKAHgIsjOiZ/PPp7qGNL4jW9CD7b7LAldMyIcszdKptc/fr2yHZkM17IuQJtL5tjBNlLkqeApW37ddPp0mp5IhhqzZMZ8Zu8/2vlyNJrVrYgnIXuoLLRE=
+  - secure: WLU2kkL9WSeS1LGUOr5UZyv8G1TnUuXOviLuAAcvv+JW+CFcoQwnDlCC7SJJOqGixKpg8+04zr5CHaVU2QmG4E/+XohuPqH23rdfBi9Ra4BubXjQvV3siSQXEAIjZWubyJ7/4EYzBK821FnlnthnabFsow9enBv6MT5NmscOy+0=
+  - secure: ivE8LTu0CrgvNH6Yjise5lLaZx5kpG9M76CuRK2APUEbAC0QOPWWudsx2yuDmn2X6lIXFYIU5WUadDE6n9LYAfbHdV0wRUD1Qimgt7oDto5vnWZIZrbWwyqSqK7RCxw503ofbHXVPRyabLRYACZV+7T+K2aDJw8V/cIITIAC7gI=
