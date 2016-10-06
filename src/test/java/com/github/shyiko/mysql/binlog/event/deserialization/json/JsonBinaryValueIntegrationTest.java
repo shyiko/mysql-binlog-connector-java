@@ -56,7 +56,8 @@ public class JsonBinaryValueIntegrationTest {
         master = new MySQLConnection(bundle.getString(prefix + "master.hostname"),
                 Integer.parseInt(bundle.getString(prefix + "master.port")),
                 bundle.getString(prefix + "master.username"), bundle.getString(prefix + "master.password"));
-        BinaryLogClient client = new BinaryLogClient(master.hostname(), master.port(), master.username(), master.password());
+        BinaryLogClient client = new BinaryLogClient(master.hostname(), master.port(), master.username(),
+            master.password());
         client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
         client.setKeepAlive(false);
         // Uncomment the next line for detailed traces of the events ...
