@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2016 Stanley Shyiko
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.json;
+package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -21,7 +21,7 @@ import java.math.BigInteger;
 import com.github.shyiko.mysql.binlog.event.deserialization.ColumnType;
 
 /**
- * Handle the various actions involved when {@link JsonBinaryValue#parse(byte[], JsonHandler) parsing} a JSON binary
+ * Handle the various actions involved when {@link JsonBinary#parse(byte[], JsonFormatter)} a JSON binary
  * value.
  *
  * @author <a href="mailto:rhauch@gmail.com">Randall Hauch</a>
@@ -173,4 +173,5 @@ public interface JsonFormatter {
      * Called after an entry signaling that another entry will be signaled.
      */
     void nextEntry();
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2016 Stanley Shyiko
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.json;
+package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -21,7 +21,7 @@ import java.math.BigInteger;
 import com.github.shyiko.mysql.binlog.event.deserialization.ColumnType;
 
 /**
- * A {@link JsonValueHandler} implementation that creates a JSON string representation.
+ * A {@link JsonFormatter} implementation that creates a JSON string representation.
  *
  * @author <a href="mailto:rhauch@gmail.com">Randall Hauch</a>
  */
@@ -31,21 +31,22 @@ public class JsonStringFormatter implements JsonFormatter {
      * Value used for lookup tables to indicate that matching characters
      * do not need to be escaped.
      */
-    public static final int ESCAPE_NONE = 0;
+    private static final int ESCAPE_NONE = 0;
 
     /**
      * Value used for lookup tables to indicate that matching characters
      * are to be escaped using standard escaping; for JSON this means
      * (for example) using "backslash - u" escape method.
      */
-    public static final int ESCAPE_GENERIC = -1;
+    private static final int ESCAPE_GENERIC = -1;
 
     /**
      * A lookup table that determines which of the first 128 Unicode code points (single-byte UTF-8 characters)
      * must be escaped. A value of '0' means no escaping is required; positive values must be escaped with a
      * preceding backslash; and negative values that generic escaping (e.g., {@code \\uXXXX}).
      */
-    protected static final int[] ESCAPES;
+    private static final int[] ESCAPES;
+
     static {
         int[] escape = new int[128];
         // Generic escape for control characters ...
@@ -64,10 +65,9 @@ public class JsonStringFormatter implements JsonFormatter {
         ESCAPES = escape;
     }
 
-    protected static final char[] HEX_CODES = "0123456789ABCDEF".toCharArray();
+    private static final char[] HEX_CODES = "0123456789ABCDEF".toCharArray();
 
     private final StringBuilder sb = new StringBuilder();
-    private final int[] escapes = ESCAPES;
 
     @Override
     public String toString() {
@@ -215,11 +215,11 @@ public class JsonStringFormatter implements JsonFormatter {
         for (int i = 0, len = original.length(); i < len; ++i) {
             char c = original.charAt(i);
             int ch = c;
-            if (ch < 0 || escapes[ch] == 0) {
+            if (ch < 0 || ESCAPES[ch] == 0) {
                 sb.append(c);
                 continue;
             }
-            int escape = escapes[ch];
+            int escape = ESCAPES[ch];
             if (escape > 0) { // 2-char escape, fine
                 sb.append('\\');
                 sb.append(c);

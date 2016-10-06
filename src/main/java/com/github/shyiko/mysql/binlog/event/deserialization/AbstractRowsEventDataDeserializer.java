@@ -333,8 +333,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     /**
      * Deserialize the {@code JSON} value on the input stream, and return MySQL's internal binary representation
-     * of the JSON value. See {@link com.github.shyiko.mysql.binlog.json.JsonBinary} for a utility to parse this
-     * binary representation into something more useful, including a string representation.
+     * of the JSON value. See {@link com.github.shyiko.mysql.binlog.event.deserialization.json.JsonBinary} for
+     * a utility to parse this binary representation into something more useful, including a string representation.
      *
      * @param meta the number of bytes in which the length of the JSON value is found first on the input stream
      * @param inputStream the stream containing the JSON value

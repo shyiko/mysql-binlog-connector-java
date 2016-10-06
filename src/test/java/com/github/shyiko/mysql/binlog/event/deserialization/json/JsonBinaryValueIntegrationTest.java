@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.json;
+package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 import java.io.Serializable;
 import java.sql.SQLSyntaxErrorException;
@@ -47,8 +46,6 @@ public class JsonBinaryValueIntegrationTest {
     private static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
 
     private MySQLConnection master;
-    private BinaryLogClient client;
-    private CountDownEventListener eventListener;
     private Map<Integer, byte[]> jsonValuesByKey;
 
     @BeforeClass
@@ -59,11 +56,12 @@ public class JsonBinaryValueIntegrationTest {
         master = new MySQLConnection(bundle.getString(prefix + "master.hostname"),
                 Integer.parseInt(bundle.getString(prefix + "master.port")),
                 bundle.getString(prefix + "master.username"), bundle.getString(prefix + "master.password"));
-        client = new BinaryLogClient(master.hostname(), master.port(), master.username(), master.password());
+        BinaryLogClient client = new BinaryLogClient(master.hostname(), master.port(), master.username(), master.password());
         client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
         client.setKeepAlive(false);
         // Uncomment the next line for detailed traces of the events ...
         // client.registerEventListener(new TraceEventListener());
+        CountDownEventListener eventListener;
         client.registerEventListener(eventListener = new CountDownEventListener());
         // client.registerLifecycleListener(new TraceLifecycleListener());
         client.connect(DEFAULT_TIMEOUT);
@@ -137,7 +135,6 @@ public class JsonBinaryValueIntegrationTest {
                 Integer rowNum = (Integer) row[0];
                 byte[] jsonBinary = (byte[]) row[1];
                 assertNotNull(rowNum);
-                assertTrue(jsonBinary == null || jsonBinary instanceof byte[]);
                 jsonValuesByKey.put(rowNum, jsonBinary);
             }
         }
@@ -320,7 +317,7 @@ public class JsonBinaryValueIntegrationTest {
      *         may be null if the JSON value is null
      */
     protected byte[] jsonForId(int i) throws Exception {
-        return jsonValuesByKey.get(new Integer(i));
+        return jsonValuesByKey.get(i);
     }
 
     @AfterClass(alwaysRun = true)

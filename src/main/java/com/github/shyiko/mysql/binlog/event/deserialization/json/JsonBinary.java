@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2016 Stanley Shyiko
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.json;
+package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -26,7 +26,7 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 /**
  * Utility to parse the binary-encoded value of a MySQL {@code JSON} type, translating the encoded representation into
- * method calls on a supplied {@link JsonHandler} implementation.
+ * method calls on a supplied {@link JsonFormatter} implementation.
  *
  * <h2>Binary Format</h2>
  *
@@ -85,20 +85,20 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
  * <pre>
  *   doc ::= type value
  *   type ::=
- *       0x00 |       // small JSON object
- *       0x01 |       // large JSON object
- *       0x02 |       // small JSON array
- *       0x03 |       // large JSON array
- *       0x04 |       // literal (true/false/null)
- *       0x05 |       // int16
- *       0x06 |       // uint16
- *       0x07 |       // int32
- *       0x08 |       // uint32
- *       0x09 |       // int64
- *       0x0a |       // uint64
- *       0x0b |       // double
- *       0x0c |       // utf8mb4 string
- *       0x0f         // custom data (any MySQL data type)
+ *       0x00 |  // small JSON object
+ *       0x01 |  // large JSON object
+ *       0x02 |  // small JSON array
+ *       0x03 |  // large JSON array
+ *       0x04 |  // literal (true/false/null)
+ *       0x05 |  // int16
+ *       0x06 |  // uint16
+ *       0x07 |  // int32
+ *       0x08 |  // uint32
+ *       0x09 |  // int64
+ *       0x0a |  // uint64
+ *       0x0b |  // double
+ *       0x0c |  // utf8mb4 string
+ *       0x0f    // custom data (any MySQL data type)
  *   value ::=
  *       object  |
  *       array   |
@@ -193,17 +193,17 @@ public class JsonBinary {
 
     @Override
     public String toString() {
-        return asString();
+        return getString();
     }
 
-    public String asString() {
+    public String getString() {
         JsonStringFormatter handler = new JsonStringFormatter();
         try {
             parse(handler);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return handler.toString();
+        return handler.getString();
     }
 
     public void parse(JsonFormatter formatter) throws IOException {
@@ -255,8 +255,8 @@ public class JsonBinary {
                 parseOpaque(formatter);
                 break;
             default:
-                throw new IOException("Unknown type value '" + asHex(type.code()) +
-                        "' in first byte of a JSON value");
+                throw new IOException("Unknown type value '" + asHex(type.getCode()) +
+                    "' in first byte of a JSON value");
         }
     }
 
@@ -318,21 +318,20 @@ public class JsonBinary {
      *                           // lengths up to 16383, and so on...
      * </pre>
      *
-     * @param offset the offset at which the value is to be read; may not be null
-     * @param isSmall {@code true} if the object being read is "small", or {@code false} otherwise
+     * @param small {@code true} if the object being read is "small", or {@code false} otherwise
      * @param formatter the formatter to be notified of the parsed value; may not be null
      * @throws IOException if there is a problem reading the JSON value
      */
-    protected void parseObject(boolean isSmall, JsonFormatter formatter)
+    protected void parseObject(boolean small, JsonFormatter formatter)
             throws IOException {
         // Read the header ...
-        int numElements = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "number of elements in");
-        int numBytes = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "size of");
+        int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
+        int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
 
         // Read each key-entry, consisting of the offset and length of each key ...
         int[] keyLengths = new int[numElements];
         for (int i = 0; i != numElements; ++i) {
-            readUnsignedIndex(numBytes, isSmall, "key offset in"); // unused
+            readUnsignedIndex(numBytes, small, "key offset in"); // unused
             keyLengths[i] = readUInt16();
         }
 
@@ -348,19 +347,19 @@ public class JsonBinary {
                 case INT16:
                 case UINT16:
                     // The "offset" is actually the value ...
-                    int value = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "value offset in");
+                    int value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                     entries[i] = new ValueEntry(type).setValue(value);
                     break;
                 case INT32:
                 case UINT32:
-                    if (!isSmall) {
+                    if (!small) {
                         // The value should be large enough to handle the actual value ...
-                        value = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "value offset in");
+                        value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                         entries[i] = new ValueEntry(type).setValue(value);
                     }
                 default:
                     // It is an offset, not a value ...
-                    int offset = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "value offset in");
+                    int offset = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                     if (offset >= numBytes) {
                         throw new IOException("The offset for the value in the JSON binary document is " +
                                 offset +
@@ -390,9 +389,9 @@ public class JsonBinary {
                 if (value == null) {
                     formatter.valueNull();
                 } else if (value instanceof Boolean) {
-                    formatter.value(((Boolean) value).booleanValue());
+                    formatter.value((Boolean) value);
                 } else if (value instanceof Integer) {
-                    formatter.value(((Integer) value).intValue());
+                    formatter.value((Integer) value);
                 }
             } else {
                 // Parse the value ...
@@ -455,17 +454,16 @@ public class JsonBinary {
      *                           // lengths up to 16383, and so on...
      * </pre>
      *
-     * @param offset the offset at which the value is to be read; may not be null
-     * @param isSmall {@code true} if the object being read is "small", or {@code false} otherwise
+     * @param small {@code true} if the object being read is "small", or {@code false} otherwise
      * @param formatter the formatter to be notified of the parsed value; may not be null
      * @throws IOException if there is a problem reading the JSON value
      */
     // checkstyle, please ignore MethodLength for the next line
-    protected void parseArray(boolean isSmall, JsonFormatter formatter)
+    protected void parseArray(boolean small, JsonFormatter formatter)
             throws IOException {
         // Read the header ...
-        int numElements = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "number of elements in");
-        int numBytes = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "size of");
+        int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
+        int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
 
         // Read each key value value-entry
         ValueEntry[] entries = new ValueEntry[numElements];
@@ -479,19 +477,19 @@ public class JsonBinary {
                 case INT16:
                 case UINT16:
                     // The "offset" is actually the value ...
-                    int value = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "value offset in");
+                    int value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                     entries[i] = new ValueEntry(type).setValue(value);
                     break;
                 case INT32:
                 case UINT32:
-                    if (!isSmall) {
+                    if (!small) {
                         // The value should be large enough to handle the actual value ...
-                        value = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "value offset in");
+                        value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                         entries[i] = new ValueEntry(type).setValue(value);
                     }
                 default:
                     // It is an offset, not a value ...
-                    int offset = readUnsignedIndex(Integer.MAX_VALUE, isSmall, "value offset in");
+                    int offset = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                     if (offset >= numBytes) {
                         throw new IOException("The offset for the value in the JSON binary document is " +
                                 offset +
@@ -514,9 +512,9 @@ public class JsonBinary {
                 if (value == null) {
                     formatter.valueNull();
                 } else if (value instanceof Boolean) {
-                    formatter.value(((Boolean) value).booleanValue());
+                    formatter.value((Boolean) value);
                 } else if (value instanceof Integer) {
-                    formatter.value(((Integer) value).intValue());
+                    formatter.value((Integer) value);
                 }
             } else {
                 // Parse the value ...
@@ -529,7 +527,6 @@ public class JsonBinary {
     /**
      * Parse a literal value that is either null, {@code true}, or {@code false}.
      *
-     * @param offset the offset at which the value is to be read; may not be null
      * @param formatter the formatter to be notified of the parsed value; may not be null
      * @throws IOException if there is a problem reading the JSON value
      */
@@ -538,7 +535,7 @@ public class JsonBinary {
         if (literal == null) {
             formatter.valueNull();
         } else {
-            formatter.value(literal.booleanValue());
+            formatter.value(literal);
         }
     }
 
@@ -622,26 +619,21 @@ public class JsonBinary {
 
     /**
      * Parse the length and value of a string stored in MySQL's "utf8mb" character set (which equates to Java's
-     * {@link StandardCharsets#UTF_8} character set. The length is a {@link #readVariableInt(ByteBuffer)
-     * variable length integer} length of the string.
+     * UTF-8 character set. The length is a {@link #readVariableInt() variable length integer} length of the string.
      *
-     * @param offset the offset at which the value is to be read; may not be null
      * @param formatter the formatter to be notified of the parsed value; may not be null
      * @throws IOException if there is a problem reading the JSON value
      */
     protected void parseString(JsonFormatter formatter) throws IOException {
         int length = readVariableInt();
-        byte[] content = new byte[length];
-        reader.read(content);
-        String value = new String(content, UTF_8);
+        String value = new String(reader.read(length), UTF_8);
         formatter.value(value);
     }
 
     /**
-     * Parse an opaque type. Specific types such as {@link #parseDate(Offset, formatter) DATE},
-     * {@link #parseTime(Offset, formatter) TIME}, and {@link #parseDatetime(Offset, formatter) DATETIME} values are
-     * stored as opaque types, though they are to be unpacked. {@link #parseTimestamp(Offset, formatter) TIMESTAMP}
-     * are also stored as opaque types, but
+     * Parse an opaque type. Specific types such as {@link #parseDate(JsonFormatter) DATE},
+     * {@link #parseTime(JsonFormatter) TIME}, and {@link #parseDatetime(JsonFormatter) DATETIME} values are
+     * stored as opaque types, though they are to be unpacked. TIMESTAMPs are also stored as opaque types, but
      * <a href="https://github.com/mysql/mysql-server/blob/5.7/sql/sql_time.cc#L1624">converted</a> by MySQL to
      * {@code DATETIME} prior to storage.
      * Other MySQL types are stored as opaque types and passed on to the formatter as opaque values.
@@ -852,9 +844,7 @@ public class JsonBinary {
 
     protected void parseOpaqueValue(ColumnType type, int length, JsonFormatter formatter)
             throws IOException {
-        byte[] rawValue = new byte[length];
-        reader.read(rawValue);
-        formatter.valueOpaque(type, rawValue);
+        formatter.valueOpaque(type, reader.read(length));
     }
 
     protected int readFractionalSecondsInMicroseconds() throws IOException {
@@ -946,7 +936,6 @@ public class JsonBinary {
      * byte of the length field. So we need 1 byte to represent lengths up to 127, 2 bytes to represent lengths up
      * to 16383, and so on...
      *
-     * @param bytes the binary input with the value
      * @return the integer value
      */
     protected int readVariableInt() throws IOException {
@@ -973,7 +962,11 @@ public class JsonBinary {
 
     protected ValueType readValueType() throws IOException {
         byte b = (byte) reader.read();
-        return ValueType.byCode(b);
+        ValueType result = ValueType.byCode(b);
+        if (result == null) {
+            throw new IOException("Unknown value type code '" + String.format("%02X", (int) b) + "'");
+        }
+        return result;
     }
 
     protected static String asHex(byte b) {
@@ -988,14 +981,15 @@ public class JsonBinary {
      * Class used internally to hold value entry information.
      */
     protected static final class ValueEntry {
+
         protected final ValueType type;
         protected final int index;
-        protected Object value = null;
-        protected boolean resolved = false;
+        protected Object value;
+        protected boolean resolved;
 
         public ValueEntry(ValueType type) {
             this.type = type;
-            index = 0;
+            this.index = 0;
         }
 
         public ValueEntry(ValueType type, int index) {

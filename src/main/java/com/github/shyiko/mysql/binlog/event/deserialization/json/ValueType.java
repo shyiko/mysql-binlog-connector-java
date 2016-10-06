@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2016 Stanley Shyiko
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.json;
+package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,20 +26,20 @@ import java.util.Map;
  *
  * <pre>
  *   type ::=
- *       0x00 |       // small JSON object
- *       0x01 |       // large JSON object
- *       0x02 |       // small JSON array
- *       0x03 |       // large JSON array
- *       0x04 |       // literal (true/false/null)
- *       0x05 |       // int16
- *       0x06 |       // uint16
- *       0x07 |       // int32
- *       0x08 |       // uint32
- *       0x09 |       // int64
- *       0x0a |       // uint64
- *       0x0b |       // double
- *       0x0c |       // utf8mb4 string
- *       0x0f         // custom data (any MySQL data type)
+ *       0x00 |  // small JSON object
+ *       0x01 |  // large JSON object
+ *       0x02 |  // small JSON array
+ *       0x03 |  // large JSON array
+ *       0x04 |  // literal (true/false/null)
+ *       0x05 |  // int16
+ *       0x06 |  // uint16
+ *       0x07 |  // int32
+ *       0x08 |  // uint32
+ *       0x09 |  // int64
+ *       0x0a |  // uint64
+ *       0x0b |  // double
+ *       0x0c |  // utf8mb4 string
+ *       0x0f    // custom data (any MySQL data type)
  * </pre>
  *
  * @author <a href="mailto:rhauch@gmail.com">Randall Hauch</a>
@@ -62,6 +61,16 @@ public enum ValueType {
     STRING(0x0c),
     CUSTOM(0x0f);
 
+    private final int code;
+
+    ValueType(int code) {
+        this.code = code;
+    }
+
+    public int getCode() {
+        return this.code;
+    }
+
     private static final Map<Integer, ValueType> TYPE_BY_CODE;
 
     static {
@@ -71,29 +80,8 @@ public enum ValueType {
         }
     }
 
-    /**
-     * Get the {@link ValueType} for the given binary type code.
-     *
-     * @param code the type code
-     * @return the {@link ValueType}; never null
-     * @throws IOException if the supplied type code is not known
-     */
-    public static ValueType byCode(int code) throws IOException {
-        ValueType result = TYPE_BY_CODE.get(code);
-        if (result == null) {
-            throw new IOException("Unknown value type code '" + String.format("%02X ", code) + "'");
-        }
-        return result;
-    }
-
-    private final int code;
-
-    private ValueType(int code) {
-        this.code = code;
-    }
-
-    protected int code() {
-        return this.code;
+    public static ValueType byCode(int code) {
+        return TYPE_BY_CODE.get(code);
     }
 
 }
