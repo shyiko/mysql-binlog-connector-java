@@ -254,9 +254,21 @@ public class BinaryLogClientIntegrationTest {
     public void testDeserializationOfDATE() throws Exception {
         assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
             generateTime(1989, 3, 21, 0, 0, 0, 0)});
-        assertEquals(writeAndCaptureRow("date", "'0000-03-21'"), new Serializable[]{null});
-        assertEquals(writeAndCaptureRow("date", "'1989-00-21'"), new Serializable[]{null});
-        assertEquals(writeAndCaptureRow("date", "'1989-03-00'"), new Serializable[]{null});
+        final boolean[] noZeroInDate = new boolean[1];
+        master.query("select @@sql_mode;", new Callback<ResultSet>() {
+
+            @Override
+            public void execute(ResultSet rs) throws SQLException {
+                // NO_ZERO_IN_DATE is turned on by default in MySQL 5.7
+                // https://github.com/shyiko/mysql-binlog-connector-java/pull/119#issuecomment-251870581
+                noZeroInDate[0] = rs.next() && rs.getString(1).contains("NO_ZERO_IN_DATE");
+            }
+        });
+        if (!noZeroInDate[0]) {
+            assertEquals(writeAndCaptureRow("date", "'0000-03-21'"), new Serializable[]{null});
+            assertEquals(writeAndCaptureRow("date", "'1989-00-21'"), new Serializable[]{null});
+            assertEquals(writeAndCaptureRow("date", "'1989-03-00'"), new Serializable[]{null});
+        }
     }
 
     @Test
