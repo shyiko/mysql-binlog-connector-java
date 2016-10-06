@@ -56,6 +56,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLSyntaxErrorException;
 import java.sql.Statement;
@@ -911,23 +912,26 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
-    private static final class MySQLConnection implements Closeable {
+    /**
+     * Representation of a MySQL connection.
+     */
+    public static final class MySQLConnection implements Closeable {
 
-        private String hostname;
-        private int port;
-        private String username;
-        private String password;
+        private final String hostname;
+        private final int port;
+        private final String username;
+        private final String password;
         private Connection connection;
 
-        private MySQLConnection(String hostname, int port, String username, String password)
-                throws ClassNotFoundException, SQLException {
+        public MySQLConnection(String hostname, int port, String username, String password)
+            throws ClassNotFoundException, SQLException {
             this.hostname = hostname;
             this.port = port;
             this.username = username;
             this.password = password;
             Class.forName("com.mysql.jdbc.Driver");
             this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port,
-                    username, password);
+                username, password);
             execute(new Callback<Statement>() {
 
                 @Override
@@ -937,12 +941,55 @@ public class BinaryLogClientIntegrationTest {
             });
         }
 
+        public String hostname() {
+            return hostname;
+        }
+
+        public int port() {
+            return port;
+        }
+
+        public String username() {
+            return username;
+        }
+
+        public String password() {
+            return password;
+        }
+
         public void execute(Callback<Statement> callback) throws SQLException {
             connection.setAutoCommit(false);
             Statement statement = connection.createStatement();
             try {
                 callback.execute(statement);
                 connection.commit();
+            } finally {
+                statement.close();
+            }
+        }
+
+        public void execute(final String...statements) throws SQLException {
+            execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    for (String command : statements) {
+                        statement.execute(command);
+                    }
+                }
+            });
+        }
+
+        public void query(String sql, Callback<ResultSet> callback) throws SQLException {
+            connection.setAutoCommit(false);
+            Statement statement = connection.createStatement();
+            try {
+                ResultSet rs = statement.executeQuery(sql);
+                try {
+                    callback.execute(rs);
+                    connection.commit();
+                } finally {
+                    rs.close();
+                }
             } finally {
                 statement.close();
             }
@@ -958,7 +1005,12 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
-    private interface Callback<T> {
+    /**
+     * Callback used in the {@link MySQLConnection#execute(Callback)} method.
+     *
+     * @param <T> the type of argument
+     */
+    public interface Callback<T> {
 
         void execute(T obj) throws SQLException;
     }

@@ -4,7 +4,7 @@
 
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.3.2-SNAPSHOT</version>
+    <version>0.5.0</version>
 
     <name>mysql-binlog-connector-java</name>
     <description>MySQL Binary Log connector</description>
@@ -45,7 +45,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <vagrant.bin>vagrant</vagrant.bin>
-        <vagrant.integration.box>${basedir}/supplement/vagrant/mysql-5.6.12-sandbox-prepackaged</vagrant.integration.box>
+        <vagrant.integration.box>${basedir}/supplement/vagrant/mysql-5.7.15-sandbox-prepackaged</vagrant.integration.box>
     </properties>
 
     <dependencies>
@@ -207,6 +207,8 @@
                             -Dvagrant.integration.box=supplement/vagrant/mysql-5.5.27-sandbox-prepackaged
                         mvn -P coverage verify \
                             -Dvagrant.integration.box=supplement/vagrant/mysql-5.6.12-sandbox-prepackaged
+                        mvn -P coverage verify \
+                        -Dvagrant.integration.box=supplement/vagrant/mysql-5.7.15-sandbox-prepackaged
 
                         # submit coverage report to coveralls
                         mvn -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
