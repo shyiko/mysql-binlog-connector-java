@@ -731,9 +731,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     continue;
                 }
                 if (isConnected()) {
+                    updateGtidSet(event);
                     notifyEventListeners(event);
                     updateClientBinlogFilenameAndPosition(event);
-                    updateGtidSet(event);
                 }
             }
         } catch (Exception e) {
