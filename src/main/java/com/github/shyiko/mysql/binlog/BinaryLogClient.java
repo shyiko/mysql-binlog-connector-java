@@ -745,8 +745,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     continue;
                 }
                 if (isConnected()) {
+                    // Update the GTID before the event listeners, and the binlog filename/position after the
+                    // listeners (since the binlog filename/position point to the *next* event) ...
+                    boolean updatedGtid = updateGtid(event);
                     notifyEventListeners(event);
-                    updatePosition(event);
+                    updatePosition(event, updatedGtid);
                 }
             }
         } catch (Exception e) {
@@ -780,40 +783,52 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return result;
     }
 
-    private void updatePosition(Event event) {
+    private boolean updateGtid(Event event) {
         EventHeader eventHeader = event.getHeader();
         EventType eventType = eventHeader.getEventType();
-        if (gtidSet != null && eventType == EventType.XID) {
-            advanceGTID();
-        } else
-        if (gtidSet != null && eventType == EventType.QUERY) {
-            QueryEventData queryEventData = getInternalEventData(event);
-            String query = queryEventData.getSql();
-            if ("COMMIT".equals(query) || "ROLLBACK".equals(query) ||
-                (previousEvent != null && previousEvent.getHeader().getEventType() == EventType.GTID &&
-                    !"BEGIN".equals(query))) {
+        if (gtidSet != null) {
+            if (eventType == EventType.XID) {
                 advanceGTID();
+                return true;
             }
-        } else
-        if (gtidSet != null && eventType == EventType.GTID) {
-            if (previousGtidEvent != null) {
-                if (advanceGTID()) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.log(Level.WARNING, "GtidSet wasn't synchronized before GTID. " +
-                            "Please submit a bug report to https://github.com/shyiko/mysql-binlog-connector-java");
+            if (eventType == EventType.QUERY) {
+                QueryEventData queryEventData = getInternalEventData(event);
+                String query = queryEventData.getSql();
+                if ("COMMIT".equals(query) || "ROLLBACK".equals(query) ||
+                        (previousEvent != null && previousEvent.getHeader().getEventType() == EventType.GTID &&
+                                !"BEGIN".equals(query))) {
+                    advanceGTID();
+                }
+                return true;
+            }
+            if (eventType == EventType.GTID) {
+                if (previousGtidEvent != null) {
+                    if (advanceGTID()) {
+                        if (logger.isLoggable(Level.WARNING)) {
+                            logger.log(Level.WARNING, "GtidSet wasn't synchronized before GTID. " +
+                                "Please submit a bug report to https://github.com/shyiko/mysql-binlog-connector-java");
+                        }
                     }
                 }
+                previousGtidEvent = event;
+                return true;
             }
-            previousGtidEvent = event;
-        } else
-        if (eventType == EventType.ROTATE) {
+        }
+        return false;
+    }
+
+    private void updatePosition(Event event, boolean updatedGtid) {
+        EventHeader eventHeader = event.getHeader();
+        EventType eventType = eventHeader.getEventType();
+        if (updatedGtid) {
+            // the GTID was previously updated based upon this event
+        } else if (eventType == EventType.ROTATE) {
             RotateEventData rotateEventData = getInternalEventData(event);
             binlogFilename = rotateEventData.getBinlogFilename();
             binlogPosition = rotateEventData.getBinlogPosition();
-        } else
-        // do not update binlogPosition on TABLE_MAP so that in case of reconnect (using a different instance of
-        // client) table mapping cache could be reconstructed before hitting row mutation event
-        if (eventType != EventType.TABLE_MAP && eventHeader instanceof EventHeaderV4) {
+        } else if (eventType != EventType.TABLE_MAP && eventHeader instanceof EventHeaderV4) {
+            // do not update binlogPosition on TABLE_MAP so that in case of reconnect (using a different instance of
+            // client) table mapping cache could be reconstructed before hitting row mutation event
             EventHeaderV4 trackableEventHeader = (EventHeaderV4) eventHeader;
             long nextBinlogPosition = trackableEventHeader.getNextPosition();
             if (nextBinlogPosition > 0) {
