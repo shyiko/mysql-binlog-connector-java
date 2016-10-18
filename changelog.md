@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.5.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.5.0...0.5.1) - 2016-10-18
+
+### Fixed
+ - ROWS_QUERY event deserialization ([#124](https://github.com/shyiko/mysql-binlog-connector-java/issues/124)).
+ - JSON length determination.
+ - GTID sync (GtidSet is now updated before BinaryLogClient.EventListener|s are notified).
+
 ## [0.5.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.4.2...0.5.0) - 2016-10-06
 
 ### Added
