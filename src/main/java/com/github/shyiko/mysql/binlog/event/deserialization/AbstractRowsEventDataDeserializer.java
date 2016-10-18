@@ -346,7 +346,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
      * @throws IOException if there is a problem reading the input stream
      */
     protected byte[] deserializeJson(int meta, ByteArrayInputStream inputStream) throws IOException {
-        int blobLength = inputStream.readInteger(4);
+        int blobLength = inputStream.readInteger(meta);
         return inputStream.read(blobLength);
     }
 

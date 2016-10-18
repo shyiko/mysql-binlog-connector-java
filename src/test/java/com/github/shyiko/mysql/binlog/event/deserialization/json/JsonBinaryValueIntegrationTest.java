@@ -45,6 +45,7 @@ public class JsonBinaryValueIntegrationTest {
 
     private static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
 
+    private BinaryLogClient client;
     private BinaryLogClientIntegrationTest.MySQLConnection master;
     private Map<Integer, byte[]> jsonValuesByKey;
 
@@ -56,16 +57,15 @@ public class JsonBinaryValueIntegrationTest {
         master = new BinaryLogClientIntegrationTest.MySQLConnection(bundle.getString(prefix + "master.hostname"),
                 Integer.parseInt(bundle.getString(prefix + "master.port")),
                 bundle.getString(prefix + "master.username"), bundle.getString(prefix + "master.password"));
-        BinaryLogClient client = new BinaryLogClient(master.hostname(), master.port(), master.username(),
-            master.password());
+        client = new BinaryLogClient(master.hostname(), master.port(), master.username(), master.password());
         client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
         client.setKeepAlive(false);
         // Uncomment the next line for detailed traces of the events ...
         // client.registerEventListener(new TraceEventListener());
-        CountDownEventListener eventListener;
-        client.registerEventListener(eventListener = new CountDownEventListener());
         // client.registerLifecycleListener(new TraceLifecycleListener());
         client.connect(DEFAULT_TIMEOUT);
+        CountDownEventListener eventListener = new CountDownEventListener();
+        client.registerEventListener(eventListener);
         try {
             master.execute("drop database if exists json_test",
                            "create database json_test",
@@ -139,6 +139,22 @@ public class JsonBinaryValueIntegrationTest {
                 jsonValuesByKey.put(rowNum, jsonBinary);
             }
         }
+    }
+
+    @Test
+    public void testLengthDeserialization() throws Exception {
+        CountDownEventListener eventListener = new CountDownEventListener();
+        client.registerEventListener(eventListener);
+        CapturingEventListener capturingEventListener = new CapturingEventListener();
+        client.registerEventListener(capturingEventListener);
+        master.execute("create table json_b (h varchar(255), j JSON, k varchar(255))",
+            "INSERT INTO json_b VALUES ('sponge', '{}', 'bob');");
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        List<WriteRowsEventData> events = capturingEventListener.getEvents(WriteRowsEventData.class);
+        Serializable[] data = events.iterator().next().getRows().get(0);
+        assertEquals(data[0], "sponge");
+        assertEquals(JsonBinary.parseAsString((byte[]) data[1]), "{}");
+        assertEquals(data[2], "bob");
     }
 
     @Test
