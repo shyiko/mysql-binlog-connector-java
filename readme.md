@@ -180,13 +180,14 @@ For the insight into the internals of MySQL look [here](https://dev.mysql.com/do
 
 ## Real-world applications
 
-Some of the OSS built on top of mysql-binlog-conector-java: 
+Some of the OSS using / built on top of mysql-binlog-conector-java: 
 * [debezium](https://github.com/debezium/debezium) A low latency data streaming platform for change data capture (CDC).
 * [mavenlink/changestream](https://github.com/mavenlink/changestream) - A stream of changes for MySQL built on Akka.
 * [mardambey/mypipe](https://github.com/mardambey/mypipe) MySQL binary log consumer with the ability to act on changed rows and publish changes to different systems with emphasis on Apache Kafka.
 * [ngocdaothanh/mydit](https://github.com/ngocdaothanh/mydit) MySQL to MongoDB data replicator.
 * [sharetribe/dumpr](https://github.com/sharetribe/dumpr) A Clojure library for live replicating data from a MySQL database.
 * [shyiko/rook](https://github.com/shyiko/rook) Generic Change Data Capture (CDC) toolkit.
+* [streamsets/datacollector](https://github.com/streamsets/datacollector) Continuous big data ingestion infrastructure.
 * [twingly/ecco](https://github.com/twingly/ecco) MySQL replication binlog parser in JRuby.
 
 It's also used [on a large scale](https://twitter.com/atwinmutt/status/626816601078300672) in MailChimp. You can read about it [here](http://devs.mailchimp.com/blog/powering-mailchimp-pro-reporting/).  
