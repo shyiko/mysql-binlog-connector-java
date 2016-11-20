@@ -191,11 +191,6 @@ public class JsonBinary {
         this.reader = contents;
     }
 
-    @Override
-    public String toString() {
-        return getString();
-    }
-
     public String getString() {
         JsonStringFormatter handler = new JsonStringFormatter();
         try {
