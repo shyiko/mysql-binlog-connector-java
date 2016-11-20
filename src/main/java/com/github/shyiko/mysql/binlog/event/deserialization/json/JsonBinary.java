@@ -322,6 +322,7 @@ public class JsonBinary {
         // Read the header ...
         int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
         int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
+        int valueSize = small ? 2 : 4;
 
         // Read each key-entry, consisting of the offset and length of each key ...
         int[] keyLengths = new int[numElements];
@@ -338,19 +339,25 @@ public class JsonBinary {
             switch (type) {
                 case LITERAL:
                     entries[i] = new ValueEntry(type).setValue(readLiteral());
+                    reader.skip(valueSize - 1);
                     break;
                 case INT16:
+                    entries[i] = new ValueEntry(type).setValue(readInt16());
+                    reader.skip(valueSize - 2);
+                    break;
                 case UINT16:
-                    // The "offset" is actually the value ...
-                    int value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
-                    entries[i] = new ValueEntry(type).setValue(value);
+                    entries[i] = new ValueEntry(type).setValue(readUInt16());
+                    reader.skip(valueSize - 2);
                     break;
                 case INT32:
+                    if (!small) {
+                        entries[i] = new ValueEntry(type).setValue(readInt32());
+                        break;
+                    }
                 case UINT32:
                     if (!small) {
-                        // The value should be large enough to handle the actual value ...
-                        value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
-                        entries[i] = new ValueEntry(type).setValue(value);
+                        entries[i] = new ValueEntry(type).setValue(readUInt32());
+                        break;
                     }
                 default:
                     // It is an offset, not a value ...
@@ -459,6 +466,7 @@ public class JsonBinary {
         // Read the header ...
         int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
         int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
+        int valueSize = small ? 2 : 4;
 
         // Read each key value value-entry
         ValueEntry[] entries = new ValueEntry[numElements];
@@ -468,19 +476,25 @@ public class JsonBinary {
             switch (type) {
                 case LITERAL:
                     entries[i] = new ValueEntry(type).setValue(readLiteral());
+                    reader.skip(valueSize - 1);
                     break;
                 case INT16:
+                    entries[i] = new ValueEntry(type).setValue(readInt16());
+                    reader.skip(valueSize - 2);
+                    break;
                 case UINT16:
-                    // The "offset" is actually the value ...
-                    int value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
-                    entries[i] = new ValueEntry(type).setValue(value);
+                    entries[i] = new ValueEntry(type).setValue(readUInt16());
+                    reader.skip(valueSize - 2);
                     break;
                 case INT32:
+                    if (!small) {
+                        entries[i] = new ValueEntry(type).setValue(readInt32());
+                        break;
+                    }
                 case UINT32:
                     if (!small) {
-                        // The value should be large enough to handle the actual value ...
-                        value = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
-                        entries[i] = new ValueEntry(type).setValue(value);
+                        entries[i] = new ValueEntry(type).setValue(readUInt32());
+                        break;
                     }
                 default:
                     // It is an offset, not a value ...
