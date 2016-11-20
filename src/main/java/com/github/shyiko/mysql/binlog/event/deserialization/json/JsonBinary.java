@@ -934,13 +934,15 @@ public class JsonBinary {
      * @return the integer value
      */
     protected int readVariableInt() throws IOException {
-        byte b = 0;
         int length = 0;
-        do {
-            b = (byte) reader.read();
-            length = (length << 7) + (b & 0x7F);
-        } while (b < 0);
-        return length;
+        for (int i = 0; i < 5; i++) {
+            byte b = (byte) reader.read();
+            length |= (b & 0x7F) << (7 * i);
+            if ((b & 0x80) == 0) {
+                return length;
+            }
+        }
+        throw new IOException("Unexpected byte sequence (" + length + ")");
     }
 
     protected Boolean readLiteral() throws IOException {
