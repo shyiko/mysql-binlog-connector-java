@@ -15,28 +15,37 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-
-import java.io.Serializable;
-import java.sql.SQLSyntaxErrorException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.ResourceBundle;
-import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
-
+import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.BinaryLogClientIntegrationTest;
+import com.github.shyiko.mysql.binlog.CapturingEventListener;
+import com.github.shyiko.mysql.binlog.CountDownEventListener;
+import com.github.shyiko.mysql.binlog.TraceEventListener;
+import com.github.shyiko.mysql.binlog.TraceLifecycleListener;
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventData;
+import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
+import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
+import org.skyscreamer.jsonassert.JSONAssert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.github.shyiko.mysql.binlog.BinaryLogClient;
-import com.github.shyiko.mysql.binlog.CapturingEventListener;
-import com.github.shyiko.mysql.binlog.CountDownEventListener;
-import com.github.shyiko.mysql.binlog.event.EventType;
-import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
+import java.io.Serializable;
+import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.Statement;
+import java.util.List;
+import java.util.ResourceBundle;
+import java.util.TimeZone;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 /**
  * @author <a href="mailto:rhauch@gmail.com">Randall Hauch</a>
@@ -45,9 +54,17 @@ public class JsonBinaryValueIntegrationTest {
 
     private static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
 
-    private BinaryLogClient client;
+    private final Logger logger = Logger.getLogger(getClass().getSimpleName());
+
+    {
+        logger.setLevel(Level.FINEST);
+    }
+
+    private final TimeZone timeZoneBeforeTheTest = TimeZone.getDefault();
+
     private BinaryLogClientIntegrationTest.MySQLConnection master;
-    private Map<Integer, byte[]> jsonValuesByKey;
+    private BinaryLogClient client;
+    private CountDownEventListener eventListener;
 
     @BeforeClass
     public void setUp() throws Exception {
@@ -60,89 +77,35 @@ public class JsonBinaryValueIntegrationTest {
         client = new BinaryLogClient(master.hostname(), master.port(), master.username(), master.password());
         client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
         client.setKeepAlive(false);
-        // Uncomment the next line for detailed traces of the events ...
-        // client.registerEventListener(new TraceEventListener());
-        // client.registerLifecycleListener(new TraceLifecycleListener());
+        client.registerEventListener(new TraceEventListener());
+        client.registerEventListener(eventListener = new CountDownEventListener());
+        client.registerLifecycleListener(new TraceLifecycleListener());
         client.connect(DEFAULT_TIMEOUT);
-        CountDownEventListener eventListener = new CountDownEventListener();
-        client.registerEventListener(eventListener);
+        master.execute(new BinaryLogClientIntegrationTest.Callback<Statement>() {
+            @Override
+            public void execute(Statement statement) throws SQLException {
+                statement.execute("drop database if exists json_test");
+                statement.execute("create database json_test");
+                statement.execute("use json_test");
+            }
+        });
         try {
-            master.execute("drop database if exists json_test",
-                           "create database json_test",
-                           "use json_test",
-                           "create table t1 (i INT, j JSON)");
-            eventListener.waitFor(EventType.QUERY, 3, DEFAULT_TIMEOUT);
-            eventListener.reset();
+            master.execute(new BinaryLogClientIntegrationTest.Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("create table json_support_validation (i INT, j JSON)");
+                }
+            });
         } catch (SQLSyntaxErrorException e) {
             // Skip the tests altogether since MySQL is pre 5.7
             throw new org.testng.SkipException("JSON data type is not supported by current version of MySQL");
         }
-
-        // Insert values into the t1 table ...
-        CapturingEventListener capturingEventListener = new CapturingEventListener();
-        client.registerEventListener(capturingEventListener);
-        master.execute("INSERT INTO t1 VALUES (0, NULL);",
-                       "INSERT INTO t1 VALUES (1, '{\"a\": 2}');",
-                       "INSERT INTO t1 VALUES (2, '[1,2]');",
-                       // checkstyle, please ignore LineLength for the next line
-                       "INSERT INTO t1 VALUES (3, '{\"a\":\"b\", \"c\":\"d\",\"ab\":\"abc\", \"bc\": [\"x\", \"y\"]}');",
-                       "INSERT INTO t1 VALUES (4, '[\"here\", [\"I\", \"am\"], \"!!!\"]');",
-                       "INSERT INTO t1 VALUES (5, '\"scalar string\"');",
-                       "INSERT INTO t1 VALUES (6, 'true');",
-                       "INSERT INTO t1 VALUES (7, 'false');",
-                       "INSERT INTO t1 VALUES (8, 'null');",
-                       "INSERT INTO t1 VALUES (9, '-1');",
-                       "INSERT INTO t1 VALUES (10, CAST(CAST(1 AS UNSIGNED) AS JSON));",
-                       "INSERT INTO t1 VALUES (11, '32767');",
-                       "INSERT INTO t1 VALUES (12, '32768');",
-                       "INSERT INTO t1 VALUES (13, '-32768');",
-                       "INSERT INTO t1 VALUES (14, '-32769');",
-                       "INSERT INTO t1 VALUES (15, '2147483647');",
-                       "INSERT INTO t1 VALUES (16, '2147483648');",
-                       "INSERT INTO t1 VALUES (17, '-2147483648');",
-                       "INSERT INTO t1 VALUES (18, '-2147483649');",
-                       "INSERT INTO t1 VALUES (19, '18446744073709551615');",
-                       "INSERT INTO t1 VALUES (20, '18446744073709551616');",
-                       "INSERT INTO t1 VALUES (21, '3.14');",
-                       "INSERT INTO t1 VALUES (22, '{}');",
-                       "INSERT INTO t1 VALUES (23, '[]');",
-                       "INSERT INTO t1 VALUES (24, CAST(CAST('2015-01-15 23:24:25' AS DATETIME) AS JSON));",
-                       "INSERT INTO t1 VALUES (25, CAST(CAST('23:24:25' AS TIME) AS JSON));",
-                       "INSERT INTO t1 VALUES (125, CAST(CAST('23:24:25.12' AS TIME(3)) AS JSON));",
-                       "INSERT INTO t1 VALUES (225, CAST(CAST('23:24:25.0237' AS TIME(3)) AS JSON));",
-                       "INSERT INTO t1 VALUES (26, CAST(CAST('2015-01-15' AS DATE) AS JSON));",
-                       "INSERT INTO t1 VALUES (27, CAST(TIMESTAMP'2015-01-15 23:24:25' AS JSON));",
-                       "INSERT INTO t1 VALUES (127, CAST(TIMESTAMP'2015-01-15 23:24:25.12' AS JSON));",
-                       "INSERT INTO t1 VALUES (227, CAST(TIMESTAMP'2015-01-15 23:24:25.0237' AS JSON));",
-                       "INSERT INTO t1 VALUES (327, CAST(UNIX_TIMESTAMP('2015-01-15 23:24:25') AS JSON));",
-                       "INSERT INTO t1 VALUES (28, CAST(ST_GeomFromText('POINT(1 1)') AS JSON));",
-                       // auto-convert to utf8mb4
-                       "INSERT INTO t1 VALUES (29, CAST('[]' AS CHAR CHARACTER SET 'ascii'));",
-                       "INSERT INTO t1 VALUES (30, CAST(x'cafe' AS JSON));",
-                       "INSERT INTO t1 VALUES (31, CAST(x'cafebabe' AS JSON));",
-                       // # Maximum allowed key length is 64k-1
-                       "INSERT INTO t1 VALUES (100, CONCAT('{\"', REPEAT('a', 64 * 1024 - 1), '\":123}'));");
-
-        // Wait for the inserts to appear ...
-        eventListener.waitFor(WriteRowsEventData.class, 37, DEFAULT_TIMEOUT);
-
-        jsonValuesByKey = new HashMap<Integer, byte[]>();
-        List<WriteRowsEventData> events = capturingEventListener.getEvents(WriteRowsEventData.class);
-        for (WriteRowsEventData event : events) {
-            List<Serializable[]> writtenRows = event.getRows();
-            for (Serializable[] row : writtenRows) {
-                assertEquals(row.length, 2);
-                // Read the values ...
-                Integer rowNum = (Integer) row[0];
-                byte[] jsonBinary = (byte[]) row[1];
-                assertNotNull(rowNum);
-                jsonValuesByKey.put(rowNum, jsonBinary);
-            }
-        }
+        eventListener.waitFor(EventType.QUERY, 3, DEFAULT_TIMEOUT);
+        eventListener.reset();
     }
 
     @Test
-    public void testLengthDeserialization() throws Exception {
+    public void testValueBoundariesAreHonored() throws Exception {
         CountDownEventListener eventListener = new CountDownEventListener();
         client.registerEventListener(eventListener);
         CapturingEventListener capturingEventListener = new CapturingEventListener();
@@ -158,190 +121,344 @@ public class JsonBinaryValueIntegrationTest {
     }
 
     @Test
-    public void testNullJsonValue() throws Exception {
-        assertJson(0, null);
+    public void testNull() throws Exception {
+        assertEquals(writeAndCaptureJSON(null), null);
     }
 
     @Test
-    public void testSimpleJsonObject() throws Exception {
-        assertJson(1, "{\"a\":2}");
+    public void testJsonObject() throws Exception {
+        assertJSONMatchOriginal(
+            "{" +
+            "\"k.1\":1," +
+            "\"k.0\":0," +
+            "\"k.-1\":-1," +
+            "\"k.true\":true," +
+            "\"k.false\":false," +
+            "\"k.null\":null," +
+            "\"k.string\":\"string\"," +
+            "\"k.true_false\":[true,false]," +
+            "\"k.32767\":32767," +
+            "\"k.32768\":32768," +
+            "\"k.-32768\":-32768," +
+            "\"k.-32769\":-32769," +
+            "\"k.2147483647\":2147483647," +
+            "\"k.2147483648\":2147483648," +
+            "\"k.-2147483648\":-2147483648," +
+            "\"k.-2147483649\":-2147483649," +
+            "\"k.18446744073709551615\":18446744073709551615," +
+            "\"k.18446744073709551616\":18446744073709551616," +
+            "\"k.3.14\":3.14," +
+            "\"k.{}\":{}," +
+            "\"k.[]\":[]" +
+            "}"
+        );
     }
 
     @Test
-    public void testMultiLevelJsonObject() throws Exception {
-        assertJson(3, "{\"a\":\"b\",\"c\":\"d\",\"ab\":\"abc\",\"bc\":[\"x\",\"y\"]}");
+    public void testJsonObjectLargerThan64k() throws Exception {
+        // https://dev.mysql.com/worklog/task/?id=8132
+
+        // To compensate for the extra space needed by the redundant length
+        // information, we will make the format allow offset and length fields to
+        // come in two different variants: 2 bytes for documents smaller than
+        // 64KB, and 4 bytes to support larger documents.
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 64 * 1024; i++) {
+            sb.append("\"g.").append(i).append("\":").append(i).append(',');
+        }
+        assertJSONMatchOriginal(
+            "{" +
+                sb +
+                "\"k.1\":1," +
+                "\"k.0\":0," +
+                "\"k.-1\":-1," +
+                "\"k.true\":true," +
+                "\"k.false\":false," +
+                "\"k.null\":null," +
+                "\"k.string\":\"string\"," +
+                "\"k.true_false\":[true,false]," +
+                "\"k.32767\":32767," +
+                "\"k.32768\":32768," +
+                "\"k.-32768\":-32768," +
+                "\"k.-32769\":-32769," +
+                "\"k.2147483647\":2147483647," +
+                "\"k.2147483648\":2147483648," +
+                "\"k.-2147483648\":-2147483648," +
+                "\"k.-2147483649\":-2147483649," +
+                "\"k.18446744073709551615\":18446744073709551615," +
+                "\"k.18446744073709551616\":18446744073709551616," +
+                "\"k.3.14\":3.14," +
+                "\"k.{}\":{}," +
+                "\"k.[]\":[]" +
+                "}"
+        );
     }
 
     @Test
-    public void testSimpleJsonArray() throws Exception {
-        assertJson(2, "[1,2]");
+    public void testJsonObjectNested() throws Exception {
+        assertJSONMatchOriginal("{\"a\":{\"b\":{\"c\":\"d\",\"e\":[\"f\",\"g\"]}}}");
     }
 
     @Test
-    public void testMultiLevelJsonArray() throws Exception {
-        assertJson(4, "[\"here\",[\"I\",\"am\"],\"!!!\"]");
+    public void testJsonArray() throws Exception {
+        assertJSONMatchOriginal(
+            "[" +
+            "-1," +
+            "0," +
+            "1," +
+            "true," +
+            "false," +
+            "null," +
+            "\"string\"," +
+            "[true,false]," +
+            "32767," +
+            "32768," +
+            "-32768," +
+            "-32769," +
+            "2147483647," +
+            "2147483648," +
+            "-2147483648," +
+            "-2147483649," +
+            "18446744073709551615," +
+            "18446744073709551616," +
+            "3.14," +
+            "{}," +
+            "[]" +
+            "]");
+    }
+
+    @Test
+    public void testJsonArrayNested() throws Exception {
+        assertJSONMatchOriginal("[-1,[\"b\",[\"c\"]],1]");
     }
 
     @Test
     public void testScalarString() throws Exception {
-        assertJson(5, "\"scalar string\"");
+        assertJSONMatchOriginal("\"scalar string\"");
+        assertJSONMatchOriginal("\"" + new String(new char[65]).replace("\0", "LONG") + "\"");
     }
 
     @Test
     public void testScalarBooleanTrue() throws Exception {
-        assertJson(6, "true");
+        assertJSONMatchOriginal("true");
     }
 
     @Test
     public void testScalarBooleanFalse() throws Exception {
-        assertJson(7, "false");
+        assertJSONMatchOriginal("false");
     }
 
     @Test
     public void testScalarNull() throws Exception {
-        assertJson(8, "null");
+        assertJSONMatchOriginal("null");
     }
 
     @Test
     public void testScalarNegativeInteger() throws Exception {
-        assertJson(9, "-1");
+        assertJSONMatchOriginal("-1");
     }
 
     @Test
-    public void testScalarUnsignedInteger() throws Exception {
-        assertJson(10, "1");
+    public void testScalarPositiveInteger() throws Exception {
+        assertJSONMatchOriginal("1");
     }
 
     @Test
     public void testScalarMaxPositiveInt16() throws Exception {
-        assertJson(11, "32767");
+        assertJSONMatchOriginal("32767");
     }
 
     @Test
     public void testScalarInt32() throws Exception {
-        assertJson(12, "32768");
+        assertJSONMatchOriginal("32768");
     }
 
     @Test
-    public void testScalarNegativeInt16() throws Exception {
-        assertJson(13, "-32768");
+    public void testScalarMinNegativeInt16() throws Exception {
+        assertJSONMatchOriginal("-32768");
     }
 
     @Test
     public void testScalarNegativeInt32() throws Exception {
-        assertJson(14, "-32769");
+        assertJSONMatchOriginal("-32769");
     }
 
     @Test
     public void testScalarMaxPositiveInt32() throws Exception {
-        assertJson(15, "2147483647");
+        assertJSONMatchOriginal("2147483647");
     }
 
     @Test
     public void testScalarPositiveInt64() throws Exception {
-        assertJson(16, "2147483648");
+        assertJSONMatchOriginal("2147483648");
     }
 
     @Test
-    public void testScalarMaxNegativeInt32() throws Exception {
-        assertJson(17, "-2147483648");
+    public void testScalarMinNegativeInt32() throws Exception {
+        assertJSONMatchOriginal("-2147483648");
     }
 
     @Test
     public void testScalarNegativeInt64() throws Exception {
-        assertJson(18, "-2147483649");
+        assertJSONMatchOriginal("-2147483649");
     }
 
     @Test
     public void testScalarUInt64() throws Exception {
-        assertJson(19, "18446744073709551615");
+        assertJSONMatchOriginal("18446744073709551615");
     }
 
     @Test
-    public void testScalarBeyondUInt64() throws Exception {
-        assertJson(20, "18446744073709551616");
+    public void testScalarUInt64Overflow() throws Exception {
+        assertJSONMatchOriginal("18446744073709551616");
     }
 
     @Test
-    public void testScalarPi() throws Exception {
-        assertJson(21, "3.14");
+    public void testScalarFloat() throws Exception {
+        assertJSONMatchOriginal("3.14");
     }
 
     @Test
     public void testEmptyObject() throws Exception {
-        assertJson(22, "{}");
+        assertJSONMatchOriginal("{}");
     }
 
     @Test
     public void testEmptyArray() throws Exception {
-        assertJson(23, "[]");
+        assertJSONMatchOriginal("[]");
     }
 
     @Test
     public void testScalarDateTime() throws Exception {
-        assertJson(24, "\"2015-01-15 23:24:25\"");
+        assertEquals(writeAndCaptureJSON("CAST(CAST('2015-01-15 23:24:25' AS DATETIME) AS JSON)"),
+            "\"2015-01-15 23:24:25\"");
     }
 
     @Test
     public void testScalarTime() throws Exception {
-        assertJson(25, "\"23:24:25\"");
-        assertJson(125, "\"23:24:25.12\"");
-        assertJson(225, "\"23:24:25.024\"");
+        assertEquals(writeAndCaptureJSON("CAST(CAST('23:24:25' AS TIME) AS JSON)"),
+            "\"23:24:25\"");
+        assertEquals(writeAndCaptureJSON("CAST(CAST('23:24:25.12' AS TIME(3)) AS JSON)"),
+            "\"23:24:25.12\"");
+        assertEquals(writeAndCaptureJSON("CAST(CAST('23:24:25.0237' AS TIME(3)) AS JSON)"),
+            "\"23:24:25.024\"");
     }
 
     @Test
     public void testScalarDate() throws Exception {
-        assertJson(26, "\"2015-01-15\"");
+        assertEquals(writeAndCaptureJSON("CAST(CAST('2015-01-15' AS DATE) AS JSON)"),
+            "\"2015-01-15\"");
     }
 
     @Test
     public void testScalarTimestamp() throws Exception {
-        // Timestamp literals are interpreted by MySQL as DATETIME values
-        assertJson(27, "\"2015-01-15 23:24:25\"");
-        assertJson(127, "\"2015-01-15 23:24:25.12\"");
-        assertJson(227, "\"2015-01-15 23:24:25.0237\"");
-        // The UNIX_TIMESTAMP(ts) function returns the number of seconds past epoch for the given ts
-        assertJson(327, "1421364265");
+        // timestamp literals are interpreted by MySQL as DATETIME values
+        assertEquals(writeAndCaptureJSON("CAST(TIMESTAMP'2015-01-15 23:24:25' AS JSON)"),
+            "\"2015-01-15 23:24:25\"");
+        assertEquals(writeAndCaptureJSON("CAST(TIMESTAMP'2015-01-15 23:24:25.12' AS JSON)"),
+            "\"2015-01-15 23:24:25.12\"");
+        assertEquals(writeAndCaptureJSON("CAST(TIMESTAMP'2015-01-15 23:24:25.0237' AS JSON)"),
+            "\"2015-01-15 23:24:25.0237\"");
+        // UNIX_TIMESTAMP(ts) function returns the number of seconds past epoch for the given ts
+        assertEquals(writeAndCaptureJSON("CAST(UNIX_TIMESTAMP('2015-01-15 23:24:25') AS JSON)"),
+            "1421364265");
     }
 
     @Test
     public void testScalarGeometry() throws Exception {
-        assertJson(28, "{\"type\":\"Point\",\"coordinates\":[1.0,1.0]}");
+        assertEquals(writeAndCaptureJSON("CAST(ST_GeomFromText('POINT(1 1)') AS JSON)"),
+            "{\"type\":\"Point\",\"coordinates\":[1.0,1.0]}");
     }
 
     @Test
     public void testScalarStringWithCharsetConversion() throws Exception {
-        assertJson(29, "[]");
+        assertEquals(writeAndCaptureJSON("CAST('[]' AS CHAR CHARACTER SET 'ascii')"), "[]");
     }
 
     @Test
     public void testScalarBinaryAsBase64() throws Exception {
-        assertJson(30, "\"yv4=\"");
-        assertJson(31, "\"yv66vg==\"");
+        assertEquals(writeAndCaptureJSON("CAST(x'cafe' AS JSON)"), "\"yv4=\"");
+        assertEquals(writeAndCaptureJSON("CAST(x'cafebabe' AS JSON)"), "\"yv66vg==\"");
     }
 
-    protected void assertJson(int i, String expected) throws Exception {
-        byte[] b = jsonForId(i);
-        String json = b != null ? JsonBinary.parseAsString(b) : null;
-        assertEquals(json, expected);
+    private void assertJSONMatchOriginal(String value) throws Exception {
+        assetJSONEquals(value, writeAndCaptureJSON("'" + value + "'"));
     }
 
-    /**
-     * Get the binary representation of the JSON value that corresponds to the specified row number.
-     *
-     * @param i the row number; should be unique for an insert to work
-     * @return the binary representation of the JSON value as read from the {@link WriteRowsEventData} event;
-     *         may be null if the JSON value is null
-     */
-    protected byte[] jsonForId(int i) throws Exception {
-        return jsonValuesByKey.get(i);
+    private void assetJSONEquals(String actual, String expected) throws Exception {
+        if (expected != null && (expected.startsWith("{") || expected.startsWith("["))) {
+            JSONAssert.assertEquals(expected, actual, true);
+        } else {
+            assertEquals(actual, expected);
+        }
+    }
+
+    private String writeAndCaptureJSON(final String value) throws Exception {
+        CapturingEventListener capturingEventListener = new CapturingEventListener();
+        client.registerEventListener(capturingEventListener);
+        try {
+            master.execute(new BinaryLogClientIntegrationTest.Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    statement.execute("drop table if exists data_type_hell");
+                    statement.execute("create table data_type_hell (column_ " + "JSON" + ")");
+                    statement.execute("insert into data_type_hell values (" + value + ")");
+                }
+            });
+            eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        } finally {
+            client.unregisterEventListener(capturingEventListener);
+        }
+        byte[] b = (byte[]) capturingEventListener.getEvents(WriteRowsEventData.class).get(0).getRows().get(0)[0];
+        return b == null ? null : JsonBinary.parseAsString(b);
+    }
+
+    @AfterMethod
+    public void afterEachTest() throws Exception {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String markerQuery = "drop table if exists _EOS_marker";
+        BinaryLogClient.EventListener markerInterceptor = new BinaryLogClient.EventListener() {
+            @Override
+            public void onEvent(Event event) {
+                if (event.getHeader().getEventType() == EventType.QUERY) {
+                    EventData data = event.getData();
+                    if (data != null && ((QueryEventData) data).getSql().contains("_EOS_marker")) {
+                        latch.countDown();
+                    }
+                }
+            }
+        };
+        client.registerEventListener(markerInterceptor);
+        master.execute(new BinaryLogClientIntegrationTest.Callback<Statement>() {
+            @Override
+            public void execute(Statement statement) throws SQLException {
+                statement.execute(markerQuery);
+            }
+        });
+        assertTrue(latch.await(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
+        client.unregisterEventListener(markerInterceptor);
+        eventListener.reset();
     }
 
     @AfterClass(alwaysRun = true)
     public void tearDown() throws Exception {
-        if (master != null) {
-            master.execute("drop database if exists json_test");
-            master.close();
+        TimeZone.setDefault(timeZoneBeforeTheTest);
+        try {
+            if (client != null) {
+                client.disconnect();
+            }
+        } finally {
+            if (master != null) {
+                master.execute(new BinaryLogClientIntegrationTest.Callback<Statement>() {
+                    @Override
+                    public void execute(Statement statement) throws SQLException {
+                        statement.execute("drop database json_test");
+                    }
+                });
+                master.close();
+            }
         }
     }
+
 }
