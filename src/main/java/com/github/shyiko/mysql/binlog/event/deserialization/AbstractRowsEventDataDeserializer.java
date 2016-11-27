@@ -69,6 +69,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private static final int DIG_PER_DEC = 9;
     private static final int[] DIG_TO_BYTES = {0, 1, 1, 2, 2, 3, 3, 4, 4, 4};
 
+    public static boolean READ_STRING_COLUMN_AS_BYTE_ARRAY = false;
+
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     public AbstractRowsEventDataDeserializer(Map<Long, TableMapEventData> tableMapEventByTableId) {
@@ -309,12 +311,18 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         // charset is not present in the binary log (meaning there is no way to distinguish between CHAR / BINARY)
         // as a result - return byte[] instead of an actual String
         int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-        return inputStream.readString(stringLength);
+        if ( READ_STRING_COLUMN_AS_BYTE_ARRAY )
+            return inputStream.read(stringLength);
+        else
+            return inputStream.readString(stringLength);
     }
 
     protected Serializable deserializeVarString(int meta, ByteArrayInputStream inputStream) throws IOException {
         int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
-        return inputStream.readString(varcharLength);
+        if ( READ_STRING_COLUMN_AS_BYTE_ARRAY )
+            return inputStream.read(varcharLength);
+        else
+            return inputStream.readString(varcharLength);
     }
 
     protected Serializable deserializeBlob(int meta, ByteArrayInputStream inputStream) throws IOException {
