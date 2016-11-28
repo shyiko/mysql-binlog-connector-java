@@ -23,6 +23,7 @@ import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -36,6 +37,7 @@ public class EventDeserializer {
     private final EventDataDeserializer defaultEventDataDeserializer;
     private final Map<EventType, EventDataDeserializer> eventDataDeserializers;
 
+    private EnumSet<CompatibilityMode> compatibilitySet = EnumSet.noneOf(CompatibilityMode.class);
     private int checksumLength;
 
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
@@ -114,6 +116,7 @@ public class EventDeserializer {
     }
 
     public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
+        ensureCompatibility(eventDataDeserializer);
         eventDataDeserializers.put(eventType, eventDataDeserializer);
         afterEventDataDeserializerSet(eventType);
     }
@@ -133,6 +136,27 @@ public class EventDeserializer {
 
     public void setChecksumType(ChecksumType checksumType) {
         this.checksumLength = checksumType.getLength();
+    }
+
+    /**
+     * @see CompatibilityMode
+     */
+    public void setCompatibilityMode(CompatibilityMode first, CompatibilityMode... rest) {
+        this.compatibilitySet = EnumSet.of(first, rest);
+        for (EventDataDeserializer eventDataDeserializer : eventDataDeserializers.values()) {
+            ensureCompatibility(eventDataDeserializer);
+        }
+    }
+
+    private void ensureCompatibility(EventDataDeserializer eventDataDeserializer) {
+        if (eventDataDeserializer instanceof AbstractRowsEventDataDeserializer) {
+            AbstractRowsEventDataDeserializer deserializer =
+                (AbstractRowsEventDataDeserializer) eventDataDeserializer;
+            deserializer.setDeserializeDateAndTimeAsLong(
+                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG));
+            deserializer.setDeserializeCharAndBinaryAsByteArray(
+                compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY));
+        }
     }
 
     /**
@@ -187,6 +211,27 @@ public class EventDeserializer {
     public EventDataDeserializer getEventDataDeserializer(EventType eventType) {
         EventDataDeserializer eventDataDeserializer = eventDataDeserializers.get(eventType);
         return eventDataDeserializer != null ? eventDataDeserializer : defaultEventDataDeserializer;
+    }
+
+    /**
+     * @see CompatibilityMode#DATE_AND_TIME_AS_LONG
+     * @see CompatibilityMode#CHAR_AND_BINARY_AS_BYTE_ARRAY
+     */
+    public enum CompatibilityMode {
+        /**
+         * Return DATETIME/DATETIME_V2/TIMESTAMP/TIMESTAMP_V2/DATE/TIME/TIME_V2 values as long|s
+         * (number of milliseconds since the epoch (00:00:00 Coordinated Universal Time (UTC), Thursday, 1 January 1970,
+         * not counting leap seconds)) (instead of java.util.Date/java.sql.Timestamp/java.sql.Date/new java.sql.Time).
+         *
+         * <p>This option is going to be enabled by default starting from mysql-binlog-connector-java@1.0.0.
+         */
+        DATE_AND_TIME_AS_LONG,
+        /**
+         * Return CHAR/VARCHAR/BINARY/VARBINARY values as byte[]|s (instead of String|s).
+         *
+         * <p>This option is going to be enabled by default starting from mysql-binlog-connector-java@1.0.0.
+         */
+        CHAR_AND_BINARY_AS_BYTE_ARRAY
     }
 
     /**

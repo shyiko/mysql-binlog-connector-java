@@ -71,8 +71,19 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
+    private boolean deserializeDateAndTimeAsLong;
+    private boolean deserializeCharAndBinaryAsByteArray;
+
     public AbstractRowsEventDataDeserializer(Map<Long, TableMapEventData> tableMapEventByTableId) {
         this.tableMapEventByTableId = tableMapEventByTableId;
+    }
+
+    void setDeserializeDateAndTimeAsLong(boolean value) {
+        this.deserializeDateAndTimeAsLong = value;
+    }
+
+    void setDeserializeCharAndBinaryAsByteArray(boolean value) {
+        this.deserializeCharAndBinaryAsByteArray = value;
     }
 
     protected Serializable[] deserializeRow(long tableId, BitSet includedColumns, ByteArrayInputStream inputStream)
@@ -223,6 +234,9 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         int month = value % 16;
         int year = value >> 4;
         Long timestamp = asUnixTime(year, month, day, 0, 0, 0, 0);
+        if (deserializeDateAndTimeAsLong) {
+            return timestamp;
+        }
         return timestamp != null ? new java.sql.Date(timestamp) : null;
     }
 
@@ -230,6 +244,9 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         int value = inputStream.readInteger(3);
         int[] split = split(value, 100, 3);
         Long timestamp = asUnixTime(1970, 1, 1, split[2], split[1], split[0], 0);
+        if (deserializeDateAndTimeAsLong) {
+            return timestamp;
+        }
         return timestamp != null ? new java.sql.Time(timestamp) : null;
     }
 
@@ -254,21 +271,35 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             bitSlice(time, 18, 6, 24),
             deserializeFractionalSeconds(meta, inputStream)
         );
+        if (deserializeDateAndTimeAsLong) {
+            return timestamp;
+        }
         return timestamp != null ? new java.sql.Time(timestamp) : null;
     }
 
     protected Serializable deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
-        return new java.sql.Timestamp(inputStream.readLong(4) * 1000);
+        long timestamp = inputStream.readLong(4) * 1000;
+        if (deserializeDateAndTimeAsLong) {
+            return timestamp;
+        }
+        return new java.sql.Timestamp(timestamp);
     }
 
     protected Serializable deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
-        return new java.sql.Timestamp(bigEndianLong(inputStream.read(4), 0, 4) * 1000 +
-            deserializeFractionalSeconds(meta, inputStream));
+        long timestamp = bigEndianLong(inputStream.read(4), 0, 4) * 1000 +
+            deserializeFractionalSeconds(meta, inputStream);
+        if (deserializeDateAndTimeAsLong) {
+            return timestamp;
+        }
+        return new java.sql.Timestamp(timestamp);
     }
 
     protected Serializable deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
         int[] split = split(inputStream.readLong(8), 100, 6);
         Long timestamp = asUnixTime(split[5], split[4], split[3], split[2], split[1], split[0], 0);
+        if (deserializeDateAndTimeAsLong) {
+            return timestamp;
+        }
         return timestamp != null ? new java.util.Date(timestamp) : null;
     }
 
@@ -298,6 +329,9 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             bitSlice(datetime, 34, 6, 40),
             deserializeFractionalSeconds(meta, inputStream)
         );
+        if (deserializeDateAndTimeAsLong) {
+            return timestamp;
+        }
         return timestamp != null ? new java.util.Date(timestamp) : null;
     }
 
@@ -309,11 +343,17 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         // charset is not present in the binary log (meaning there is no way to distinguish between CHAR / BINARY)
         // as a result - return byte[] instead of an actual String
         int stringLength = length < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
+        if (deserializeCharAndBinaryAsByteArray) {
+            return inputStream.read(stringLength);
+        }
         return inputStream.readString(stringLength);
     }
 
     protected Serializable deserializeVarString(int meta, ByteArrayInputStream inputStream) throws IOException {
         int varcharLength = meta < 256 ? inputStream.readInteger(1) : inputStream.readInteger(2);
+        if (deserializeCharAndBinaryAsByteArray) {
+            return inputStream.read(varcharLength);
+        }
         return inputStream.readString(varcharLength);
     }
 
