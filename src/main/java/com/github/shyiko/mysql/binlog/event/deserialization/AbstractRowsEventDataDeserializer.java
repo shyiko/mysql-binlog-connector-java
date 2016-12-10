@@ -15,10 +15,6 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
-import com.github.shyiko.mysql.binlog.event.EventData;
-import com.github.shyiko.mysql.binlog.event.TableMapEventData;
-import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -26,6 +22,10 @@ import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Map;
 import java.util.TimeZone;
+
+import com.github.shyiko.mysql.binlog.event.EventData;
+import com.github.shyiko.mysql.binlog.event.TableMapEventData;
+import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 /**
  * Whole class is basically a mix of <a href="https://code.google.com/p/open-replicator">open-replicator</a>'s
@@ -170,6 +170,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
                 return deserializeSet(length, inputStream);
             case GEOMETRY:
                 return deserializeGeometry(meta, inputStream);
+            case JSON:
+                return deserializeJson(meta, inputStream);
             default:
                 throw new IOException("Unsupported type " + type);
         }
@@ -329,6 +331,21 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return inputStream.read(dataLength);
     }
 
+    /**
+     * Deserialize the {@code JSON} value on the input stream, and return MySQL's internal binary representation
+     * of the JSON value. See {@link com.github.shyiko.mysql.binlog.event.deserialization.json.JsonBinary} for
+     * a utility to parse this binary representation into something more useful, including a string representation.
+     *
+     * @param meta the number of bytes in which the length of the JSON value is found first on the input stream
+     * @param inputStream the stream containing the JSON value
+     * @return the MySQL internal binary representation of the JSON value; may be null
+     * @throws IOException if there is a problem reading the input stream
+     */
+    protected byte[] deserializeJson(int meta, ByteArrayInputStream inputStream) throws IOException {
+        int blobLength = inputStream.readInteger(4);
+        return inputStream.read(blobLength);
+    }
+
     // checkstyle, please ignore ParameterNumber for the next line
     private static Long asUnixTime(int year, int month, int day, int hour, int minute, int second, int millis) {
         // https://dev.mysql.com/doc/refman/5.0/en/datetime.html
@@ -376,7 +393,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     /**
      * see mysql/strings/decimal.c
      */
-    private static BigDecimal asBigDecimal(int precision, int scale, byte[] value) {
+    public static BigDecimal asBigDecimal(int precision, int scale, byte[] value) {
         boolean positive = (value[0] & 0x80) == 0x80;
         value[0] ^= 0x80;
         if (!positive) {

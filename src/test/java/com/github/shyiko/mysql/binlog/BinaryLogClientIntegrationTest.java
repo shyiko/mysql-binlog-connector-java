@@ -49,6 +49,7 @@ import java.math.MathContext;
 import java.net.SocketException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.AbstractMap;
@@ -253,9 +254,21 @@ public class BinaryLogClientIntegrationTest {
     public void testDeserializationOfDATE() throws Exception {
         assertEquals(writeAndCaptureRow("date", "'1989-03-21'"), new Serializable[]{
             generateTime(1989, 3, 21, 0, 0, 0, 0)});
-        assertEquals(writeAndCaptureRow("date", "'0000-03-21'"), new Serializable[]{null});
-        assertEquals(writeAndCaptureRow("date", "'1989-00-21'"), new Serializable[]{null});
-        assertEquals(writeAndCaptureRow("date", "'1989-03-00'"), new Serializable[]{null});
+        final boolean[] noZeroInDate = new boolean[1];
+        master.query("select @@sql_mode;", new Callback<ResultSet>() {
+
+            @Override
+            public void execute(ResultSet rs) throws SQLException {
+                // NO_ZERO_IN_DATE is turned on by default in MySQL 5.7
+                // https://github.com/shyiko/mysql-binlog-connector-java/pull/119#issuecomment-251870581
+                noZeroInDate[0] = rs.next() && rs.getString(1).contains("NO_ZERO_IN_DATE");
+            }
+        });
+        if (!noZeroInDate[0]) {
+            assertEquals(writeAndCaptureRow("date", "'0000-03-21'"), new Serializable[]{null});
+            assertEquals(writeAndCaptureRow("date", "'1989-00-21'"), new Serializable[]{null});
+            assertEquals(writeAndCaptureRow("date", "'1989-03-00'"), new Serializable[]{null});
+        }
     }
 
     @Test
@@ -847,15 +860,18 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
-    private static final class MySQLConnection implements Closeable {
+    /**
+     * Representation of a MySQL connection.
+     */
+    public static final class MySQLConnection implements Closeable {
 
-        private String hostname;
-        private int port;
-        private String username;
-        private String password;
+        private final String hostname;
+        private final int port;
+        private final String username;
+        private final String password;
         private Connection connection;
 
-        private MySQLConnection(String hostname, int port, String username, String password)
+        public MySQLConnection(String hostname, int port, String username, String password)
                 throws ClassNotFoundException, SQLException {
             this.hostname = hostname;
             this.port = port;
@@ -873,12 +889,55 @@ public class BinaryLogClientIntegrationTest {
             });
         }
 
+        public String hostname() {
+            return hostname;
+        }
+
+        public int port() {
+            return port;
+        }
+
+        public String username() {
+            return username;
+        }
+
+        public String password() {
+            return password;
+        }
+
         public void execute(Callback<Statement> callback) throws SQLException {
             connection.setAutoCommit(false);
             Statement statement = connection.createStatement();
             try {
                 callback.execute(statement);
                 connection.commit();
+            } finally {
+                statement.close();
+            }
+        }
+
+        public void execute(final String...statements) throws SQLException {
+            execute(new Callback<Statement>() {
+                @Override
+                public void execute(Statement statement) throws SQLException {
+                    for (String command : statements) {
+                        statement.execute(command);
+                    }
+                }
+            });
+        }
+
+        public void query(String sql, Callback<ResultSet> callback) throws SQLException {
+            connection.setAutoCommit(false);
+            Statement statement = connection.createStatement();
+            try {
+                ResultSet rs = statement.executeQuery(sql);
+                try {
+                    callback.execute(rs);
+                    connection.commit();
+                } finally {
+                    rs.close();
+                }
             } finally {
                 statement.close();
             }
@@ -894,7 +953,12 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
-    private interface Callback<T> {
+    /**
+     * Callback used in the {@link MySQLConnection#execute(Callback)} method.
+     *
+     * @param <T> the type of argument
+     */
+    public interface Callback<T> {
 
         void execute(T obj) throws SQLException;
     }

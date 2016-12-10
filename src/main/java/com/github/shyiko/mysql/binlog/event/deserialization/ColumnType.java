@@ -45,6 +45,7 @@ public enum ColumnType {
     TIMESTAMP_V2(17),
     DATETIME_V2(18),
     TIME_V2(19),
+    JSON(245),
     NEWDECIMAL(246),
     ENUM(247),
     SET(248),

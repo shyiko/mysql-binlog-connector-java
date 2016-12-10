@@ -1,0 +1,22 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = 'lucid32'
+    config.vm.box_url = 'http://files.vagrantup.com/lucid32.box'
+    config.vm.provision :shell, :inline => %Q(
+        sed -i.bak -r 's/(us.)?(archive|security).ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list
+        apt-get update && apt-get install -y make libaio1 # libaio1 required by mysql
+        echo 'Downloading MySQL distribution ...'
+        wget --progress=dot:mega --content-disposition \
+            http://cdn.mysql.com/Downloads/MySQL-5.7/mysql-5.7.15-linux-glibc2.5-i686.tar.gz \
+            2>&1 | grep --line-buffered -o '[0-9]*%'
+        wget -O - https://github.com/datacharmer/mysql-sandbox/releases/download/3.1.13/MySQL-Sandbox-3.1.13.tar.gz | tar xzv
+        (cd MySQL-Sandbox-3.1.13 && perl Makefile.PL && make && make install)
+        su -c "make_replication_sandbox ~/mysql-5.7.15-linux-glibc2.5-i686.tar.gz \
+            --remote_access='%' --how_many_slaves=1 --sandbox_base_port=33061 \
+            --master_options='-c binlog_format=ROW' \
+            --slave_options='-c binlog_format=ROW -c log-slave-updates=TRUE'" vagrant
+        rm -f *.tar.gz
+        sed -i -e "s/exit\ 0/\\/home\\/vagrant\\/sandboxes\\/rsandbox_mysql-5_7_15\\/restart_all; exit 0/g" /etc/rc.local
+    )
+    config.vm.network :forwarded_port, guest: 33061, host: 33061
+    config.vm.network :forwarded_port, guest: 33062, host: 33062
+end
