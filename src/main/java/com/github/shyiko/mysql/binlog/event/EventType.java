@@ -186,7 +186,49 @@ public enum EventType {
      */
     GTID,
     ANONYMOUS_GTID,
-    PREVIOUS_GTIDS;
+    PREVIOUS_GTIDS,
+
+    /* MARIA_EVENT_BEGIN */
+
+    MARIA_ANNOTATE_ROWS_EVENT(160),
+    /**
+     * Binlog checkpoint event. Used for XA crash recovery on the master, not used
+     * in replication.
+     * A binlog checkpoint event specifies a binlog file such that XA crash
+     * recovery can start from that file - and it is guaranteed to find all XIDs
+     * that are prepared in storage engines but not yet committed.
+     */
+    MARIA_BINLOG_CHECKPOINT_EVENT(161),
+    /**
+     * Gtid event. For global transaction ID, used to start a new event group,
+     * instead of the old BEGIN query event, and also to mark stand-alone
+     * events.
+     */
+    MARIA_GTID_EVENT(162),
+    /**
+     * Gtid list event. Logged at the start of every binlog, to record the
+     * current replication state. This consists of the last GTID seen for
+     * each replication domain.
+     */
+    MARIA_GTID_LIST_EVENT(163),
+    ;
+
+    final int v;
+
+    EventType()
+    {
+        v = ordinal();
+    }
+
+    EventType(int n)
+    {
+        v = n;
+    }
+
+    public int get()
+    {
+        return v;
+    }
 
     public static boolean isRowMutation(EventType eventType) {
         return EventType.isWrite(eventType) ||
