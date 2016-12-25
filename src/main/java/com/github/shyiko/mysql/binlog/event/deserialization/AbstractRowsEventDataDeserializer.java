@@ -72,6 +72,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     private boolean deserializeDateAndTimeAsLong;
+    private boolean microsecondsPrecision;
     private boolean deserializeCharAndBinaryAsByteArray;
 
     public AbstractRowsEventDataDeserializer(Map<Long, TableMapEventData> tableMapEventByTableId) {
@@ -80,6 +81,10 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     void setDeserializeDateAndTimeAsLong(boolean value) {
         this.deserializeDateAndTimeAsLong = value;
+    }
+
+    void setMicrosecondsPrecision(boolean value) {
+        this.microsecondsPrecision = value;
     }
 
     void setDeserializeCharAndBinaryAsByteArray(boolean value) {
@@ -265,13 +270,17 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             + fractional-seconds storage (size depends on meta)
         */
         long time = bigEndianLong(inputStream.read(3), 0, 3);
+        int fsp = deserializeFractionalSeconds(meta, inputStream);
         Long timestamp = asUnixTime(1970, 1, 1,
             bitSlice(time, 2, 10, 24),
             bitSlice(time, 12, 6, 24),
             bitSlice(time, 18, 6, 24),
-            deserializeFractionalSeconds(meta, inputStream)
+            fsp / 1000
         );
         if (deserializeDateAndTimeAsLong) {
+            if (microsecondsPrecision) {
+                timestamp = timestamp * 1000 + fsp % 1000;
+            }
             return timestamp;
         }
         return timestamp != null ? new java.sql.Time(timestamp) : null;
@@ -286,9 +295,12 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     protected Serializable deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
-        long timestamp = bigEndianLong(inputStream.read(4), 0, 4) * 1000 +
-            deserializeFractionalSeconds(meta, inputStream);
+        int fsp = deserializeFractionalSeconds(meta, inputStream);
+        long timestamp = bigEndianLong(inputStream.read(4), 0, 4) * 1000 + fsp / 1000;
         if (deserializeDateAndTimeAsLong) {
+            if (microsecondsPrecision) {
+                timestamp = timestamp * 1000 + fsp % 1000;
+            }
             return timestamp;
         }
         return new java.sql.Timestamp(timestamp);
@@ -320,6 +332,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         */
         long datetime = bigEndianLong(inputStream.read(5), 0, 5);
         int yearMonth = bitSlice(datetime, 1, 17, 40);
+        int fsp = deserializeFractionalSeconds(meta, inputStream);
         Long timestamp = asUnixTime(
             yearMonth / 13,
             yearMonth % 13,
@@ -327,9 +340,12 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             bitSlice(datetime, 23, 5, 40),
             bitSlice(datetime, 28, 6, 40),
             bitSlice(datetime, 34, 6, 40),
-            deserializeFractionalSeconds(meta, inputStream)
+            fsp / 1000
         );
         if (deserializeDateAndTimeAsLong) {
+            if (microsecondsPrecision) {
+                timestamp = timestamp * 1000 + fsp % 1000;
+            }
             return timestamp;
         }
         return timestamp != null ? new java.util.Date(timestamp) : null;
@@ -402,8 +418,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     protected int deserializeFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
         int length = (meta + 1) / 2;
         if (length > 0) {
-            long fraction = bigEndianLong(inputStream.read(length), 0, length);
-            return (int) (fraction / (0.1 * Math.pow(100, length - 1)));
+            int fraction = bigEndianInteger(inputStream.read(length), 0, length);
+            return fraction * (int) Math.pow(100, 3 - length);
         }
         return 0;
     }

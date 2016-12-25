@@ -153,9 +153,15 @@ public class EventDeserializer {
             AbstractRowsEventDataDeserializer deserializer =
                 (AbstractRowsEventDataDeserializer) eventDataDeserializer;
             deserializer.setDeserializeDateAndTimeAsLong(
-                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG));
+                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG) ||
+                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO)
+            );
+            deserializer.setMicrosecondsPrecision(
+                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO)
+            );
             deserializer.setDeserializeCharAndBinaryAsByteArray(
-                compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY));
+                compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY)
+            );
         }
     }
 
@@ -215,6 +221,7 @@ public class EventDeserializer {
 
     /**
      * @see CompatibilityMode#DATE_AND_TIME_AS_LONG
+     * @see CompatibilityMode#DATE_AND_TIME_AS_LONG_MICRO
      * @see CompatibilityMode#CHAR_AND_BINARY_AS_BYTE_ARRAY
      */
     public enum CompatibilityMode {
@@ -226,6 +233,10 @@ public class EventDeserializer {
          * <p>This option is going to be enabled by default starting from mysql-binlog-connector-java@1.0.0.
          */
         DATE_AND_TIME_AS_LONG,
+        /**
+         * Same as {@link CompatibilityMode#DATE_AND_TIME_AS_LONG} but values are returned in microseconds.
+         */
+        DATE_AND_TIME_AS_LONG_MICRO,
         /**
          * Return CHAR/VARCHAR/BINARY/VARBINARY values as byte[]|s (instead of String|s).
          *

@@ -77,6 +77,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.CompatibilityMode;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -292,6 +293,38 @@ public class BinaryLogClientIntegrationTest {
             new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 777))});
     }
 
+    @Test
+    public void testDeserializationOfDateAndTimeAsLong() throws Exception {
+        final BinaryLogClient client = new BinaryLogClient(slave.hostname, slave.port,
+            slave.username, slave.password);
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        eventDeserializer.setCompatibilityMode(CompatibilityMode.DATE_AND_TIME_AS_LONG);
+        client.setEventDeserializer(eventDeserializer);
+        client.connect(DEFAULT_TIMEOUT);
+        try {
+            assertEquals(writeAndCaptureRow(client, "datetime(6)", "'1989-03-21 01:02:03.123456'"), new Serializable[]{
+                generateTime(1989, 3, 21, 1, 2, 3, 123)});
+        } catch (Exception e) {
+            client.disconnect();
+        }
+    }
+
+    @Test
+    public void testDeserializationOfDateAndTimeAsLongMicrosecondsPrecision() throws Exception {
+        final BinaryLogClient client = new BinaryLogClient(slave.hostname, slave.port,
+            slave.username, slave.password);
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        eventDeserializer.setCompatibilityMode(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO);
+        client.setEventDeserializer(eventDeserializer);
+        client.connect(DEFAULT_TIMEOUT);
+        try {
+            assertEquals(writeAndCaptureRow(client, "datetime(6)", "'1989-03-21 01:02:03.123456'"), new Serializable[]{
+                generateTime(1989, 3, 21, 1, 2, 3, 123) * 1000 + 456});
+        } catch (Exception e) {
+            client.disconnect();
+        }
+    }
+
     private BitSet bitSet(int... bitsToSetTrue) {
         BitSet result = new BitSet(bitsToSetTrue.length);
         for (int bit : bitsToSetTrue) {
@@ -313,8 +346,12 @@ public class BinaryLogClientIntegrationTest {
         return instance.getTimeInMillis();
     }
 
-    private Serializable[] writeAndCaptureRow(final String columnDefinition, final String... values)
-            throws Exception {
+    private Serializable[] writeAndCaptureRow(final String columnDefinition, final String... values) throws Exception {
+        return writeAndCaptureRow(client, columnDefinition, values);
+    }
+
+    private Serializable[] writeAndCaptureRow(BinaryLogClient client, final String columnDefinition,
+            final String... values) throws Exception {
         CapturingEventListener capturingEventListener = new CapturingEventListener();
         client.registerEventListener(capturingEventListener);
         try {
