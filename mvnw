@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# The Maven Wrapper (https://github.com/shyiko/mvnw).
+# The Maven Wrapper 0.1.0 (https://github.com/shyiko/mvnw).
 # Based on https://github.com/gradle/gradle/blob/62925785791e2487c43d19d234c2fced6d750412/gradlew.
 #
 
@@ -147,7 +147,6 @@ if $cygwin ; then
 fi
 
 # taken from https://github.com/takari/maven-wrapper/blob/69f3c6dd1b07620f28c1fc8cb20e392afcd9e95b/mvnw
-
 ld() { if [ -f "$1" ]; then echo "$(tr -s '\n' ' ' < "$1")"; fi }
 
 JVM_CONFIG="$(ld "$APP_HOME/.mvn/jvm.config")"
