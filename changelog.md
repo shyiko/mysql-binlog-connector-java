@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.1...HEAD)
+## [Unreleased](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.2...HEAD)
 
 ### Added
  - A way to control Socket i/s buffering (using BinaryLogClient::setSocketFactory()). 
@@ -15,6 +15,12 @@ This is **BACKWARD-INCOMPATIBLE** change.
 ### Fixed
  - BINARY/VARBINARY deserialization ([#56](https://github.com/shyiko/mysql-binlog-connector-java/issues/56)).  
 This is **BACKWARD-INCOMPATIBLE** change as CHAR/VARCHAR/BINARY/VARBINARY are now returned as `byte[]` (which you can obviously convert to String with `new String(byte[], Charset)` if needed).
+
+## [0.7.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.1...0.7.2) - 2016-12-26
+
+### Fixed
+
+ - Inconsistent microseconds deserialization ([#138](https://github.com/shyiko/mysql-binlog-connector-java/pull/138)).
 
 ## [0.7.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.0...0.7.1) - 2016-12-25
 
