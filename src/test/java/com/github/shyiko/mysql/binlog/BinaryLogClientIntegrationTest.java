@@ -234,6 +234,7 @@ public class BinaryLogClientIntegrationTest {
             new java.sql.Date(generateTime(1989, 3, 21, 0, 0, 0, 0))});
         assertEquals(writeAndCaptureRow("datetime", "'1989-03-21 01:02:03.000000'"), new Serializable[]{
             new java.util.Date(generateTime(1989, 3, 21, 1, 2, 3, 0))});
+        assertEquals(writeAndCaptureRow("datetime", "'0000-00-00'"), new Serializable[]{null});
         assertEquals(writeAndCaptureRow("timestamp", "'1989-03-18 01:02:03.000000'"), new Serializable[]{
             new java.sql.Timestamp(generateTime(1989, 3, 18, 1, 2, 3, 0))});
         assertEquals(writeAndCaptureRow("time", "'1:2:3.000000'"), new Serializable[]{
