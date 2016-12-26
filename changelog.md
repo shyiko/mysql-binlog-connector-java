@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.7.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.0...0.7.1) - 2016-12-25
+
+### Fixed
+
+ - TIMESTAMP fsp deserialization regression introduced in 0.7.0.
+
 ## [0.7.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.6.0...0.7.0) - 2016-12-24
 
 ### Added
