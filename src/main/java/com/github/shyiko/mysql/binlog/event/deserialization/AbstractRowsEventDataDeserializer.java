@@ -235,10 +235,10 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private Long castTimestamp(Long timestamp, int fsp) {
         if (microsecondsPrecision) {
             return timestamp * 1000 + fsp % 1000;
-        } else
+        } else {
             return timestamp;
+        }
     }
-
 
     protected Serializable deserializeDate(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
