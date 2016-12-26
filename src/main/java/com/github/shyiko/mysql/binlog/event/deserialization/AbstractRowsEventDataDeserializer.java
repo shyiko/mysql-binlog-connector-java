@@ -295,8 +295,9 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     protected Serializable deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
+        long millis = bigEndianLong(inputStream.read(4), 0, 4);
         int fsp = deserializeFractionalSeconds(meta, inputStream);
-        long timestamp = bigEndianLong(inputStream.read(4), 0, 4) * 1000 + fsp / 1000;
+        long timestamp = millis * 1000 + fsp / 1000;
         if (deserializeDateAndTimeAsLong) {
             if (microsecondsPrecision) {
                 timestamp = timestamp * 1000 + fsp % 1000;
