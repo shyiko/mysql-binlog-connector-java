@@ -232,6 +232,14 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         return asBigDecimal(precision, scale, inputStream.read(decimalLength));
     }
 
+    private Long castTimestamp(Long timestamp, int fsp) {
+        if (microsecondsPrecision) {
+            return timestamp * 1000 + fsp % 1000;
+        } else
+            return timestamp;
+    }
+
+
     protected Serializable deserializeDate(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
         int day = value % 32;
@@ -240,7 +248,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         int year = value >> 4;
         Long timestamp = asUnixTime(year, month, day, 0, 0, 0, 0);
         if (deserializeDateAndTimeAsLong) {
-            return timestamp;
+            return castTimestamp(timestamp, 0);
         }
         return timestamp != null ? new java.sql.Date(timestamp) : null;
     }
@@ -250,7 +258,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         int[] split = split(value, 100, 3);
         Long timestamp = asUnixTime(1970, 1, 1, split[2], split[1], split[0], 0);
         if (deserializeDateAndTimeAsLong) {
-            return timestamp;
+            return castTimestamp(timestamp, 0);
         }
         return timestamp != null ? new java.sql.Time(timestamp) : null;
     }
@@ -278,10 +286,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             fsp / 1000
         );
         if (deserializeDateAndTimeAsLong) {
-            if (microsecondsPrecision) {
-                timestamp = timestamp * 1000 + fsp % 1000;
-            }
-            return timestamp;
+            return castTimestamp(timestamp, fsp);
         }
         return timestamp != null ? new java.sql.Time(timestamp) : null;
     }
@@ -289,7 +294,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     protected Serializable deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
         long timestamp = inputStream.readLong(4) * 1000;
         if (deserializeDateAndTimeAsLong) {
-            return timestamp;
+            return castTimestamp(timestamp, 0);
         }
         return new java.sql.Timestamp(timestamp);
     }
@@ -299,10 +304,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         int fsp = deserializeFractionalSeconds(meta, inputStream);
         long timestamp = millis * 1000 + fsp / 1000;
         if (deserializeDateAndTimeAsLong) {
-            if (microsecondsPrecision) {
-                timestamp = timestamp * 1000 + fsp % 1000;
-            }
-            return timestamp;
+            return castTimestamp(timestamp, fsp);
         }
         return new java.sql.Timestamp(timestamp);
     }
@@ -311,7 +313,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         int[] split = split(inputStream.readLong(8), 100, 6);
         Long timestamp = asUnixTime(split[5], split[4], split[3], split[2], split[1], split[0], 0);
         if (deserializeDateAndTimeAsLong) {
-            return timestamp;
+            return castTimestamp(timestamp, 0);
         }
         return timestamp != null ? new java.util.Date(timestamp) : null;
     }
@@ -344,10 +346,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             fsp / 1000
         );
         if (deserializeDateAndTimeAsLong) {
-            if (microsecondsPrecision) {
-                timestamp = timestamp * 1000 + fsp % 1000;
-            }
-            return timestamp;
+            return castTimestamp(timestamp, fsp);
         }
         return timestamp != null ? new java.util.Date(timestamp) : null;
     }
