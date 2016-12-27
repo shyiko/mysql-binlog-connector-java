@@ -27,7 +27,8 @@ public class RowsQueryEventDataDeserializer implements EventDataDeserializer<Row
     @Override
     public RowsQueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
         RowsQueryEventData eventData = new RowsQueryEventData();
-        int len = inputStream.readInteger(1);
+        inputStream.skip(1);
+        int len = inputStream.available();
         eventData.setQuery(inputStream.readString(len));
         return eventData;
     }
