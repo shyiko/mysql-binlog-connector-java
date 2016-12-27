@@ -20,14 +20,25 @@ import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventHeaderV4> {
 
-    private static final EventType[] EVENT_TYPES = EventType.values();
 
+    private static final Map<Integer,EventType> EVENT_TYPES;
+
+    static {
+        // Mutable map but will never update, so it's safe.
+        EVENT_TYPES = new HashMap<Integer, EventType>();
+        for (EventType type : EventType.values())
+        {
+            EVENT_TYPES.put(type.get(),type);
+        }
+    }
     @Override
     public EventHeaderV4 deserialize(ByteArrayInputStream inputStream) throws IOException {
         EventHeaderV4 header = new EventHeaderV4();
@@ -41,10 +52,11 @@ public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventH
     }
 
     private static EventType getEventType(int ordinal) throws IOException {
-        if (ordinal >= EVENT_TYPES.length) {
+        EventType type = EVENT_TYPES.get(ordinal);
+        if (type == null) {
             throw new IOException("Unknown event type " + ordinal);
         }
-        return EVENT_TYPES[ordinal];
+        return type;
     }
 
 }
