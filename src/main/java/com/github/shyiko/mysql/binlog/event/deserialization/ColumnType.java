@@ -22,7 +22,7 @@ import java.util.Map;
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public enum ColumnType {
-
+    TEXT(-4),
     DECIMAL(0),
     TINY(1),
     SHORT(2),
