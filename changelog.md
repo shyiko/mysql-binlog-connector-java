@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.7.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.2...0.7.3) - 2016-12-26
+
+### Fixed
+
+ - Handling of DATE/DATETIME/TIMESTAMP "zero" value (e.g. '0000-00-00') when 
+ `CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO` is set (false by default).
+
 ## [0.7.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.1...0.7.2) - 2016-12-26
 
 ### Fixed
