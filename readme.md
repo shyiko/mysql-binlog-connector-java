@@ -1,17 +1,24 @@
-# mysql-binlog-connector-java [![Build Status](https://travis-ci.org/shyiko/mysql-binlog-connector-java.png?branch=master)](https://travis-ci.org/shyiko/mysql-binlog-connector-java) [![Coverage Status](https://coveralls.io/repos/shyiko/mysql-binlog-connector-java/badge.png?branch=master)](https://coveralls.io/r/shyiko/mysql-binlog-connector-java?branch=master)
+# mysql-binlog-connector-java [![Build Status](https://travis-ci.org/shyiko/mysql-binlog-connector-java.svg?branch=master)](https://travis-ci.org/shyiko/mysql-binlog-connector-java) [![Coverage Status](https://coveralls.io/repos/shyiko/mysql-binlog-connector-java/badge.svg?branch=master)](https://coveralls.io/r/shyiko/mysql-binlog-connector-java?branch=master) [![Maven Central](http://img.shields.io/badge/maven_central-0.7.3-blue.svg?style=flat)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.shyiko%22%20AND%20a%3A%22mysql-binlog-connector-java%22)
 
 MySQL Binary Log connector.
 
-Initially project was started as a fork of [open-replicator](https://code.google.com/p/open-replicator), but ended up as a complete rewrite. Key differences/features:
+Initially project was started as a fork of [open-replicator](https://code.google.com/p/open-replicator), 
+but ended up as a complete rewrite. Key differences/features:
 
-- automatic binlog filename/position resolution
+- automatic binlog filename/position | GTID resolution
 - resumable disconnects
 - plugable failover strategies
-- JMX exposure (optionally with statistics)
+- binlog_checksum=CRC32 support (for MySQL 5.6.2+ users)
+- secure communication over the TLS
+- JMX-friendly
+- real-time stats
 - availability in Maven Central
 - no third-party dependencies
-- binlog_checksum support (for MySQL 5.6.2+ users)
 - test suite over different versions of MySQL releases
+
+> If you are looking for something similar in other languages - check out 
+[siddontang/go-mysql](https://github.com/siddontang/go-mysql) (Go), 
+[noplay/python-mysql-replication](https://github.com/noplay/python-mysql-replication) (Python).
 
 ## Usage
 
@@ -21,36 +28,11 @@ Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3
 <dependency>
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.2.2</version>
+    <version>0.7.3</version>
 </dependency>
 ```
 
-The latest development version always available through Sonatype Snapshots repository (as shown below).
-
-```xml
-<dependencies>
-    <dependency>
-        <groupId>com.github.shyiko</groupId>
-        <artifactId>mysql-binlog-connector-java</artifactId>
-        <version>0.2.3-SNAPSHOT</version>
-    </dependency>
-</dependencies>
-
-<repositories>
-    <repository>
-    <id>sonatype-snapshots</id>
-    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-    <snapshots>
-        <enabled>true</enabled>
-    </snapshots>
-    <releases>
-        <enabled>false</enabled>
-    </releases>
-    </repository>
-</repositories>
-```
-
-### Reading Binary Log file
+#### Reading binary log file
 
 ```java
 File binlogFile = ...
@@ -64,7 +46,7 @@ try {
 }
 ```
 
-### Tapping into MySQL replication stream
+#### Tapping into MySQL replication stream
 
 > PREREQUISITES: Whichever user you plan to use for the BinaryLogClient, he MUST have [REPLICATION SLAVE](http://dev.mysql.com/doc/refman/5.5/en/privileges-provided.html#priv_replication-slave) privilege. Unless you specify binlogFilename/binlogPosition yourself (in which case automatic resolution won't kick in), you'll need [REPLICATION CLIENT](http://dev.mysql.com/doc/refman/5.5/en/privileges-provided.html#priv_replication-client) granted as well.
 
@@ -86,7 +68,13 @@ kick off from a specific filename or position, use `client.setBinlogFilename(fil
 > `client.connect()` is blocking (meaning that client will listen for events in the current thread). 
 `client.connect(timeout)`, on the other hand, spawns a separate thread.  
 
-### Controlling event deserialization
+#### Controlling event deserialization
+
+> You might need it for several reasons: 
+you don't want to waste time deserializing events you won't need; 
+there is no EventDataDeserializer defined for the event type you are interested in (or there is but it contains a bug); 
+you want certain type of events to be deserialized in a different way (perhaps *RowsEventData should contain table 
+name and not id?); etc.
 
 ```java
 EventDeserializer eventDeserializer = new EventDeserializer();
@@ -109,7 +97,7 @@ BinaryLogClient client = ...
 client.setEventDeserializer(eventDeserializer);
 ```
 
-### Making client available through JMX
+#### Exposing BinaryLogClient through JMX
 
 ```java
 MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
@@ -125,19 +113,84 @@ ObjectName statsObjectName = new ObjectName("mysql.binlog:type=BinaryLogClientSt
 mBeanServer.registerMBean(stats, statsObjectName);
 ```
 
+#### Using SSL
+
+> Introduced in 0.4.0.
+
+TLSv1.1 & TLSv1.2 require [JDK 7](http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6916074)+.  
+Prior to MySQL 5.7.10, MySQL supported only TLSv1 
+(see [Secure Connection Protocols and Ciphers](http://dev.mysql.com/doc/refman/5.7/en/secure-connection-protocols-ciphers.html)). 
+
+> To check that MySQL server is [properly configured with SSL support](http://dev.mysql.com/doc/refman/5.7/en/using-secure-connections.html) -
+`mysql -h host -u root -ptypeyourpasswordmaybe -e "show global variables like 'have_%ssl';"` ("Value" 
+should be "YES"). State of the current session can be determined using `\s` ("SSL" should not be blank).
+
+```java
+System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore.jks");
+System.setProperty("javax.net.ssl.trustStorePassword","truststore.password");
+System.setProperty("javax.net.ssl.keyStore", "/path/to/keystore.jks");
+System.setProperty("javax.net.ssl.keyStorePassword", "keystore.password");
+
+BinaryLogClient client = ...
+client.setSSLMode(SSLMode.VERIFY_IDENTITY);
+```
+
 ## Implementation notes
 
-- data of numeric types (tinyint, etc) always returned signed(!) regardless of whether column definition includes "unsigned" keyword or not
-- data of \*text/\*blob types always returned as a byte array
+- data of numeric types (tinyint, etc) always returned signed(!) regardless of whether column definition includes "unsigned" keyword or not.
+- data of var\*/\*text/\*blob types always returned as a byte array (for var\* this is true starting from 1.0.0). 
 
 ## Frequently Asked Questions
 
-Q: How do I get column names of a table?   
-A: The easiest way is to use JDBC (as described [here](https://github.com/shyiko/mysql-binlog-connector-java/issues/24#issuecomment-43747417)). Binary log itself does not contain that piece of information.
+**Q**. How does a typical transaction look like?
+ 
+**A**. GTID event (if gtid_mode=ON) -> QUERY event with "BEGIN" as sql -> ... -> XID event | QUERY event with "COMMIT" or "ROLLBACK" as sql. 
+
+**Q**. EventData for inserted/updated/deleted rows has no information about table (except for some weird id). 
+How do I make sense out of it?  
+
+**A**. Each [WriteRowsEventData](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/WriteRowsEventData.java)/[UpdateRowsEventData](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/UpdateRowsEventData.java)/[DeleteRowsEventData](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/DeleteRowsEventData.java) event is preceded by [TableMapEventData](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/TableMapEventData.java) which
+contains schema & table name. If for some reason you need to know column names (types, etc). - the easiest way is to
+
+```sql
+select TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION, COLUMN_DEFAULT, IS_NULLABLE, 
+DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, CHARACTER_OCTET_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE, 
+CHARACTER_SET_NAME, COLLATION_NAME from INFORMATION_SCHEMA.COLUMNS;
+# see https://dev.mysql.com/doc/refman/5.6/en/columns-table.html for more information
+```
+
+(yes, binary log DOES NOT include that piece of information).
+
+You can find JDBC snippet [here](https://github.com/shyiko/mysql-binlog-connector-java/issues/24#issuecomment-43747417).
 
 ## Documentation
 
-For the insight into the internals of MySQL look [here](https://dev.mysql.com/doc/internals/en/index.html). [MySQL Client/Server Protocol](http://dev.mysql.com/doc/internals/en/client-server-protocol.html) and [The Binary Log](http://dev.mysql.com/doc/internals/en/binary-log.html) sections are particularly useful as a reference documentation for the `com.**.mysql.binlog.network` and `com.**.mysql.binlog.event` packages.
+#### API overview
+
+There are two entry points - [BinaryLogClient](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/BinaryLogClient.java) (which you can use to read binary logs from a MySQL server) and 
+[BinaryLogFileReader](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/BinaryLogFileReader.java) (for offline log processing). Both of them rely on [EventDeserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventDeserializer.java) to deserialize 
+stream of events. Each [Event](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/Event.java) consists of [EventHeader](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/EventHeader.java) (containing among other things reference to [EventType](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/EventType.java)) and 
+[EventData](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/EventData.java). The aforementioned EventDeserializer has one [EventHeaderDeserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventHeaderDeserializer.java) ([EventHeaderV4Deserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventHeaderV4Deserializer.java) by default) 
+and [a collection of EventDataDeserializer|s](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/EventDeserializer.java#L82). If there is no EventDataDeserializer registered for
+some particular type of Event - default EventDataDeserializer kicks in ([NullEventDataDeserializer](https://github.com/shyiko/mysql-binlog-connector-java/blob/master/src/main/java/com/github/shyiko/mysql/binlog/event/deserialization/NullEventDataDeserializer.java)).
+
+#### MySQL Internals Manual
+
+For the insight into the internals of MySQL look [here](https://dev.mysql.com/doc/internals/en/index.html). [MySQL Client/Server Protocol](http://dev.mysql.com/doc/internals/en/client-server-protocol.html) and [The Binary Log](http://dev.mysql.com/doc/internals/en/binary-log.html) sections are particularly useful as a reference documentation for the `**.binlog.network` and `**.binlog.event` packages.
+
+## Real-world applications
+
+Some of the OSS using / built on top of mysql-binlog-conector-java: 
+* [debezium](https://github.com/debezium/debezium) A low latency data streaming platform for change data capture (CDC).
+* [mavenlink/changestream](https://github.com/mavenlink/changestream) - A stream of changes for MySQL built on Akka.
+* [mardambey/mypipe](https://github.com/mardambey/mypipe) MySQL binary log consumer with the ability to act on changed rows and publish changes to different systems with emphasis on Apache Kafka.
+* [ngocdaothanh/mydit](https://github.com/ngocdaothanh/mydit) MySQL to MongoDB data replicator.
+* [sharetribe/dumpr](https://github.com/sharetribe/dumpr) A Clojure library for live replicating data from a MySQL database.
+* [shyiko/rook](https://github.com/shyiko/rook) Generic Change Data Capture (CDC) toolkit.
+* [streamsets/datacollector](https://github.com/streamsets/datacollector) Continuous big data ingestion infrastructure.
+* [twingly/ecco](https://github.com/twingly/ecco) MySQL replication binlog parser in JRuby.
+
+It's also used [on a large scale](https://twitter.com/atwinmutt/status/626816601078300672) in MailChimp. You can read about it [here](http://devs.mailchimp.com/blog/powering-mailchimp-pro-reporting/).  
 
 ## Development
 
@@ -146,12 +199,6 @@ git clone https://github.com/shyiko/mysql-binlog-connector-java.git
 cd mysql-binlog-connector-java
 mvn # shows how to build, test, etc. project
 ```
-
-## Used by
-
-* [shyiko/rook](https://github.com/shyiko/rook) - Change Data Capture (CDC) toolkit for keeping system layers in sync with the database.
-* [ngocdaothanh/mydit](https://github.com/ngocdaothanh/mydit) - MySQL to MongoDB data replicator.
-* [mardambey/mypipe](https://github.com/mardambey/mypipe) - MySQL binary log consumer with the ability to act on changed rows and publish changes to different systems with emphasis on Apache Kafka.
 
 ## Contributing
 
