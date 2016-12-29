@@ -1,4 +1,6 @@
 language: java
+jdk:
+  - openjdk6
 script: 'if [[ $TRAVIS_REPO_SLUG == "shyiko/mysql-binlog-connector-java" && $TRAVIS_BRANCH == "master" && $TRAVIS_PULL_REQUEST == "false" ]]; then mvn -P with-sources-and-javadocs -Ddeploy=snapshot -DskipTests=true -s .travis.settings.xml; fi'
 env:
   global: 
