@@ -530,9 +530,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 SSLRequestCommand sslRequestCommand = new SSLRequestCommand();
                 sslRequestCommand.setCollation(collation);
                 channel.write(sslRequestCommand, packetNumber++);
-                SSLSocketFactory sslSocketFactory = this.sslSocketFactory != null ? this.sslSocketFactory :
-                    sslMode == SSLMode.REQUIRED ? DEFAULT_REQUIRED_SSL_MODE_SOCKET_FACTORY :
-                        DEFAULT_VERIFY_CA_SSL_MODE_SOCKET_FACTORY;
+                SSLSocketFactory sslSocketFactory =
+                    this.sslSocketFactory != null ?
+                        this.sslSocketFactory :
+                        sslMode == SSLMode.REQUIRED || sslMode == SSLMode.PREFERRED ?
+                            DEFAULT_REQUIRED_SSL_MODE_SOCKET_FACTORY :
+                            DEFAULT_VERIFY_CA_SSL_MODE_SOCKET_FACTORY;
                 channel.upgradeToSSL(sslSocketFactory,
                     sslMode == SSLMode.VERIFY_IDENTITY ? new TLSHostnameVerifier() : null);
             }
