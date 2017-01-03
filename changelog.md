@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.7.4](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.3...0.7.4) - 2016-01-02
+
+### Fixed
+
+ - `SSLMode.PREFERRED` handling (verification against the CA is no longer enforced) ([#142](https://github.com/shyiko/mysql-binlog-connector-java/pull/142)).  
+ NOTE: This change does NOT affect `SSLMode.VERIFY_CA` / `SSLMode.VERIFY_IDENTITY`.
+
 ## [0.7.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.2...0.7.3) - 2016-12-26
 
 ### Fixed
