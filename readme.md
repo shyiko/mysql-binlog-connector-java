@@ -189,6 +189,7 @@ Some of the OSS using / built on top of mysql-binlog-conector-java:
 * [shyiko/rook](https://github.com/shyiko/rook) Generic Change Data Capture (CDC) toolkit.
 * [streamsets/datacollector](https://github.com/streamsets/datacollector) Continuous big data ingestion infrastructure.
 * [twingly/ecco](https://github.com/twingly/ecco) MySQL replication binlog parser in JRuby.
+* [zendesk/maxwell](https://github.com/zendesk/maxwell) A MySQL-to-JSON Kafka producer.
 
 It's also used [on a large scale](https://twitter.com/atwinmutt/status/626816601078300672) in MailChimp. You can read about it [here](http://devs.mailchimp.com/blog/powering-mailchimp-pro-reporting/).  
 
