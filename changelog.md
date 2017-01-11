@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.8.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.8.0...0.8.1) - 2016-01-10
+
+### Fixed
+
+ - ArrayIndexOutOfBoundsException while parsing JSON ([145](https://github.com/shyiko/mysql-binlog-connector-java/issues/145)).
+
 ## [0.8.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.4...0.8.0) - 2016-01-04
 
 ### Added
