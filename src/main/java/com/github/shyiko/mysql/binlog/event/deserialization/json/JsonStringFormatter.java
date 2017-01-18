@@ -215,14 +215,14 @@ public class JsonStringFormatter implements JsonFormatter {
         for (int i = 0, len = original.length(); i < len; ++i) {
             char c = original.charAt(i);
             int ch = c;
-            if (ch < 0 || ESCAPES[ch] == 0) {
+            if (ch < 0 || ch >= ESCAPES.length || ESCAPES[ch] == 0) {
                 sb.append(c);
                 continue;
             }
             int escape = ESCAPES[ch];
             if (escape > 0) { // 2-char escape, fine
                 sb.append('\\');
-                sb.append(c);
+                sb.append((char) escape);
             } else {
                 unicodeEscape(ch);
             }

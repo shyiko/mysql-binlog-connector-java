@@ -126,6 +126,11 @@ public class JsonBinaryValueIntegrationTest {
     }
 
     @Test
+    public void testUnicodeSupport() throws Exception {
+        assertJSONMatchOriginal("{\"key\":\"éééàààà\"}");
+    }
+
+    @Test
     public void testJsonObject() throws Exception {
         assertJSONMatchOriginal(
             "{" +

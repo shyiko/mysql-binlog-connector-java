@@ -186,7 +186,12 @@ public enum EventType {
      */
     GTID,
     ANONYMOUS_GTID,
-    PREVIOUS_GTIDS;
+    PREVIOUS_GTIDS,
+    VIEW_CHANGE,
+    /**
+     * Prepared XA transaction terminal event similar to XID except that it is specific to XA transaction.
+     */
+    XA_PREPARE;
 
     public static boolean isRowMutation(EventType eventType) {
         return EventType.isWrite(eventType) ||
