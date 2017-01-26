@@ -591,8 +591,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         channel.write(new PingCommand());
                     } catch (IOException e) {
                         if (logger.isLoggable(Level.INFO)) {
-                            logger.info(
-                                "Trying to restore lost connection to " + hostname + ":" + port);
+                            logger.info("Trying to restore lost connection to " + hostname + ":" + port);
                         }
                         try {
                             terminateConnect();
@@ -600,7 +599,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         } catch (Exception ce) {
                             if (logger.isLoggable(Level.WARNING)) {
                                 logger.warning("Failed to restore connection to " + hostname + ":" + port +
-                                        ". Next attempt in " + keepAliveInterval + "ms");
+                                    ". Next attempt in " + keepAliveInterval + "ms");
                             }
                         }
                     }
@@ -989,11 +988,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void disconnectChannel() throws IOException {
-        try {
-            throw new Exception("Disconnect.");
-        } catch (Exception ex) {
-            logger.warning(getStackTrace(ex));
-        }
         connected = false;
         if (channel != null && channel.isOpen()) {
             channel.close();
