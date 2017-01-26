@@ -62,6 +62,8 @@ client.registerEventListener(new EventListener() {
 client.connect();
 ```
 
+> You can register a listener for `onConnect` / `onCommunicationFailure` / `onEventDeserializationFailure` / `onDisconnect` using `client.registerLifecycleListener(...)`.
+
 > By default, BinaryLogClient starts from the current (at the time of connect) master binlog position. If you wish to
 kick off from a specific filename or position, use `client.setBinlogFilename(filename)` + `client.setBinlogPosition(position)`.
 
