@@ -178,7 +178,12 @@ public class JsonBinary {
      * @throws IOException if there is a problem reading or processing the binary representation
      */
     public static void parse(byte[] bytes, JsonFormatter formatter) throws IOException {
-        new JsonBinary(bytes).parse(formatter);
+        if (bytes.length == 0) {
+            // When the top-level value is a JSON "null", the value in java shows up as a non-null, empty byte array
+            formatter.valueNull();
+        } else {
+            new JsonBinary(bytes).parse(formatter);
+        }
     }
 
     private final ByteArrayInputStream reader;
