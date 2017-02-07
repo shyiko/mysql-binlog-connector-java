@@ -2,11 +2,18 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.9.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.8.1...0.9.0) - 2017-02-07
+
+### Added
+
+ - `BinaryLogClient::connectTimeout` (3 seconds by default).  
+   NOTE: `BinaryLogClient::keepAliveConnectTimeout` has been deprecated and is going to be removed in 1.0.0.
+
 ## [0.8.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.8.0...0.8.1) - 2016-01-10
 
 ### Fixed
 
- - ArrayIndexOutOfBoundsException while parsing JSON ([145](https://github.com/shyiko/mysql-binlog-connector-java/issues/145)).
+ - `ArrayIndexOutOfBoundsException` while parsing JSON ([145](https://github.com/shyiko/mysql-binlog-connector-java/issues/145)).
 
 ## [0.8.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.7.4...0.8.0) - 2016-01-04
 
@@ -48,7 +55,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ## [0.6.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.5.2...0.6.0) - 2016-11-27
 
 ### Added 
- - EventDeserializer compatibility modes to mimic upcoming 1.0.0 event deserialization behavior ([#131](https://github.com/shyiko/mysql-binlog-connector-java/pull/131)).
+ - `EventDeserializer` compatibility modes to mimic upcoming 1.0.0 event deserialization behavior ([#131](https://github.com/shyiko/mysql-binlog-connector-java/pull/131)).
 
 ## [0.5.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.5.1...0.5.2) - 2016-11-19
 
@@ -60,7 +67,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
  - ROWS_QUERY event deserialization ([#124](https://github.com/shyiko/mysql-binlog-connector-java/issues/124)).
  - JSON length determination.
- - GTID sync (GtidSet is now updated before BinaryLogClient.EventListener|s are notified).
+ - GTID sync (`GtidSet` is now updated before `BinaryLogClient.EventListener`|s are notified).
 
 ## [0.5.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.4.2...0.5.0) - 2016-10-06
 
@@ -115,7 +122,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ## [0.2.4](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.3...0.2.4) - 2015-09-09
 
 ### Fixed
- - Possible infinite loop in case of EOF in the middle of ByteArrayInputStream::fill.
+ - Possible infinite loop in case of EOF in the middle of `ByteArrayInputStream::fill`.
  
 ## [0.2.3](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.2.2...0.2.3) - 2015-08-31
 
@@ -135,7 +142,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 - Initial handshake error reporting (so that actual message received from the server wouldn't be lost).
-- Risk of BinaryLogClient getting stuck while in "pre-close" state.
+- Risk of `BinaryLogClient` getting stuck while in "pre-close" state.
 
 ## [0.2.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.1.3...0.2.0) - 2015-05-01
 ### Added
