@@ -147,7 +147,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private boolean keepAlive = true;
     private long keepAliveInterval = TimeUnit.MINUTES.toMillis(1);
-    private long keepAliveConnectTimeout = TimeUnit.SECONDS.toMillis(3);
+
+    private long connectTimeout = TimeUnit.SECONDS.toMillis(3);
 
     private volatile ExecutorService keepAliveThreadExecutor;
 
@@ -343,19 +344,39 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
-     * @return "keep alive" connect timeout in milliseconds, 3 seconds by default.
+     * @return "keep alive" connect timeout in milliseconds.
      * @see #setKeepAliveConnectTimeout(long)
+     *
+     * @deprecated in favour of {@link #getConnectTimeout()}
      */
     public long getKeepAliveConnectTimeout() {
-        return keepAliveConnectTimeout;
+        return connectTimeout;
     }
 
     /**
-     * @param keepAliveConnectTimeout "keep alive" connect timeout in milliseconds.
+     * @param connectTimeout "keep alive" connect timeout in milliseconds.
      * @see #getKeepAliveConnectTimeout()
+    *
+     * @deprecated in favour of {@link #setConnectTimeout(long)}
      */
-    public void setKeepAliveConnectTimeout(long keepAliveConnectTimeout) {
-        this.keepAliveConnectTimeout = keepAliveConnectTimeout;
+    public void setKeepAliveConnectTimeout(long connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    /**
+     * @return connect timeout in milliseconds, 3 seconds by default.
+     * @see #setConnectTimeout(long)
+     */
+    public long getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    /**
+     * @param connectTimeout connect timeout in milliseconds.
+     * @see #getConnectTimeout()
+     */
+    public void setConnectTimeout(long connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
     /**
@@ -464,7 +485,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private PacketChannel openChannel() throws IOException {
         try {
             Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
-            socket.connect(new InetSocketAddress(hostname, port));
+            socket.connect(new InetSocketAddress(hostname, port), (int) connectTimeout);
             PacketChannel channel = new PacketChannel(socket);
             if (channel.getInputStream().peek() == -1) {
                 throw new EOFException();
@@ -585,7 +606,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         }
                         try {
                             terminateConnect();
-                            connect(keepAliveConnectTimeout);
+                            connect(connectTimeout);
                         } catch (Exception ce) {
                             if (logger.isLoggable(Level.WARNING)) {
                                 logger.warning("Failed to restore connection to " + hostname + ":" + port +
@@ -611,13 +632,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     /**
      * Connect to the replication stream in a separate thread.
-     * @param timeoutInMilliseconds timeout in milliseconds
+     * @param timeout timeout in milliseconds
      * @throws AuthenticationException if authentication fails
      * @throws ServerException if MySQL server responds with an error
      * @throws IOException if anything goes wrong while trying to connect
      * @throws TimeoutException if client was unable to connect within given time limit
      */
-    public void connect(long timeoutInMilliseconds) throws IOException, TimeoutException {
+    public void connect(final long timeout) throws IOException, TimeoutException {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
         AbstractLifecycleListener connectListener = new AbstractLifecycleListener() {
             @Override
@@ -632,6 +653,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             @Override
             public void run() {
                 try {
+                    setConnectTimeout(timeout);
                     connect();
                 } catch (IOException e) {
                     exceptionReference.set(e);
@@ -642,7 +664,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         newNamedThread(runnable, "blc-" + hostname + ":" + port).start();
         boolean started = false;
         try {
-            started = countDownLatch.await(timeoutInMilliseconds, TimeUnit.MILLISECONDS);
+            started = countDownLatch.await(timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             if (logger.isLoggable(Level.WARNING)) {
                 logger.log(Level.WARNING, e.getMessage());
@@ -653,7 +675,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw exceptionReference.get();
         }
         if (!started) {
-            throw new TimeoutException("BinaryLogClient was unable to connect in " + timeoutInMilliseconds + "ms");
+            throw new TimeoutException("BinaryLogClient was unable to connect in " + timeout + "ms");
         }
     }
 
