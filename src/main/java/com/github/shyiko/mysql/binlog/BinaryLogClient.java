@@ -378,6 +378,27 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.threadFactory = threadFactory;
     }
 
+    private void beginConnection() throws IOException {
+        channel = openChannel();
+        GreetingPacket greetingPacket = receiveGreeting();
+        authenticate(greetingPacket);
+        connectionId = greetingPacket.getThreadId();
+        if (binlogFilename == null) {
+            fetchBinlogFilenameAndPosition();
+        }
+        if (binlogPosition < 4) {
+            if (logger.isLoggable(Level.WARNING)) {
+                logger.warning("Binary log position adjusted from " + binlogPosition + " to " + 4);
+            }
+            binlogPosition = 4;
+        }
+        ChecksumType checksumType = fetchBinlogChecksum();
+        if (checksumType != ChecksumType.NONE) {
+            confirmSupportOfChecksum(checksumType);
+        }
+        requestBinaryLogStream();
+    }
+
     /**
      * Connect to the replication stream. Note that this method blocks until disconnected.
      * @throws AuthenticationException if authentication fails
@@ -391,24 +412,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         boolean notifyWhenDisconnected = false;
         try {
             try {
-                channel = openChannel();
-                GreetingPacket greetingPacket = receiveGreeting();
-                authenticate(greetingPacket);
-                connectionId = greetingPacket.getThreadId();
-                if (binlogFilename == null) {
-                    fetchBinlogFilenameAndPosition();
-                }
-                if (binlogPosition < 4) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.warning("Binary log position adjusted from " + binlogPosition + " to " + 4);
-                    }
-                    binlogPosition = 4;
-                }
-                ChecksumType checksumType = fetchBinlogChecksum();
-                if (checksumType != ChecksumType.NONE) {
-                    confirmSupportOfChecksum(checksumType);
-                }
-                requestBinaryLogStream();
+                beginConnection();
             } catch (IOException e) {
                 disconnectChannel();
                 throw e;
@@ -686,28 +690,38 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         eventDeserializer.setChecksumType(checksumType);
     }
 
+    private int readPacketHeader(ByteArrayInputStream inputStream) throws IOException {
+        int packetLength = inputStream.readInteger(3);
+        inputStream.skip(1); // 1 byte for sequence
+        int marker = inputStream.read();
+        if (marker == 0xFF) {
+            ErrorPacket errorPacket = new ErrorPacket(inputStream.read(packetLength - 1));
+            throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                                      errorPacket.getSqlState());
+        }
+        if (marker == 0xFE && !blocking) return -1;
+        return packetLength;
+    }
+
+    private Event readNextEvent(ByteArrayInputStream inputStream, int packetLength) throws IOException {
+        return eventDeserializer.nextEvent(packetLength == MAX_PACKET_LENGTH ?
+                                               new ByteArrayInputStream(readPacketSplitInChunks(inputStream, packetLength - 1)) :
+                                               inputStream);
+    }
+
     private void listenForEventPackets() throws IOException {
         ByteArrayInputStream inputStream = channel.getInputStream();
         boolean completeShutdown = false;
         try {
             while (inputStream.peek() != -1) {
-                int packetLength = inputStream.readInteger(3);
-                inputStream.skip(1); // 1 byte for sequence
-                int marker = inputStream.read();
-                if (marker == 0xFF) {
-                    ErrorPacket errorPacket = new ErrorPacket(inputStream.read(packetLength - 1));
-                    throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
-                        errorPacket.getSqlState());
-                }
-                if (marker == 0xFE && !blocking) {
+                int packetLength = readPacketHeader(inputStream);
+                if (packetLength == -1) {
                     completeShutdown = true;
                     break;
                 }
                 Event event;
                 try {
-                    event = eventDeserializer.nextEvent(packetLength == MAX_PACKET_LENGTH ?
-                        new ByteArrayInputStream(readPacketSplitInChunks(inputStream, packetLength - 1)) :
-                        inputStream);
+                    event = readNextEvent(inputStream, packetLength);
                 } catch (Exception e) {
                     Throwable cause = e instanceof EventDataDeserializationException ? e.getCause() : e;
                     if (cause instanceof EOFException || cause instanceof SocketException) {
