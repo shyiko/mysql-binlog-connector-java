@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.channels.Channel;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -378,6 +379,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.threadFactory = threadFactory;
     }
 
+    public Channel connectToBinlog() throws IOException {
+        beginConnection();
+        return channel;
+    }
+
     private void beginConnection() throws IOException {
         channel = openChannel();
         GreetingPacket greetingPacket = receiveGreeting();
@@ -688,6 +694,16 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 errorPacket.getSqlState());
         }
         eventDeserializer.setChecksumType(checksumType);
+    }
+
+    public Event readNextEvent() throws IOException {
+        ByteArrayInputStream inputStream = channel.getInputStream();
+        int packetLength = readPacketHeader(inputStream);
+        Event event = readNextEvent(inputStream, packetLength);
+        updateGtidSet(event);
+        notifyEventListeners(event);
+        updateClientBinlogFilenameAndPosition(event);
+        return event;
     }
 
     private int readPacketHeader(ByteArrayInputStream inputStream) throws IOException {
