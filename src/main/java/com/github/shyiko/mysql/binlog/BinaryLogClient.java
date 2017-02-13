@@ -129,6 +129,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private volatile long connectionId;
     private SSLMode sslMode = SSLMode.DISABLED;
 
+    private String gtid;
     private GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
 
@@ -280,6 +281,15 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public long getConnectionId() {
         return connectionId;
+    }
+
+    /**
+     * @return the latest GTID. Note that this value changes with each received GTID event (provided client is in GTID mode).
+     */
+    public String getGtid() {
+        synchronized (gtidSetAccessLock) {
+            return gtid;
+        }
     }
 
     /**
@@ -830,6 +840,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         gtidEventData = (GtidEventData) eventData;
                     }
                     gtidSet.add(gtidEventData.getGtid());
+                    gtid = gtidEventData.getGtid();
                 }
             }
         }
