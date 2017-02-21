@@ -1,8 +1,2 @@
 language: java
-jdk:
-  - openjdk6
-script: './mvnw clean package -DskipTests=true'
-env:
-  global: 
-  - secure: QI6w4d/W9Sjckgcdwc/K5Rb+UFa6PxDbhiilv70fEZCXg0P4GMBFGD/zbpsfTlLbA9rgKBotrSm7EXRtQM94dluW0kS9jQiJfw33l9WbfMAJL4797xq+7ekvIvPBf7xVfwGsAcCcB5DcPBTKroX2s8tJEY3CQTienkW4pT7/zh0=
-  - secure: b/7SnPmS2BUrzc167F5sbI8ILNBqo3ODz9ZtuOOcXQ/9uJVgaLrB3KmKAHgIsjOiZ/PPp7qGNL4jW9CD7b7LAldMyIcszdKptc/fr2yHZkM17IuQJtL5tjBNlLkqeApW37ddPp0mp5IhhqzZMZ8Zu8/2vlyNJrVrYgnIXuoLLRE=
+script: ./mvnw clean package -DskipTests=true
