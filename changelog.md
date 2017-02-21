@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.9.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.9.0...0.9.1) - 2017-02-21
+
+### Fixed
+
+ - NPE in case of EOF (BinaryLogClient) ([153](https://github.com/shyiko/mysql-binlog-connector-java/pull/153)).  
+
 ## [0.9.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.8.1...0.9.0) - 2017-02-07
 
 ### Added
