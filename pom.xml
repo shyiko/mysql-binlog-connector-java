@@ -238,6 +238,7 @@
                         # publish a new version
                         ./mvnw versions:set -DnewVersion=&lt;version&gt;
                         ./mvnw -Ddeploy=maven-central
+                        git tag &lt;version&gt; &amp;&amp; git push origin &lt;version&gt;
                     </usage>
                 </configuration>
             </plugin>
