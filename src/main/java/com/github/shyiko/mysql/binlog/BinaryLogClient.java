@@ -741,6 +741,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     event = eventDeserializer.nextEvent(packetLength == MAX_PACKET_LENGTH ?
                         new ByteArrayInputStream(readPacketSplitInChunks(inputStream, packetLength - 1)) :
                         inputStream);
+                    if (event == null) {
+                        throw new EOFException();
+                    }
                 } catch (Exception e) {
                     Throwable cause = e instanceof EventDataDeserializationException ? e.getCause() : e;
                     if (cause instanceof EOFException || cause instanceof SocketException) {
