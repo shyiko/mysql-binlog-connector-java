@@ -23,22 +23,17 @@
     </scm>
     <developers>
         <developer>
-            <id>sshyiko</id>
+            <id>shyiko</id>
             <email>stanley.shyiko@gmail.com</email>
             <name>Stanley Shyiko</name>
         </developer>
     </developers>
     <distributionManagement>
         <repository>
-            <id>sonatype-nexus-staging</id>
+            <id>maven-central</id>
             <name>Sonatype Nexus Staging</name>
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
         </repository>
-        <snapshotRepository>
-            <id>sonatype-nexus-snapshots</id>
-            <name>Sonatype Nexus Snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
     </distributionManagement>
 
     <properties>
@@ -91,10 +86,31 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
+                <version>3.5.1</version>
                 <configuration>
                     <source>1.6</source>
                     <target>1.6</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.0.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <!-- for class.getPackage().getImplementationVersion() -->
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>2.8.2</version>
+                <configuration>
+                    <skip>true</skip>
                 </configuration>
             </plugin>
             <plugin>
@@ -201,29 +217,27 @@
                 <configuration>
                     <usage>
                         # build everything (append "-DskipTests=true" if you wish to skip tests)
-                        mvn clean install
+                        ./mvnw clean package
 
                         # run unit + integration tests, validate codebase using checkstyle
-                        mvn -P coverage clean verify
+                        ./mvnw -P coverage clean verify
                         # use -Dvagrant.integration.box= to switch between MySQL sandboxes
 
                         # for aggregated coverage over different mysql releases use
-                        mvn clean
-                        mvn -P coverage verify \
+                        ./mvnw clean
+                        ./mvnw -P coverage verify \
                             -Dvagrant.integration.box=supplement/vagrant/mysql-5.5.27-sandbox-prepackaged
-                        mvn -P coverage verify \
+                        ./mvnw -P coverage verify \
                             -Dvagrant.integration.box=supplement/vagrant/mysql-5.6.12-sandbox-prepackaged
-                        mvn -P coverage verify \
-                        -Dvagrant.integration.box=supplement/vagrant/mysql-5.7.15-sandbox-prepackaged
+                        ./mvnw -P coverage verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.7.15-sandbox-prepackaged
 
                         # submit coverage report to coveralls
-                        mvn -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
+                        ./mvnw -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
 
-                        # deploy snapshots into nexus
-                        mvn -P with-sources-and-javadocs -Ddeploy=snapshot
-
-                        # sign release build and deploy into nexus
-                        mvn -P with-sources-and-javadocs -Ddeploy=release
+                        # publish a new version
+                        ./mvnw versions:set -DnewVersion=&lt;version&gt;
+                        ./mvnw -Ddeploy=maven-central
                     </usage>
                 </configuration>
             </plugin>
@@ -279,13 +293,20 @@
             </build>
         </profile>
         <profile>
-            <id>with-sources-and-javadocs</id>
+            <id>deploy-to-maven-central</id>
+            <activation>
+                <property>
+                    <name>deploy</name>
+                    <value>maven-central</value>
+                </property>
+            </activation>
             <build>
+                <defaultGoal>clean deploy</defaultGoal>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>
-                        <version>2.2.1</version>
+                        <version>3.0.1</version>
                         <executions>
                             <execution>
                                 <id>attach-sources</id>
@@ -299,46 +320,24 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>2.9</version>
+                        <version>2.10.4</version>
                         <executions>
                             <execution>
                                 <id>attach-javadocs</id>
                                 <goals>
                                     <goal>jar</goal>
                                 </goals>
+                                <configuration>
+                                    <additionalparam>-Xdoclint:none</additionalparam>
+                                    <quiet>true</quiet>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>snapshot</id>
-            <activation>
-                <property>
-                    <name>deploy</name>
-                    <value>snapshot</value>
-                </property>
-            </activation>
-            <build>
-                <defaultGoal>clean deploy</defaultGoal>
-            </build>
-        </profile>
-        <profile>
-            <id>release</id>
-            <activation>
-                <property>
-                    <name>deploy</name>
-                    <value>release</value>
-                </property>
-            </activation>
-            <build>
-                <defaultGoal>clean release:clean release:prepare release:perform</defaultGoal>
-                <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.4</version>
+                        <version>1.6</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
@@ -350,11 +349,15 @@
                         </executions>
                     </plugin>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-release-plugin</artifactId>
-                        <version>2.2.2</version>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.7</version>
+                        <extensions>true</extensions>
                         <configuration>
-                            <mavenExecutorId>forked-path</mavenExecutorId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <serverId>maven-central</serverId>
+                            <skipStagingRepositoryClose>true</skipStagingRepositoryClose>
+                            <!--<autoReleaseAfterClose>true</autoReleaseAfterClose>-->
                         </configuration>
                     </plugin>
                 </plugins>
