@@ -423,7 +423,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         boolean notifyWhenDisconnected = false;
         try {
             try {
-                channel = openChannel();
+                openChannel();
                 GreetingPacket greetingPacket = receiveGreeting();
                 authenticate(greetingPacket);
                 connectionId = greetingPacket.getThreadId();
@@ -482,15 +482,16 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private PacketChannel openChannel() throws IOException {
+    private void openChannel() throws IOException {
         try {
             Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
             socket.connect(new InetSocketAddress(hostname, port), (int) connectTimeout);
-            PacketChannel channel = new PacketChannel(socket);
-            if (channel.getInputStream().peek() == -1) {
+            // assigning channel immediately to avoid issue described in
+            // https://github.com/shyiko/mysql-binlog-connector-java/issues/154
+            this.channel = new PacketChannel(socket);
+            if (this.channel.getInputStream().peek() == -1) {
                 throw new EOFException();
             }
-            return channel;
         } catch (IOException e) {
             throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
                 ". Please make sure it's running.", e);
