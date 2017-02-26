@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.9.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.9.1...0.9.2) - 2017-02-25
+
+### Fixed
+- `BinaryLogClient` hangs while trying to connect ([154](https://github.com/shyiko/mysql-binlog-connector-java/issues/154)).
+
 ## [0.9.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.9.0...0.9.1) - 2017-02-21
 
 ### Fixed
