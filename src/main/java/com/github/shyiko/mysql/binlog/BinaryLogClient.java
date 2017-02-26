@@ -148,6 +148,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private boolean keepAlive = true;
     private long keepAliveInterval = TimeUnit.MINUTES.toMillis(1);
 
+    private long heartbeatInterval;
+    private volatile long heartbeatLastSeen;
+
     private long connectTimeout = TimeUnit.SECONDS.toMillis(3);
 
     private volatile ExecutorService keepAliveThreadExecutor;
@@ -322,6 +325,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * @param keepAlive true if "keep alive" thread should be automatically started (recommended and true by default),
      * false otherwise.
      * @see #isKeepAlive()
+     * @see #setKeepAliveInterval(long)
      */
     public void setKeepAlive(boolean keepAlive) {
         this.keepAlive = keepAlive;
@@ -338,6 +342,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     /**
      * @param keepAliveInterval "keep alive" interval in milliseconds.
      * @see #getKeepAliveInterval()
+     * @see #setHeartbeatInterval(long)
      */
     public void setKeepAliveInterval(long keepAliveInterval) {
         this.keepAliveInterval = keepAliveInterval;
@@ -361,6 +366,32 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public void setKeepAliveConnectTimeout(long connectTimeout) {
         this.connectTimeout = connectTimeout;
+    }
+
+    /**
+     * @return heartbeat period in milliseconds (0 if not set (default)).
+     * @see #setHeartbeatInterval(long)
+     */
+    public long getHeartbeatInterval() {
+        return heartbeatInterval;
+    }
+
+    /**
+     * @param heartbeatInterval heartbeat period in milliseconds.
+     * <p>
+     * If set (recommended)
+     * <ul>
+     * <li> HEARTBEAT event will be emitted every "heartbeatInterval".
+     * <li> if {@link #setKeepAlive(boolean)} is on then keepAlive thread will attempt to reconnect if no
+     *   HEARTBEAT events were received within {@link #setKeepAliveInterval(long)} (instead of trying to send
+     *   PING every {@link #setKeepAliveInterval(long)}, which is fundamentally flawed - https://github.com/shyiko/mysql-binlog-connector-java/issues/118).
+     * </ul>
+     * Note that when used together with keepAlive heartbeatInterval MUST be set less than keepAliveInterval.
+     *
+     * @see #getHeartbeatInterval()
+     */
+    public void setHeartbeatInterval(long heartbeatInterval) {
+        this.heartbeatInterval = heartbeatInterval;
     }
 
     /**
@@ -440,6 +471,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 if (checksumType != ChecksumType.NONE) {
                     confirmSupportOfChecksum(checksumType);
                 }
+                if (heartbeatInterval > 0) {
+                    enableHeartbeat();
+                }
                 requestBinaryLogStream();
             } catch (IOException e) {
                 disconnectChannel();
@@ -507,6 +541,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     errorPacket.getSqlState());
         }
         return new GreetingPacket(initialHandshakePacket);
+    }
+
+    private void enableHeartbeat() throws IOException {
+        channel.write(new QueryCommand("set @master_heartbeat_period=" + heartbeatInterval * 1000000));
+        byte[] statementResult = channel.read();
+        if (statementResult[0] == (byte) 0xFF /* error */) {
+            byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
+            ErrorPacket errorPacket = new ErrorPacket(bytes);
+            throw new ServerException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                errorPacket.getSqlState());
+        }
     }
 
     private void requestBinaryLogStream() throws IOException {
@@ -599,9 +644,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     if (threadExecutor.isShutdown()) {
                         return;
                     }
-                    try {
-                        channel.write(new PingCommand());
-                    } catch (IOException e) {
+                    boolean connectionLost = false;
+                    if (heartbeatInterval > 0) {
+                        connectionLost = System.currentTimeMillis() - heartbeatLastSeen > keepAliveInterval;
+                    } else {
+                        try {
+                            channel.write(new PingCommand());
+                        } catch (IOException e) {
+                            connectionLost = true;
+                        }
+                    }
+                    if (connectionLost) {
                         if (logger.isLoggable(Level.INFO)) {
                             logger.info("Trying to restore lost connection to " + hostname + ":" + port);
                         }
@@ -760,6 +813,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     continue;
                 }
                 if (isConnected()) {
+                    if (event.getHeader().getEventType() == EventType.HEARTBEAT) {
+                        heartbeatLastSeen = System.currentTimeMillis();
+                    }
                     updateGtidSet(event);
                     notifyEventListeners(event);
                     updateClientBinlogFilenameAndPosition(event);
