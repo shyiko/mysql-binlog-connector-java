@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.10.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.9.2...0.10.0) - 2017-02-28
+
+### Added
+- `BinaryLogClient::heartbeatInterval` ([118](https://github.com/shyiko/mysql-binlog-connector-java/issues/118)).
+  NOTE: While it's 0 (disabled) by default it's RECOMMENDED that you turn it on (regardless whether you use built-in
+  keepAlive mechanism or not).
+
+### Changed
+- `BinaryLogClient::connectTimeout` scope (connection will now be forcefully terminated if `LifecycleListener::onConnect`
+isn't reached within `BinaryLogClient::connectTimeout` from `BinaryLogClient::connect`).
+
 ## [0.9.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.9.1...0.9.2) - 2017-02-25
 
 ### Fixed
