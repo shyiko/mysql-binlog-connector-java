@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.10.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.10.0...0.10.1) - 2017-02-28
+
+### Fixed
+- HEARTBEAT tracking ([118](https://github.com/shyiko/mysql-binlog-connector-java/issues/118#issuecomment-283138143)). 
+
 ## [0.10.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.9.2...0.10.0) - 2017-02-28
 
 ### Added
