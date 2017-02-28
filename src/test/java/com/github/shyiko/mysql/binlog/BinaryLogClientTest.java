@@ -19,7 +19,6 @@ import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientStatistics;
 import com.github.shyiko.mysql.binlog.network.SocketFactory;
 import org.testng.annotations.Test;
 
-import java.io.EOFException;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -71,8 +70,42 @@ public class BinaryLogClientTest {
     }
 
     @Test(expectedExceptions = TimeoutException.class)
-    public void testConnectionTimeout() throws Exception {
+    public void testNoConnectionTimeout() throws Exception {
         new BinaryLogClient("_localhost_", 3306, "root", "mysql").connect(0);
+    }
+
+    @Test(timeOut = 15000)
+    public void testConnectionTimeout() throws Exception {
+        final BinaryLogClient binaryLogClient = new BinaryLogClient("localhost", 33059, "root", "mysql");
+        final CountDownLatch socketBound = new CountDownLatch(1);
+        final CountDownLatch binaryLogClientDisconnected = new CountDownLatch(1);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final ServerSocket serverSocket = new ServerSocket();
+                    try {
+                        serverSocket.bind(new InetSocketAddress("localhost", 33059));
+                        socketBound.countDown();
+                        Socket accept = serverSocket.accept();
+                        accept.getOutputStream().write(1);
+                        accept.getOutputStream().flush();
+                        assertTrue(binaryLogClientDisconnected.await(3000, TimeUnit.MILLISECONDS));
+                    } finally {
+                        serverSocket.close();
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }).start();
+        assertTrue(socketBound.await(3000, TimeUnit.MILLISECONDS));
+        binaryLogClient.setConnectTimeout(1000);
+        try {
+            binaryLogClient.connect();
+        } catch (IOException e) {
+            binaryLogClientDisconnected.countDown();
+        }
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
@@ -93,7 +126,7 @@ public class BinaryLogClientTest {
                     public InputStream getInputStream() throws IOException {
                         return new FilterInputStream(super.getInputStream()) {
 
-                             @Override
+                            @Override
                             public int read(byte[] b, int off, int len) throws IOException {
                                 readAttempted.countDown();
                                 return super.read(b, off, len);
@@ -140,8 +173,8 @@ public class BinaryLogClientTest {
         try {
             binaryLogClient.connect();
         } catch (IOException e) {
-           assertEquals(readAttempted.getCount(), 0);
-           assertTrue(e.getCause() instanceof EOFException);
+            assertEquals(readAttempted.getCount(), 0);
+            assertTrue(e.getMessage().contains("Failed to connect to MySQL"));
         }
     }
 

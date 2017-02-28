@@ -67,6 +67,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -384,7 +385,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * <li> HEARTBEAT event will be emitted every "heartbeatInterval".
      * <li> if {@link #setKeepAlive(boolean)} is on then keepAlive thread will attempt to reconnect if no
      *   HEARTBEAT events were received within {@link #setKeepAliveInterval(long)} (instead of trying to send
-     *   PING every {@link #setKeepAliveInterval(long)}, which is fundamentally flawed - https://github.com/shyiko/mysql-binlog-connector-java/issues/118).
+     *   PING every {@link #setKeepAliveInterval(long)}, which is fundamentally flawed -
+     *   https://github.com/shyiko/mysql-binlog-connector-java/issues/118).
      * </ul>
      * Note that when used together with keepAlive heartbeatInterval MUST be set less than keepAliveInterval.
      *
@@ -453,8 +455,22 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
         boolean notifyWhenDisconnected = false;
         try {
+            Callable cancelDisconnect = null;
             try {
-                openChannel();
+                try {
+                    long start = System.currentTimeMillis();
+                    channel = openChannel();
+                    if (connectTimeout > 0 && !isKeepAliveThreadRunning()) {
+                        cancelDisconnect = scheduleDisconnectIn(connectTimeout -
+                            (System.currentTimeMillis() - start));
+                    }
+                    if (channel.getInputStream().peek() == -1) {
+                        throw new EOFException();
+                    }
+                } catch (IOException e) {
+                    throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
+                        ". Please make sure it's running.", e);
+                }
                 GreetingPacket greetingPacket = receiveGreeting();
                 authenticate(greetingPacket);
                 connectionId = greetingPacket.getThreadId();
@@ -478,6 +494,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             } catch (IOException e) {
                 disconnectChannel();
                 throw e;
+            } finally {
+                if (cancelDisconnect != null) {
+                    try {
+                        cancelDisconnect.call();
+                    } catch (Exception e) {
+                        if (logger.isLoggable(Level.WARNING)) {
+                            logger.warning("\"" + e.getMessage() +
+                                "\" was thrown while canceling scheduled disconnect call");
+                        }
+                    }
+                }
             }
             connected = true;
             notifyWhenDisconnected = true;
@@ -516,20 +543,49 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private void openChannel() throws IOException {
-        try {
-            Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
-            socket.connect(new InetSocketAddress(hostname, port), (int) connectTimeout);
-            // assigning channel immediately to avoid issue described in
-            // https://github.com/shyiko/mysql-binlog-connector-java/issues/154
-            this.channel = new PacketChannel(socket);
-            if (this.channel.getInputStream().peek() == -1) {
-                throw new EOFException();
+    private PacketChannel openChannel() throws IOException {
+        Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
+        socket.connect(new InetSocketAddress(hostname, port), (int) connectTimeout);
+        return new PacketChannel(socket);
+    }
+
+    private Callable scheduleDisconnectIn(final long timeout) {
+        final BinaryLogClient self = this;
+        final CountDownLatch connectLatch = new CountDownLatch(1);
+        final Thread thread = newNamedThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    connectLatch.await(timeout, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    if (logger.isLoggable(Level.WARNING)) {
+                        logger.log(Level.WARNING, e.getMessage());
+                    }
+                }
+                if (connectLatch.getCount() != 0) {
+                    if (logger.isLoggable(Level.WARNING)) {
+                        logger.warning("Failed to establish connection in " + timeout + "ms. " +
+                            "Forcing disconnect.");
+                    }
+                    try {
+                        self.disconnectChannel();
+                    } catch (IOException e) {
+                        if (logger.isLoggable(Level.WARNING)) {
+                            logger.log(Level.WARNING, e.getMessage());
+                        }
+                    }
+                }
             }
-        } catch (IOException e) {
-            throw new IOException("Failed to connect to MySQL on " + hostname + ":" + port +
-                ". Please make sure it's running.", e);
-        }
+        }, "blc-disconnect-" + hostname + ":" + port);
+        thread.start();
+        return new Callable() {
+
+            public Object call() throws Exception {
+                connectLatch.countDown();
+                thread.join();
+                return null;
+            }
+        };
     }
 
     private GreetingPacket receiveGreeting() throws IOException {
@@ -729,7 +785,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw exceptionReference.get();
         }
         if (!started) {
-            throw new TimeoutException("BinaryLogClient was unable to connect in " + timeout + "ms");
+            try {
+                terminateConnect();
+            } finally {
+                throw new TimeoutException("BinaryLogClient was unable to connect in " + timeout + "ms");
+            }
         }
     }
 
