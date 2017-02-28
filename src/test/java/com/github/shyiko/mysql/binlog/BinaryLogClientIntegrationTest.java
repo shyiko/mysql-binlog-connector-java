@@ -161,6 +161,9 @@ public class BinaryLogClientIntegrationTest {
     public void testWriteUpdateDeleteEvents() throws Exception {
         CapturingEventListener capturingEventListener = new CapturingEventListener();
         client.registerEventListener(capturingEventListener);
+        // ensure "capturingEventListener -> eventListener" order
+        client.unregisterEventListener(eventListener);
+        client.registerEventListener(eventListener);
         try {
             master.execute(new Callback<Statement>() {
                 @Override
@@ -448,6 +451,9 @@ public class BinaryLogClientIntegrationTest {
             final String... values) throws Exception {
         CapturingEventListener capturingEventListener = new CapturingEventListener();
         client.registerEventListener(capturingEventListener);
+        // ensure "capturingEventListener -> eventListener" order
+        client.unregisterEventListener(eventListener);
+        client.registerEventListener(eventListener);
         try {
             master.execute(new Callback<Statement>() {
                 @Override
