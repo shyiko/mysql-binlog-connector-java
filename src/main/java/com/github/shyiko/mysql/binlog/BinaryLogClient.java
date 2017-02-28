@@ -150,7 +150,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private long keepAliveInterval = TimeUnit.MINUTES.toMillis(1);
 
     private long heartbeatInterval;
-    private volatile long heartbeatLastSeen;
+    private volatile long eventLastSeen;
 
     private long connectTimeout = TimeUnit.SECONDS.toMillis(3);
 
@@ -702,7 +702,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     }
                     boolean connectionLost = false;
                     if (heartbeatInterval > 0) {
-                        connectionLost = System.currentTimeMillis() - heartbeatLastSeen > keepAliveInterval;
+                        connectionLost = System.currentTimeMillis() - eventLastSeen > keepAliveInterval;
                     } else {
                         try {
                             channel.write(new PingCommand());
@@ -873,9 +873,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     continue;
                 }
                 if (isConnected()) {
-                    if (event.getHeader().getEventType() == EventType.HEARTBEAT) {
-                        heartbeatLastSeen = System.currentTimeMillis();
-                    }
+                    eventLastSeen = System.currentTimeMillis();
                     updateGtidSet(event);
                     notifyEventListeners(event);
                     updateClientBinlogFilenameAndPosition(event);
