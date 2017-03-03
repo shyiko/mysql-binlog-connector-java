@@ -132,6 +132,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
+    private boolean gtidSetFallbackToPurged;
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -298,12 +299,15 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     /**
      * @param gtidSet GTID set (can be an empty string).
-     * <p>NOTE #1: Any value but null will switch BinaryLogClient into a GTID mode (in which case GTID set will be
-     * updated with each incoming GTID event) as well as set binlogFilename to "" (empty string) (meaning
-     * BinaryLogClient will request events "outside of the set" <u>starting from the oldest known binlog</u>).
+     * <p>NOTE #1: Any value but null will switch BinaryLogClient into a GTID mode (this will also set binlogFilename
+     * to "" (provided it's null) forcing MySQL to send events starting from the oldest known binlog (keep in mind
+     * that connection will fail if gtid_purged is anything but empty (unless
+     * {@link #setGtidSetFallbackToPurged(boolean)} is set to true))).
      * <p>NOTE #2: {@link #setBinlogFilename(String)} and {@link #setBinlogPosition(long)} can be used to specify the
      * exact position from which MySQL server should start streaming events (taking into account GTID set).
+     * <p>NOTE #3: GTID set is automatically updated with each incoming GTID event (provided GTID mode is on).
      * @see #getGtidSet()
+     * @see #setGtidSetFallbackToPurged(boolean)
      */
     public void setGtidSet(String gtidSet) {
         if (gtidSet != null && this.binlogFilename == null) {
@@ -312,6 +316,21 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         synchronized (gtidSetAccessLock) {
             this.gtidSet = gtidSet != null ? new GtidSet(gtidSet) : null;
         }
+    }
+
+    /**
+     * @see #setGtidSetFallbackToPurged(boolean)
+     */
+    public boolean isGtidSetFallbackToPurged() {
+        return gtidSetFallbackToPurged;
+    }
+
+    /**
+     * @param gtidSetFallbackToPurged true if gtid_purged should be used as a fallback when gtidSet is set to "" and
+     * MySQL server has purged some of the binary logs, false otherwise (default).
+     */
+    public void setGtidSetFallbackToPurged(boolean gtidSetFallbackToPurged) {
+        this.gtidSetFallbackToPurged = gtidSetFallbackToPurged;
     }
 
     /**
@@ -474,6 +493,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 GreetingPacket greetingPacket = receiveGreeting();
                 authenticate(greetingPacket);
                 connectionId = greetingPacket.getThreadId();
+                if ("".equals(binlogFilename)) {
+                    synchronized (gtidSetAccessLock) {
+                        if (gtidSet != null && "".equals(gtidSet.toString()) && gtidSetFallbackToPurged) {
+                            gtidSet = new GtidSet(fetchGtidPurged());
+                        }
+                    }
+                }
                 if (binlogFilename == null) {
                     fetchBinlogFilenameAndPosition();
                 }
@@ -798,6 +824,15 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public boolean isConnected() {
         return connected;
+    }
+
+    private String fetchGtidPurged() throws IOException {
+        channel.write(new QueryCommand("show global variables like 'gtid_purged'"));
+        ResultSetRowPacket[] resultSet = readResultSet();
+        if (resultSet.length != 0) {
+            return resultSet[0].getValue(1).toUpperCase();
+        }
+        return "";
     }
 
     private void fetchBinlogFilenameAndPosition() throws IOException {
