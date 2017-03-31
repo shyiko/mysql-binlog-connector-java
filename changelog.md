@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.12.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.11.0...0.12.0) - 2017-03-31
+
+### Added
+- PREVIOUS_GTIDS deserializer ([159](https://github.com/shyiko/mysql-binlog-connector-java/pull/159)).
+
 ## [0.11.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.10.1...0.11.0) - 2017-03-02
 
 ### Added
