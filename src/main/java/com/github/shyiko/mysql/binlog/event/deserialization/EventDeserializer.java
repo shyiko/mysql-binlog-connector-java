@@ -113,6 +113,8 @@ public class EventDeserializer {
                 new RowsQueryEventDataDeserializer());
         eventDataDeserializers.put(EventType.GTID,
                 new GtidEventDataDeserializer());
+       eventDataDeserializers.put(EventType.PREVIOUS_GTIDS,
+               new PreviousGtidSetDeserializer());
     }
 
     public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
