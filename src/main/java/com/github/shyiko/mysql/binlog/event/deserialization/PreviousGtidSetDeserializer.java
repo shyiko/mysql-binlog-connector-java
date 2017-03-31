@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2017 Javier Olivares
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,9 @@ import com.github.shyiko.mysql.binlog.event.PreviousGtidSetEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 /**
- * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+ * @author <a href="https://github.com/jolivares">Javier Olivares</a>
  */
-public class PreviousGtidSetDeserializer
-        implements
-            EventDataDeserializer<PreviousGtidSetEventData> {
+public class PreviousGtidSetDeserializer implements EventDataDeserializer<PreviousGtidSetEventData> {
 
     @Override
     public PreviousGtidSetEventData deserialize(
@@ -51,10 +49,12 @@ public class PreviousGtidSetDeserializer
     }
 
     private String formatUUID(byte[] bytes) {
-        return format("%s-%s-%s-%s-%s", byteArrayToHex(bytes, 0, 4),
-                byteArrayToHex(bytes, 4, 2), byteArrayToHex(bytes, 6, 2),
-                byteArrayToHex(bytes, 8, 2), byteArrayToHex(bytes, 10, 6));
-
+        return format("%s-%s-%s-%s-%s",
+            byteArrayToHex(bytes, 0, 4),
+            byteArrayToHex(bytes, 4, 2),
+            byteArrayToHex(bytes, 6, 2),
+            byteArrayToHex(bytes, 8, 2),
+            byteArrayToHex(bytes, 10, 6));
     }
 
     private static String byteArrayToHex(byte[] a, int offset, int len) {

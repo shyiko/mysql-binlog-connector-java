@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2017 Javier Olivares
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import com.github.shyiko.mysql.binlog.event.PreviousGtidSetEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 /**
- * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+ * @author <a href="https://github.com/jolivares">Javier Olivares</a>
  */
 public class PreviousGtidSetDeserializerTest {
 
