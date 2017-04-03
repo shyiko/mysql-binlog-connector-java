@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Javier Olivares
+ * Copyright 2017 Juan Olivares
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package com.github.shyiko.mysql.binlog.event;
 
 /**
- * @author <a href="https://github.com/jolivares">Javier Olivares</a>
+ * @author <a href="https://github.com/jolivares">Juan Olivares</a>
  */
 public class PreviousGtidSetEventData implements EventData {
 
