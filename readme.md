@@ -183,6 +183,7 @@ For the insight into the internals of MySQL look [here](https://dev.mysql.com/do
 ## Real-world applications
 
 Some of the OSS using / built on top of mysql-binlog-conector-java: 
+* [apache/nifi](https://github.com/apache/nifi) An easy to use, powerful, and reliable system to process and distribute data.
 * [debezium](https://github.com/debezium/debezium) A low latency data streaming platform for change data capture (CDC).
 * [mavenlink/changestream](https://github.com/mavenlink/changestream) - A stream of changes for MySQL built on Akka.
 * [mardambey/mypipe](https://github.com/mardambey/mypipe) MySQL binary log consumer with the ability to act on changed rows and publish changes to different systems with emphasis on Apache Kafka.
