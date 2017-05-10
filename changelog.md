@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.12.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.12.0...0.12.1) - 2017-05-10
+
+### Fixed
+- List of event types (TRANSACTION_CONTEXT was missing) ([167](https://github.com/shyiko/mysql-binlog-connector-java/issues/167)).
+
 ## [0.12.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.11.0...0.12.0) - 2017-03-31
 
 ### Added
