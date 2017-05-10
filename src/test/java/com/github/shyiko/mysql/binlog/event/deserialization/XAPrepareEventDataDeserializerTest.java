@@ -24,14 +24,14 @@ import java.io.IOException;
 import static org.testng.Assert.assertEquals;
 
 /**
- * Created by cc on 2017/5/10.
+ * @author <a href="https://github.com/stevenczp">Steven Cheng</a>
  */
 public class XAPrepareEventDataDeserializerTest {
     private static final byte[] DATA =
         {0, 123, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 103, 116, 114, 105, 100, 98, 113, 117, 97, 108};
 
-    private static boolean ONE_PHASE = false;
-    private static final int FORMAT_ID = 123;
+    private static boolean ONEPHASE = false;
+    private static final int FORMATID = 123;
     private static final String GTRID = "gtrid";
     private static final String BQUAL = "bqual";
 
@@ -41,8 +41,8 @@ public class XAPrepareEventDataDeserializerTest {
         XAPrepareEventData xaPrepareEventData =
             deserializer.deserialize(new ByteArrayInputStream(DATA));
 
-        assertEquals(ONE_PHASE, xaPrepareEventData.isOne_phase());
-        assertEquals(FORMAT_ID, xaPrepareEventData.getFormatID());
+        assertEquals(ONEPHASE, xaPrepareEventData.isOnePhase());
+        assertEquals(FORMATID, xaPrepareEventData.getFormatID());
         assertEquals(GTRID, xaPrepareEventData.getGtrid());
         assertEquals(BQUAL, xaPrepareEventData.getBqual());
     }

@@ -23,24 +23,24 @@ import java.io.IOException;
 /**
  * https://github.com/mysql/mysql-server/blob/5.7/libbinlogevents/src/control_events.cpp#L590
  * <p>
- * one_phase : boolean, 1byte
+ * onePhase : boolean, 1byte
  * formatID : int, 4byte
- * gtrid_length : int, 4byte
- * bqual_length : int, 4byte
- * data : String, gtrid + bqual, (gtrid_length + bqual_length)byte
+ * gtridLength : int, 4byte
+ * bqualLength : int, 4byte
+ * data : String, gtrid + bqual, (gtridLength + bqualLength)byte
  * <p>
- * Created by cc on 2017/5/10.
+ * @author <a href="https://github.com/stevenczp">Steven Cheng</a>
  */
 public class XAPrepareEventDataDeserializer implements EventDataDeserializer<XAPrepareEventData> {
     @Override
     public XAPrepareEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
         XAPrepareEventData xaPrepareEventData = new XAPrepareEventData();
-        xaPrepareEventData.setOne_phase(inputStream.read() == 0x00 ? false : true);
+        xaPrepareEventData.setOnePhase(inputStream.read() == 0x00 ? false : true);
         xaPrepareEventData.setFormatID(inputStream.readInteger(4));
-        xaPrepareEventData.setGtrid_length(inputStream.readInteger(4));
-        xaPrepareEventData.setBqual_length(inputStream.readInteger(4));
+        xaPrepareEventData.setGtridLength(inputStream.readInteger(4));
+        xaPrepareEventData.setBqualLength(inputStream.readInteger(4));
         xaPrepareEventData.setData(inputStream.read(
-            xaPrepareEventData.getGtrid_length() + xaPrepareEventData.getBqual_length()));
+            xaPrepareEventData.getGtridLength() + xaPrepareEventData.getBqualLength()));
 
         return xaPrepareEventData;
     }

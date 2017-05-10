@@ -18,23 +18,23 @@ package com.github.shyiko.mysql.binlog.event;
 import java.util.Arrays;
 
 /**
- * Created by cc on 2017/5/10.
+ * @author <a href="https://github.com/stevenczp">Steven Cheng</a>
  */
 public class XAPrepareEventData implements EventData {
-    private boolean one_phase;
+    private boolean onePhase;
     private int formatID;
-    private int gtrid_length;
-    private int bqual_length;
+    private int gtridLength;
+    private int bqualLength;
     private byte data[];
     private String gtrid;
     private String bqual;
 
-    public boolean isOne_phase() {
-        return one_phase;
+    public boolean isOnePhase() {
+        return onePhase;
     }
 
-    public void setOne_phase(boolean one_phase) {
-        this.one_phase = one_phase;
+    public void setOnePhase(boolean onePhase) {
+        this.onePhase = onePhase;
     }
 
     public int getFormatID() {
@@ -45,20 +45,20 @@ public class XAPrepareEventData implements EventData {
         this.formatID = formatID;
     }
 
-    public int getGtrid_length() {
-        return gtrid_length;
+    public int getGtridLength() {
+        return gtridLength;
     }
 
-    public void setGtrid_length(int gtrid_length) {
-        this.gtrid_length = gtrid_length;
+    public void setGtridLength(int gtridLength) {
+        this.gtridLength = gtridLength;
     }
 
-    public int getBqual_length() {
-        return bqual_length;
+    public int getBqualLength() {
+        return bqualLength;
     }
 
-    public void setBqual_length(int bqual_length) {
-        this.bqual_length = bqual_length;
+    public void setBqualLength(int bqualLength) {
+        this.bqualLength = bqualLength;
     }
 
     public byte[] getData() {
@@ -67,8 +67,8 @@ public class XAPrepareEventData implements EventData {
 
     public void setData(byte[] data) {
         this.data = data;
-        gtrid = new String(data, 0, gtrid_length);
-        bqual = new String(data, gtrid_length, bqual_length);
+        gtrid = new String(data, 0, gtridLength);
+        bqual = new String(data, gtridLength, bqualLength);
     }
 
     public String getGtrid() {
@@ -81,8 +81,15 @@ public class XAPrepareEventData implements EventData {
 
     @Override
     public String toString() {
-        return "XAPrepareEventData{" + "one_phase=" + one_phase + ", formatID=" + formatID
-            + ", gtrid_length=" + gtrid_length + ", bqual_length=" + bqual_length + ", data="
-            + Arrays.toString(data) + ", gtrid='" + gtrid + '\'' + ", bqual='" + bqual + '\'' + '}';
+        final StringBuilder sb = new StringBuilder("XAPrepareEventData{");
+        sb.append("onePhase=").append(onePhase);
+        sb.append(", formatID=").append(formatID);
+        sb.append(", gtridLength=").append(gtridLength);
+        sb.append(", bqualLength=").append(bqualLength);
+        sb.append(", data=").append(Arrays.toString(data));
+        sb.append(", gtrid='").append(gtrid).append('\'');
+        sb.append(", bqual='").append(bqual).append('\'');
+        sb.append('}');
+        return sb.toString();
     }
 }
