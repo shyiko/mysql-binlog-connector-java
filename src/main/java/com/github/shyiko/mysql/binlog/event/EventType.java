@@ -187,6 +187,7 @@ public enum EventType {
     GTID,
     ANONYMOUS_GTID,
     PREVIOUS_GTIDS,
+    TRANSACTION_CONTEXT,
     VIEW_CHANGE,
     /**
      * Prepared XA transaction terminal event similar to XID except that it is specific to XA transaction.
