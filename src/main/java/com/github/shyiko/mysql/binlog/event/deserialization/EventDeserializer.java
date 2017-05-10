@@ -115,6 +115,8 @@ public class EventDeserializer {
                 new GtidEventDataDeserializer());
        eventDataDeserializers.put(EventType.PREVIOUS_GTIDS,
                new PreviousGtidSetDeserializer());
+        eventDataDeserializers.put(EventType.XA_PREPARE,
+                new XAPrepareEventDataDeserializer());
     }
 
     public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
