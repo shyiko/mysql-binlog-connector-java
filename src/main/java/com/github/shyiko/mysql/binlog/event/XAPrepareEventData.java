@@ -25,7 +25,7 @@ public class XAPrepareEventData implements EventData {
     private int formatID;
     private int gtridLength;
     private int bqualLength;
-    private byte data[];
+    private byte[] data;
     private String gtrid;
     private String bqual;
 

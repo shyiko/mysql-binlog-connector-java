@@ -30,7 +30,7 @@ public class XAPrepareEventDataDeserializerTest {
     private static final byte[] DATA =
         {0, 123, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 103, 116, 114, 105, 100, 98, 113, 117, 97, 108};
 
-    private static boolean ONEPHASE = false;
+    private static final boolean ONEPHASE = false;
     private static final int FORMATID = 123;
     private static final String GTRID = "gtrid";
     private static final String BQUAL = "bqual";
