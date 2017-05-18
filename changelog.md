@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.12.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.12.1...0.12.2) - 2017-05-18
+
+### Fixed
+- Deserialization of JSON objects that contain empty keys ([170](https://github.com/shyiko/mysql-binlog-connector-java/issues/170)).
+
 ## [0.12.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.12.0...0.12.1) - 2017-05-10
 
 ### Fixed
