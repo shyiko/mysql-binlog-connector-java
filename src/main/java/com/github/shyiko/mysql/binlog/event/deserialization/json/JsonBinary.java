@@ -872,7 +872,7 @@ public class JsonBinary {
 
     protected int readUnsignedIndex(int maxValue, boolean isSmall, String desc) throws IOException {
         long result = isSmall ? readUInt16() : readUInt32();
-        if (result >= maxValue) {
+        if (result > maxValue) {
             throw new IOException("The " + desc + " the JSON document is " + result +
                     " and is too big for the binary form of the document (" + maxValue + ")");
         }
