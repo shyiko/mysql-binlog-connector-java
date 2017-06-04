@@ -154,4 +154,14 @@ public class GtidSetTest {
         assertEquals(gtidSet.toString(), UUID + ":1-199:1000-1033:1035-1036:1038-1039");
     }
 
+    @Test
+    public void testPutUUIDSet() {
+        GtidSet gtidSet = new GtidSet(UUID + ":1-191");
+        UUIDSet uuidSet = gtidSet.getUUIDSet(UUID);
+        GtidSet gtidSet2 = new GtidSet(UUID + ":1-190");
+        UUIDSet uuidSet2 = gtidSet2.getUUIDSet(UUID);
+        gtidSet.putUUIDSet(uuidSet2);
+        assertEquals(gtidSet, gtidSet2);
+    }
+
 }
