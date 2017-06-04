@@ -180,7 +180,7 @@ public class GtidSet {
         private String uuid;
         private List<Interval> intervals;
 
-        UUIDSet(String uuid, List<Interval> intervals) {
+        public UUIDSet(String uuid, List<Interval> intervals) {
             this.uuid = uuid;
             this.intervals = intervals;
             if (intervals.size() > 1) {
@@ -349,7 +349,7 @@ public class GtidSet {
         private long start;
         private long end;
 
-        Interval(long start, long end) {
+        public Interval(long start, long end) {
             this.start = start;
             this.end = end;
         }
