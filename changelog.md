@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.13.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.12.2...0.13.0) - 2017-06-04
+
+### Changed
+- GtidSet to be more flexible when it comes down to UUIDSet|s manipulations ([171](https://github.com/shyiko/mysql-binlog-connector-java/issues/171)).
+
 ## [0.12.2](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.12.1...0.12.2) - 2017-05-18
 
 ### Fixed
