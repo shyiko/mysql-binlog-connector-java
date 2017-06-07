@@ -56,6 +56,8 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
@@ -238,6 +240,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public void setServerId(long serverId) {
         this.serverId = serverId;
+    }
+
+    /**
+     * @return gtid position or binlog position depending on whether gtid mode is on
+     */
+    public String getPosition() {
+        String position;
+        synchronized (gtidSetAccessLock) {
+            position = gtidSet != null ? gtidSet.toString() : binlogFilename + "/" + binlogPosition;
+        }
+        return position;
     }
 
     /**
@@ -535,10 +548,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             connected = true;
             notifyWhenDisconnected = true;
             if (logger.isLoggable(Level.INFO)) {
-                String position;
-                synchronized (gtidSetAccessLock) {
-                    position = gtidSet != null ? gtidSet.toString() : binlogFilename + "/" + binlogPosition;
-                }
+                String position = getPosition();
                 logger.info("Connected to " + hostname + ":" + port + " at " + position +
                     " (" + (blocking ? "sid:" + serverId + ", " : "") + "cid:" + connectionId + ")");
             }
@@ -845,6 +855,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         ResultSetRowPacket resultSetRow = resultSet[0];
         binlogFilename = resultSetRow.getValue(0);
         binlogPosition = Long.parseLong(resultSetRow.getValue(1));
+        logger.info("fetched binlog filename: " + binlogFilename);
+        logger.info("fetched binlog position: " + binlogPosition);
     }
 
     private ChecksumType fetchBinlogChecksum() throws IOException {
@@ -914,7 +926,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     updateClientBinlogFilenameAndPosition(event);
                 }
             }
+            logger.info("No more data to read from master");
         } catch (Exception e) {
+            logger.warning(getStackTrace(e));
             if (isConnected()) {
                 synchronized (lifecycleListeners) {
                     for (LifecycleListener lifecycleListener : lifecycleListeners) {
@@ -1155,6 +1169,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    protected static String getStackTrace(Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        t.printStackTrace(pw);
+        return sw.toString(); // stack trace as a string
+    }
+
     /**
      * {@link BinaryLogClient}'s event listener.
      */
@@ -1195,12 +1216,17 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * Default (no-op) implementation of {@link LifecycleListener}.
      */
     public static abstract class AbstractLifecycleListener implements LifecycleListener {
+        private final Logger logger = Logger.getLogger(getClass().getName());
 
         public void onConnect(BinaryLogClient client) { }
 
-        public void onCommunicationFailure(BinaryLogClient client, Exception ex) { }
+        public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
+            logger.warning(getStackTrace(ex));
+        }
 
-        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) { }
+        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
+            logger.warning(getStackTrace(ex));
+        }
 
         public void onDisconnect(BinaryLogClient client) { }
 
