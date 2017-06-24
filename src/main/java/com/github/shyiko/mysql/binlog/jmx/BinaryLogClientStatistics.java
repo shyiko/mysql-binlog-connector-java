@@ -31,6 +31,7 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     private AtomicReference<EventHeader> lastEventHeader = new AtomicReference<EventHeader>();
     private AtomicLong timestampOfLastEvent = new AtomicLong();
     private AtomicLong totalNumberOfEventsSeen = new AtomicLong();
+    private AtomicLong totalBytesReceived = new AtomicLong();
     private AtomicLong numberOfSkippedEvents = new AtomicLong();
     private AtomicLong numberOfDisconnects = new AtomicLong();
 
@@ -73,6 +74,11 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     }
 
     @Override
+    public long getTotalBytesReceived() {
+        return totalBytesReceived.get();
+    }
+
+    @Override
     public long getNumberOfSkippedEvents() {
         return numberOfSkippedEvents.get();
     }
@@ -87,15 +93,18 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
         lastEventHeader.set(null);
         timestampOfLastEvent.set(0);
         totalNumberOfEventsSeen.set(0);
+        totalBytesReceived.set(0);
         numberOfSkippedEvents.set(0);
         numberOfDisconnects.set(0);
     }
 
     @Override
     public void onEvent(Event event) {
-        lastEventHeader.set(event.getHeader());
+        EventHeader header = event.getHeader();
+        lastEventHeader.set(header);
         timestampOfLastEvent.set(getCurrentTimeMillis());
         totalNumberOfEventsSeen.getAndIncrement();
+        totalBytesReceived.getAndAdd(header.getHeaderLength() + header.getDataLength());
     }
 
     @Override
