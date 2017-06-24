@@ -24,6 +24,7 @@ public interface BinaryLogClientStatisticsMXBean {
     long getSecondsSinceLastEvent();
     long getSecondsBehindMaster();
     long getTotalNumberOfEventsSeen();
+    long getTotalBytesReceived();
     long getNumberOfSkippedEvents();
     long getNumberOfDisconnects();
     void reset();
