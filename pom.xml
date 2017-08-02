@@ -231,6 +231,8 @@
                             -Dvagrant.integration.box=supplement/vagrant/mysql-5.6.12-sandbox-prepackaged
                         ./mvnw -P coverage verify \
                             -Dvagrant.integration.box=supplement/vagrant/mysql-5.7.15-sandbox-prepackaged
+                        ./mvnw -P coverage,mysql-8-compat verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-8.0.1-sandbox-prepackaged
 
                         # submit coverage report to coveralls
                         ./mvnw -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
@@ -253,6 +255,17 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>mysql-8-compat</id>
+            <dependencies>
+                <dependency>
+                    <groupId>mysql</groupId>
+                    <artifactId>mysql-connector-java</artifactId>
+                    <version>8.0.7-dmr</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
         <profile>
             <id>coverage</id>
             <build>
