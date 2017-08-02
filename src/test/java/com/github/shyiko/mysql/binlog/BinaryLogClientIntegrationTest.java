@@ -355,7 +355,7 @@ public class BinaryLogClientIntegrationTest {
 
     @Test
     public void testDeserializationOfGEOMETRY() throws Exception {
-        assertEquals(writeAndCaptureRow("geometry", "GeomFromText('POINT(40.717957 -73.736501)')"),
+        assertEquals(writeAndCaptureRow("geometry", "ST_GeomFromText('POINT(40.717957 -73.736501)')"),
             new Serializable[]{new byte[] {0, 0, 0, 0, 1, 1, 0, 0, 0, -106, 119, -43, 3, -26, 91, 68,
                 64, 42, 30, 23, -43, 34, 111, 82, -64}});
     }
@@ -540,7 +540,8 @@ public class BinaryLogClientIntegrationTest {
                 @Override
                 public void execute(Statement statement) throws SQLException {
                     statement.execute("create table geometry_table (location geometry)");
-                    statement.execute("insert into geometry_table values(GeomFromText('POINT(40.717957 -73.736501)'))");
+                    statement.execute(
+                        "insert into geometry_table values(ST_GeomFromText('POINT(40.717957 -73.736501)'))");
                     statement.execute("drop table geometry_table");
                 }
             });
