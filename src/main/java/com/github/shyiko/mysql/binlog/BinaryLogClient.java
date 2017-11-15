@@ -127,6 +127,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private long serverId = 65535;
     private volatile String binlogFilename;
     private volatile long binlogPosition = 4;
+    private final Object binlogAccessLock = new Object();
     private volatile long connectionId;
     private SSLMode sslMode = SSLMode.DISABLED;
 
@@ -843,8 +844,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             throw new IOException("Failed to determine binlog filename/position");
         }
         ResultSetRowPacket resultSetRow = resultSet[0];
-        binlogFilename = resultSetRow.getValue(0);
-        binlogPosition = Long.parseLong(resultSetRow.getValue(1));
+        setBinlogPair(resultSetRow.getValue(0), Long.parseLong(resultSetRow.getValue(1)));
     }
 
     private ChecksumType fetchBinlogChecksum() throws IOException {
@@ -956,8 +956,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             } else {
                 rotateEventData = (RotateEventData) eventData;
             }
-            binlogFilename = rotateEventData.getBinlogFilename();
-            binlogPosition = rotateEventData.getBinlogPosition();
+            setBinlogPair(rotateEventData.getBinlogFilename(), rotateEventData.getBinlogPosition());
         } else
         // do not update binlogPosition on TABLE_MAP so that in case of reconnect (using a different instance of
         // client) table mapping cache could be reconstructed before hitting row mutation event
@@ -967,6 +966,19 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             if (nextBinlogPosition > 0) {
                 binlogPosition = nextBinlogPosition;
             }
+        }
+    }
+
+    private void setBinlogPair(String binlogFilename, long binlogPosition) {
+        synchronized (binlogAccessLock) {
+            this.binlogFilename = binlogFilename;
+            this.binlogPosition = binlogPosition;
+        }
+    }
+
+    public Object[] getBinlogPair() {
+        synchronized (binlogAccessLock) {
+            return new Object[]{binlogFilename, binlogPosition};
         }
     }
 
