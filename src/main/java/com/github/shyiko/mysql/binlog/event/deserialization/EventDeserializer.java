@@ -40,7 +40,6 @@ public class EventDeserializer {
 
     private EnumSet<CompatibilityMode> compatibilitySet = EnumSet.noneOf(CompatibilityMode.class);
     private int checksumLength;
-    private int serverTimezoneDiff = 0;
 
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
