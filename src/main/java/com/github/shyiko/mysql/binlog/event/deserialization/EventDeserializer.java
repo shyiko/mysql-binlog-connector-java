@@ -27,6 +27,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.TimeZone;
 
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
@@ -140,6 +141,23 @@ public class EventDeserializer {
 
     public void setChecksumType(ChecksumType checksumType) {
         this.checksumLength = checksumType.getLength();
+    }
+    
+    /**
+     * @see set timezone setting to calculate unix_timestamp
+     */
+    public void setServerTimeZone(String tzId) {
+    		// Check valiad timezone, invalid timezone would be UTC
+    		String tz = TimeZone.getTimeZone(tzId).getID();
+    		
+        for (EventDataDeserializer eventDataDeserializer : eventDataDeserializers.values()) {
+            if (eventDataDeserializer instanceof AbstractRowsEventDataDeserializer) {
+                AbstractRowsEventDataDeserializer deserializer =
+                        (AbstractRowsEventDataDeserializer) eventDataDeserializer;
+                // calculate time diff from UTC
+                deserializer.setServerTimezoneDiff(TimeZone.getTimeZone(tz).getRawOffset());
+            }
+        }
     }
 
     /**
