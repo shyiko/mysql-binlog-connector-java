@@ -72,6 +72,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     private boolean deserializeDateAndTimeAsLong;
+    private boolean deserializeInvalidDateAndTimeAsZero;
     private boolean microsecondsPrecision;
     private boolean deserializeCharAndBinaryAsByteArray;
 
@@ -81,6 +82,10 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     void setDeserializeDateAndTimeAsLong(boolean value) {
         this.deserializeDateAndTimeAsLong = value;
+    }
+
+    void setDeserializeInvalidDateAndTimeAsZero(boolean value) {
+        this.deserializeInvalidDateAndTimeAsZero = value;
     }
 
     void setMicrosecondsPrecision(boolean value) {
@@ -409,7 +414,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     protected Long asUnixTime(int year, int month, int day, int hour, int minute, int second, int millis) {
         // https://dev.mysql.com/doc/refman/5.0/en/datetime.html
         if (year == 0 || month == 0 || day == 0) {
-            return null;
+            return deserializeInvalidDateAndTimeAsZero ? 0L : null;
         }
         return UnixTime.from(year, month, day, hour, minute, second, millis);
     }

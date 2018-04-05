@@ -163,6 +163,9 @@ public class EventDeserializer {
             deserializer.setMicrosecondsPrecision(
                 compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO)
             );
+            deserializer.setDeserializeInvalidDateAndTimeAsZero(
+                compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_ZERO)
+            );
             deserializer.setDeserializeCharAndBinaryAsByteArray(
                 compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY)
             );
@@ -226,6 +229,7 @@ public class EventDeserializer {
     /**
      * @see CompatibilityMode#DATE_AND_TIME_AS_LONG
      * @see CompatibilityMode#DATE_AND_TIME_AS_LONG_MICRO
+     * @see CompatibilityMode#INVALID_DATE_AND_TIME_AS_ZERO
      * @see CompatibilityMode#CHAR_AND_BINARY_AS_BYTE_ARRAY
      */
     public enum CompatibilityMode {
@@ -241,6 +245,13 @@ public class EventDeserializer {
          * Same as {@link CompatibilityMode#DATE_AND_TIME_AS_LONG} but values are returned in microseconds.
          */
         DATE_AND_TIME_AS_LONG_MICRO,
+        /**
+         * Return 0 instead of null if year/month/day is 0.
+         * Affects DATETIME/DATETIME_V2/DATE/TIME/TIME_V2.
+         *
+         * <p>This option is going to be enabled by default starting from mysql-binlog-connector-java@1.0.0.
+         */
+        INVALID_DATE_AND_TIME_AS_ZERO,
         /**
          * Return CHAR/VARCHAR/BINARY/VARBINARY values as byte[]|s (instead of String|s).
          *
