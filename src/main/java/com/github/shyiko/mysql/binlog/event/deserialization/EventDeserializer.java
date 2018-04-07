@@ -156,16 +156,23 @@ public class EventDeserializer {
         if (eventDataDeserializer instanceof AbstractRowsEventDataDeserializer) {
             AbstractRowsEventDataDeserializer deserializer =
                 (AbstractRowsEventDataDeserializer) eventDataDeserializer;
-            deserializer.setDeserializeDateAndTimeAsLong(
+            boolean deserializeDateAndTimeAsLong =
                 compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG) ||
-                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO)
-            );
+                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO);
+            deserializer.setDeserializeDateAndTimeAsLong(deserializeDateAndTimeAsLong);
             deserializer.setMicrosecondsPrecision(
                 compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO)
             );
-            deserializer.setDeserializeInvalidDateAndTimeAsZero(
-                compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_ZERO)
-            );
+            if (compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_ZERO)) {
+                deserializer.setInvalidDateAndTimeRepresentation(0L);
+            }
+            if (compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE)) {
+                if (!deserializeDateAndTimeAsLong) {
+                    throw new IllegalArgumentException("INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE requires " +
+                        "DATE_AND_TIME_AS_LONG or DATE_AND_TIME_AS_LONG_MICRO");
+                }
+                deserializer.setInvalidDateAndTimeRepresentation(-1L);
+            }
             deserializer.setDeserializeCharAndBinaryAsByteArray(
                 compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY)
             );
@@ -248,10 +255,15 @@ public class EventDeserializer {
         /**
          * Return 0 instead of null if year/month/day is 0.
          * Affects DATETIME/DATETIME_V2/DATE/TIME/TIME_V2.
+         */
+        INVALID_DATE_AND_TIME_AS_ZERO,
+        /**
+         * Return -1 instead of null if year/month/day is 0.
+         * Affects DATETIME/DATETIME_V2/DATE/TIME/TIME_V2.
          *
          * <p>This option is going to be enabled by default starting from mysql-binlog-connector-java@1.0.0.
          */
-        INVALID_DATE_AND_TIME_AS_ZERO,
+        INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE,
         /**
          * Return CHAR/VARCHAR/BINARY/VARBINARY values as byte[]|s (instead of String|s).
          *

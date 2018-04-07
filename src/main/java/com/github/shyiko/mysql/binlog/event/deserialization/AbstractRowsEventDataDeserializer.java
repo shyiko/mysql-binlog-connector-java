@@ -72,7 +72,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     private boolean deserializeDateAndTimeAsLong;
-    private boolean deserializeInvalidDateAndTimeAsZero;
+    private Long invalidDateAndTimeRepresentation;
     private boolean microsecondsPrecision;
     private boolean deserializeCharAndBinaryAsByteArray;
 
@@ -84,8 +84,9 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         this.deserializeDateAndTimeAsLong = value;
     }
 
-    void setDeserializeInvalidDateAndTimeAsZero(boolean value) {
-        this.deserializeInvalidDateAndTimeAsZero = value;
+    // value to return in case of 0000-00-00 00:00:00, 0000-00-00, etc.
+    void setInvalidDateAndTimeRepresentation(Long value) {
+        this.invalidDateAndTimeRepresentation = value;
     }
 
     void setMicrosecondsPrecision(boolean value) {
@@ -238,7 +239,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     private Long castTimestamp(Long timestamp, int fsp) {
-        if (timestamp != null && microsecondsPrecision) {
+        if (microsecondsPrecision && timestamp != null && timestamp > -1) {
             return timestamp * 1000 + fsp % 1000;
         }
         return timestamp;
@@ -414,7 +415,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     protected Long asUnixTime(int year, int month, int day, int hour, int minute, int second, int millis) {
         // https://dev.mysql.com/doc/refman/5.0/en/datetime.html
         if (year == 0 || month == 0 || day == 0) {
-            return deserializeInvalidDateAndTimeAsZero ? 0L : null;
+            return invalidDateAndTimeRepresentation;
         }
         return UnixTime.from(year, month, day, hour, minute, second, millis);
     }
