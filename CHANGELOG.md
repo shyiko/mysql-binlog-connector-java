@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.16.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.16.0...0.16.1) - 2018-04-12
+
+### Fixed
+- `DATE_AND_TIME_AS_LONG_MICRO` handling regression ([introduced in 0.15.0](https://github.com/shyiko/mysql-binlog-connector-java/commit/2530a83283ac681ae9ab8a99acfa6aa6b4e9d288#r28556787)).
+
 ## [0.16.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.15.0...0.16.0) - 2018-04-12
 
 ### Added
