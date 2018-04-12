@@ -2,15 +2,20 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.16.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.15.0...0.16.0) - 2018-04-12
+
+### Added
+- `EventDeserializer::setCompatibilityMode(INVALID_DATE_AND_TIME_AS_MIN_VALUE)` ([#210](https://github.com/shyiko/mysql-binlog-connector-java/issues/210)).
+
 ## [0.15.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.14.0...0.15.0) - 2018-04-07
 
 ### Added
-- EventDeserializer `CompatibilityMode.INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE` (false by default until 1.0.0) ([#210](https://github.com/shyiko/mysql-binlog-connector-java/issues/210)).
+- `EventDeserializer::setCompatibilityMode(INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE)` ([#210](https://github.com/shyiko/mysql-binlog-connector-java/issues/210)).
 
 ## [0.14.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.13.0...0.14.0) - 2018-04-04
 
 ### Added
-- EventDeserializer `CompatibilityMode.INVALID_DATE_AND_TIME_AS_ZERO` ([#210](https://github.com/shyiko/mysql-binlog-connector-java/issues/210)).
+- `EventDeserializer::setCompatibilityMode(INVALID_DATE_AND_TIME_AS_ZERO)` ([#210](https://github.com/shyiko/mysql-binlog-connector-java/issues/210)).
 
 ## [0.13.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.12.2...0.13.0) - 2017-06-04
 
