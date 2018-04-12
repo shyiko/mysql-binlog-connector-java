@@ -173,6 +173,13 @@ public class EventDeserializer {
                 }
                 deserializer.setInvalidDateAndTimeRepresentation(-1L);
             }
+            if (compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_MIN_VALUE)) {
+                if (!deserializeDateAndTimeAsLong) {
+                    throw new IllegalArgumentException("INVALID_DATE_AND_TIME_AS_MIN_VALUE requires " +
+                        "DATE_AND_TIME_AS_LONG or DATE_AND_TIME_AS_LONG_MICRO");
+                }
+                deserializer.setInvalidDateAndTimeRepresentation(Long.MIN_VALUE);
+            }
             deserializer.setDeserializeCharAndBinaryAsByteArray(
                 compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY)
             );
@@ -260,10 +267,13 @@ public class EventDeserializer {
         /**
          * Return -1 instead of null if year/month/day is 0.
          * Affects DATETIME/DATETIME_V2/DATE/TIME/TIME_V2.
-         *
-         * <p>This option is going to be enabled by default starting from mysql-binlog-connector-java@1.0.0.
          */
         INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE,
+        /**
+         * Return Long.MIN_VALUE instead of null if year/month/day is 0.
+         * Affects DATETIME/DATETIME_V2/DATE/TIME/TIME_V2.
+         */
+        INVALID_DATE_AND_TIME_AS_MIN_VALUE,
         /**
          * Return CHAR/VARCHAR/BINARY/VARBINARY values as byte[]|s (instead of String|s).
          *
