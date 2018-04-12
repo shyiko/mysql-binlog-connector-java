@@ -239,7 +239,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     private Long castTimestamp(Long timestamp, int fsp) {
-        if (microsecondsPrecision && timestamp != null && timestamp > -1) {
+        if (microsecondsPrecision && timestamp != null && !timestamp.equals(invalidDateAndTimeRepresentation)) {
             return timestamp * 1000 + fsp % 1000;
         }
         return timestamp;
