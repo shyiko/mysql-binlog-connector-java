@@ -547,7 +547,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     lifecycleListener.onConnect(this);
                 }
             }
-            if (keepAlive && !isKeepAliveThreadRunning()) {
+            // Any of lifecycle listeners may disconnect the client, so it is important to check
+            // connection status before starting keep alive thread.
+            if (connected && keepAlive && !isKeepAliveThreadRunning()) {
                 spawnKeepAliveThread();
             }
             ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
@@ -714,6 +716,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     return newNamedThread(runnable, "blc-keepalive-" + hostname + ":" + port);
                 }
             });
+        keepAliveThreadExecutor = threadExecutor;
         threadExecutor.submit(new Runnable() {
             @Override
             public void run() {
@@ -753,7 +756,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
             }
         });
-        keepAliveThreadExecutor = threadExecutor;
     }
 
     private Thread newNamedThread(Runnable runnable, String threadName) {
