@@ -40,8 +40,8 @@ public class BinaryLogFileReaderIntegrationTest {
 
     @Test
     public void testNextEvent() throws Exception {
-        BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
-                new FileInputStream("src/test/resources/mysql-bin.sakila.gz")));
+        BinaryLogFileReader reader = new BinaryLogFileReader("mysql-bin.sakila",
+            new GZIPInputStream(new FileInputStream("src/test/resources/mysql-bin.sakila.gz")));
         try {
             int numberOfEvents = 0;
             while ((reader.readEvent()) != null) {
@@ -68,7 +68,7 @@ public class BinaryLogFileReaderIntegrationTest {
         EventDeserializer eventDeserializer = new EventDeserializer();
         eventDeserializer.setEventDataDeserializer(EventType.XID, new NullEventDataDeserializer());
         eventDeserializer.setEventDataDeserializer(EventType.QUERY, new ByteArrayEventDataDeserializer());
-        BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
+        BinaryLogFileReader reader = new BinaryLogFileReader("mysql-bin.sakila.gz", new GZIPInputStream(
             new FileInputStream("src/test/resources/mysql-bin.sakila.gz")), eventDeserializer);
         try {
             boolean n = true, b = true;

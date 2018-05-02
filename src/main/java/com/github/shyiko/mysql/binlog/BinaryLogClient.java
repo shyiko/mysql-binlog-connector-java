@@ -889,7 +889,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 try {
                     event = eventDeserializer.nextEvent(packetLength == MAX_PACKET_LENGTH ?
                         new ByteArrayInputStream(readPacketSplitInChunks(inputStream, packetLength - 1)) :
-                        inputStream);
+                        inputStream, binlogFilename, binlogPosition);
                     if (event == null) {
                         throw new EOFException();
                     }
@@ -1047,7 +1047,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void notifyEventListeners(Event event) {
         if (event.getData() instanceof EventDeserializer.EventDataWrapper) {
-            event = new Event(event.getHeader(), ((EventDeserializer.EventDataWrapper) event.getData()).getExternal());
+            event = new Event(event.getHeader(), ((EventDeserializer.EventDataWrapper) event.getData()).getExternal(),
+                binlogFilename, binlogPosition);
         }
         synchronized (eventListeners) {
             for (EventListener eventListener : eventListeners) {

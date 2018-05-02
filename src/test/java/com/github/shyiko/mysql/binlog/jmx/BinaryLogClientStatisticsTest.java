@@ -107,6 +107,6 @@ public class BinaryLogClientStatisticsTest {
         header.setEventType(type);
         header.setServerId(serverId);
         header.setNextPosition(nextPosition);
-        return new Event(header, null);
+        return new Event(header, null, "filename", 4);
     }
 }

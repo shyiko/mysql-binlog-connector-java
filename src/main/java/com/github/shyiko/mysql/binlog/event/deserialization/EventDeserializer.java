@@ -189,7 +189,8 @@ public class EventDeserializer {
     /**
      * @return deserialized event or null in case of end-of-stream
      */
-    public Event nextEvent(ByteArrayInputStream inputStream) throws IOException {
+    public Event nextEvent(ByteArrayInputStream inputStream, String binlogFilename, long binlogOffset)
+        throws IOException {
         if (inputStream.peek() == -1) {
             return null;
         }
@@ -212,7 +213,7 @@ public class EventDeserializer {
             }
             tableMapEventByTableId.put(tableMapEvent.getTableId(), tableMapEvent);
         }
-        return new Event(eventHeader, eventData);
+        return new Event(eventHeader, eventData, binlogFilename, binlogOffset);
     }
 
     private EventData deserializeEventData(ByteArrayInputStream inputStream, EventHeader eventHeader,
