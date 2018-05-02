@@ -34,30 +34,39 @@ import java.util.Arrays;
  */
 public class BinaryLogFileReader implements Closeable {
 
-    public static final byte[] MAGIC_HEADER = new byte[]{(byte) 0xfe, (byte) 0x62, (byte) 0x69, (byte) 0x6e};
+    public static final byte[] MAGIC_HEADER = new byte[] {(byte) 0xfe, (byte) 0x62, (byte) 0x69, (byte) 0x6e};
 
     private final ByteArrayInputStream inputStream;
     private final EventDeserializer eventDeserializer;
+    private final String filename;
+    private long offset;
 
     public BinaryLogFileReader(File file) throws IOException {
         this(file, new EventDeserializer());
     }
 
     public BinaryLogFileReader(File file, EventDeserializer eventDeserializer) throws IOException {
-        this(file != null ? new BufferedInputStream(new FileInputStream(file)) : null, eventDeserializer);
+        this(file != null ? file.getName() : null,
+            file != null ? new BufferedInputStream(new FileInputStream(file)) : null,
+            eventDeserializer);
     }
 
-    public BinaryLogFileReader(InputStream inputStream) throws IOException {
-        this(inputStream, new EventDeserializer());
+    public BinaryLogFileReader(String filename, InputStream inputStream) throws IOException {
+        this(filename, inputStream, new EventDeserializer());
     }
 
-    public BinaryLogFileReader(InputStream inputStream, EventDeserializer eventDeserializer) throws IOException {
+    public BinaryLogFileReader(String filename, InputStream inputStream, EventDeserializer eventDeserializer)
+        throws IOException {
+        if (filename == null) {
+            throw new IllegalArgumentException("File name cannot be NULL");
+        }
         if (inputStream == null) {
             throw new IllegalArgumentException("Input stream cannot be NULL");
         }
         if (eventDeserializer == null) {
             throw new IllegalArgumentException("Event deserializer cannot be NULL");
         }
+        this.filename = filename;
         this.inputStream = new ByteArrayInputStream(inputStream);
         try {
             byte[] magicHeader = this.inputStream.read(MAGIC_HEADER.length);
@@ -79,7 +88,7 @@ public class BinaryLogFileReader implements Closeable {
      * @return deserialized event or null in case of end-of-stream
      */
     public Event readEvent() throws IOException {
-        return eventDeserializer.nextEvent(inputStream);
+        return eventDeserializer.nextEvent(inputStream, filename, offset++);
     }
 
     @Override

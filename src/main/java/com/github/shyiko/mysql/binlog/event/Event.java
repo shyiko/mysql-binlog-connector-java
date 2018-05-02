@@ -24,10 +24,14 @@ public class Event implements Serializable {
 
     private EventHeader header;
     private EventData data;
+    private String binlogFilename;
+    private long binlogPosition;
 
-    public Event(EventHeader header, EventData data) {
+    public Event(EventHeader header, EventData data, String binlogFilename, long binlogPosition) {
         this.header = header;
         this.data = data;
+        this.binlogFilename = binlogFilename;
+        this.binlogPosition = binlogPosition;
     }
 
     @SuppressWarnings("unchecked")
