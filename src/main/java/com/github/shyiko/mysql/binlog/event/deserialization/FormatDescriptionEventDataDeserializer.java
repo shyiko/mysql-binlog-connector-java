@@ -15,6 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
+import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.FormatDescriptionEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
@@ -32,7 +33,9 @@ public class FormatDescriptionEventDataDeserializer implements EventDataDeserial
         eventData.setServerVersion(inputStream.readString(50).trim());
         inputStream.skip(4); // redundant, present in a header
         eventData.setHeaderLength(inputStream.readInteger(1));
-        // lengths for all event types
+        // skip lengths for some event types
+        inputStream.skip(EventType.FORMAT_DESCRIPTION.ordinal() - 1);
+        eventData.setEventLength(inputStream.readInteger(1));
         return eventData;
     }
 }

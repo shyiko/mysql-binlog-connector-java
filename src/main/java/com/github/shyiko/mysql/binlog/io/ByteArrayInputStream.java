@@ -28,6 +28,8 @@ public class ByteArrayInputStream extends InputStream {
     private InputStream inputStream;
     private Integer peek;
     private int blockLength = -1;
+    private Integer peekMark;
+    private int blockMark;
 
     public ByteArrayInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -218,4 +220,17 @@ public class ByteArrayInputStream extends InputStream {
         }
     }
 
+    @Override
+    public synchronized void mark(int readlimit) {
+        inputStream.mark(readlimit);
+        peekMark = peek;
+        blockMark = blockLength;
+    }
+
+    @Override
+    public synchronized void reset() throws IOException {
+        inputStream.reset();
+        peek = peekMark;
+        blockLength = blockMark;
+    }
 }

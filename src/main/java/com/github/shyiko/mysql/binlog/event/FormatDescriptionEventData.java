@@ -23,6 +23,7 @@ public class FormatDescriptionEventData implements EventData {
     private int binlogVersion;
     private String serverVersion;
     private int headerLength;
+    private int eventLength;
 
     public int getBinlogVersion() {
         return binlogVersion;
@@ -46,6 +47,14 @@ public class FormatDescriptionEventData implements EventData {
 
     public void setHeaderLength(int headerLength) {
         this.headerLength = headerLength;
+    }
+
+    public void setEventLength(int eventLength) {
+        this.eventLength = eventLength;
+    }
+
+    public int getEventLength() {
+        return eventLength;
     }
 
     @Override

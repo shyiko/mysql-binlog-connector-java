@@ -18,7 +18,9 @@ package com.github.shyiko.mysql.binlog.event.deserialization;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
+import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.FormatDescriptionEventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
@@ -238,6 +240,27 @@ public class EventDeserializer {
     public EventDataDeserializer getEventDataDeserializer(EventType eventType) {
         EventDataDeserializer eventDataDeserializer = eventDataDeserializers.get(eventType);
         return eventDataDeserializer != null ? eventDataDeserializer : defaultEventDataDeserializer;
+    }
+
+    public EventDeserializer detectChecksumType(ByteArrayInputStream inputStream)
+        throws IOException {
+        inputStream.mark(EventHeaderV4.HEADER_LEN);
+        EventHeader eventHeader = eventHeaderDeserializer.deserialize(inputStream);
+        inputStream.reset();
+
+        inputStream.mark((int) (EventHeaderV4.HEADER_LEN + eventHeader.getDataLength()));
+        inputStream.skip(EventHeaderV4.HEADER_LEN); // skip header, not interpret it twice
+        FormatDescriptionEventDataDeserializer deserializer = new FormatDescriptionEventDataDeserializer();
+        FormatDescriptionEventData formatDescriptionEventData = deserializer.deserialize(inputStream);
+        int eventLength = formatDescriptionEventData.getEventLength();
+        // 1 byte means checksum algo, 4 byte is crc checksum content
+        if (eventLength + 1 + 4 == eventHeader.getDataLength()) {
+            setChecksumType(ChecksumType.CRC32);
+        } else {
+            setChecksumType(ChecksumType.NONE);
+        }
+        inputStream.reset();
+        return this;
     }
 
     /**
