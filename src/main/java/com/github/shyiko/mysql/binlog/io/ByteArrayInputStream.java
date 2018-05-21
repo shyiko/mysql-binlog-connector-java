@@ -221,14 +221,14 @@ public class ByteArrayInputStream extends InputStream {
     }
 
     @Override
-    public synchronized void mark(int readlimit) {
+    public void mark(int readlimit) {
         inputStream.mark(readlimit);
         peekMark = peek;
         blockMark = blockLength;
     }
 
     @Override
-    public synchronized void reset() throws IOException {
+    public void reset() throws IOException {
         inputStream.reset();
         peek = peekMark;
         blockLength = blockMark;

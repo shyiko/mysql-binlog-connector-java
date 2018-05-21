@@ -57,7 +57,7 @@ public class BinaryLogFileReaderIntegrationTest {
     public void testCRCChecksum() throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
         BinaryLogFileReader reader = new BinaryLogFileReader(
-                new FileInputStream("/data/mysql-bin.000001"), eventDeserializer);
+                new FileInputStream("src/test/resources/mysql-bin.000001"), eventDeserializer);
         readAll(reader, 303);
     }
 

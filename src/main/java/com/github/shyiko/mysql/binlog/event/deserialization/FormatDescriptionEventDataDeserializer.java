@@ -33,7 +33,8 @@ public class FormatDescriptionEventDataDeserializer implements EventDataDeserial
         eventData.setServerVersion(inputStream.readString(50).trim());
         inputStream.skip(4); // redundant, present in a header
         eventData.setHeaderLength(inputStream.readInteger(1));
-        // skip lengths for some event types
+        // https://dev.mysql.com/doc/internals/en/format-description-event.html
+        // next part: a array indexed by `Binlog Event Type - 1` to extract the length of the event specific header.
         inputStream.skip(EventType.FORMAT_DESCRIPTION.ordinal() - 1);
         eventData.setEventLength(inputStream.readInteger(1));
         return eventData;
