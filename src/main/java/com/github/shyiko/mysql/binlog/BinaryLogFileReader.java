@@ -58,13 +58,12 @@ public class BinaryLogFileReader implements Closeable {
         if (eventDeserializer == null) {
             throw new IllegalArgumentException("Event deserializer cannot be NULL");
         }
-        this.inputStream = new ByteArrayInputStream(new BufferedInputStream(inputStream));
+        this.inputStream = new ByteArrayInputStream(inputStream);
         try {
             byte[] magicHeader = this.inputStream.read(MAGIC_HEADER.length);
             if (!Arrays.equals(magicHeader, MAGIC_HEADER)) {
                 throw new IOException("Not a valid binary log");
             }
-            this.eventDeserializer = eventDeserializer.detectChecksumType(this.inputStream);
         } catch (IOException e) {
             try {
                 this.inputStream.close();
@@ -73,6 +72,7 @@ public class BinaryLogFileReader implements Closeable {
             }
             throw e;
         }
+        this.eventDeserializer = eventDeserializer;
     }
 
     /**

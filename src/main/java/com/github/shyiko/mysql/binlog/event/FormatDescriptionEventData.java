@@ -64,6 +64,7 @@ public class FormatDescriptionEventData implements EventData {
         sb.append("{binlogVersion=").append(binlogVersion);
         sb.append(", serverVersion='").append(serverVersion).append('\'');
         sb.append(", headerLength=").append(headerLength);
+        sb.append(", eventLength=").append(eventLength);
         sb.append('}');
         return sb.toString();
     }
