@@ -1135,9 +1135,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void terminateConnect() throws IOException {
         do {
-            disconnectChannel();
+            try {
+                disconnectChannel();
+            } finally {
+                connectLock.unlock();
+            }
         } while (!tryLockInterruptibly(connectLock, 1000, TimeUnit.MILLISECONDS));
-        connectLock.unlock();
     }
 
     private static boolean tryLockInterruptibly(Lock lock, long time, TimeUnit unit) {
