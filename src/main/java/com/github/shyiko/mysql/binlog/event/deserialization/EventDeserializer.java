@@ -205,8 +205,7 @@ public class EventDeserializer {
         EventData eventData = deserializeEventData(inputStream, eventHeader, eventDataDeserializer);
         if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
             // 1 byte means checksum algo, 4 byte is crc checksum content
-            if (((FormatDescriptionEventData) eventData).getEventLength() + 1 + 4
-                == eventHeader.getDataLength()) {
+            if (((FormatDescriptionEventData) eventData).getEventLength() + 1 + 4 == eventHeader.getDataLength()) {
                 setChecksumType(ChecksumType.CRC32);
             } else {
                 setChecksumType(ChecksumType.NONE);
