@@ -19,6 +19,7 @@ import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.FormatDescriptionEventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
@@ -195,11 +196,21 @@ public class EventDeserializer {
         }
         EventHeader eventHeader = eventHeaderDeserializer.deserialize(inputStream);
         EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
-        if (eventHeader.getEventType() == EventType.TABLE_MAP && tableMapEventDataDeserializer != null) {
+        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
+            eventDataDeserializer = new FormatDescriptionEventDataDeserializer();
+            setChecksumType(ChecksumType.NONE);
+        } else if (eventHeader.getEventType() == EventType.TABLE_MAP && tableMapEventDataDeserializer != null) {
             eventDataDeserializer = tableMapEventDataDeserializer;
         }
         EventData eventData = deserializeEventData(inputStream, eventHeader, eventDataDeserializer);
-        if (eventHeader.getEventType() == EventType.TABLE_MAP) {
+        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
+            // 1 byte means checksum algo, 4 byte is crc checksum content
+            if (((FormatDescriptionEventData) eventData).getEventLength() + 1 + 4 == eventHeader.getDataLength()) {
+                setChecksumType(ChecksumType.CRC32);
+            } else {
+                setChecksumType(ChecksumType.NONE);
+            }
+        } else if (eventHeader.getEventType() == EventType.TABLE_MAP) {
             TableMapEventData tableMapEvent;
             if (eventData instanceof EventDataWrapper) {
                 EventDataWrapper eventDataWrapper = (EventDataWrapper) eventData;
@@ -217,8 +228,6 @@ public class EventDeserializer {
 
     private EventData deserializeEventData(ByteArrayInputStream inputStream, EventHeader eventHeader,
             EventDataDeserializer eventDataDeserializer) throws EventDataDeserializationException {
-        // todo: use checksum algorithm descriptor from FormatDescriptionEvent
-        // (as per http://dev.mysql.com/worklog/task/?id=2540)
         int eventBodyLength = (int) eventHeader.getDataLength() - checksumLength;
         EventData eventData;
         try {

@@ -42,12 +42,32 @@ public class BinaryLogFileReaderIntegrationTest {
     public void testNextEvent() throws Exception {
         BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
                 new FileInputStream("src/test/resources/mysql-bin.sakila.gz")));
+        readAll(reader, 1462);
+    }
+
+    @Test
+    public void testNoChecksum() throws Exception {
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
+                new FileInputStream("src/test/resources/mysql-bin.sakila.gz")), eventDeserializer);
+        readAll(reader, 1462);
+    }
+
+    @Test
+    public void testCRCChecksum() throws Exception {
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        BinaryLogFileReader reader = new BinaryLogFileReader(
+                new FileInputStream("src/test/resources/mysql-bin.000001"), eventDeserializer);
+        readAll(reader, 303);
+    }
+
+    private void readAll(BinaryLogFileReader reader, int expect) throws IOException {
         try {
             int numberOfEvents = 0;
             while ((reader.readEvent()) != null) {
                 numberOfEvents++;
             }
-            assertEquals(numberOfEvents, 1462);
+            assertEquals(numberOfEvents, expect);
         } finally {
             reader.close();
         }

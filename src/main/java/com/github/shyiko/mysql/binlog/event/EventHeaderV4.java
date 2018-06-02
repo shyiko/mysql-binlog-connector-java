@@ -21,6 +21,7 @@ package com.github.shyiko.mysql.binlog.event;
  */
 public class EventHeaderV4 implements EventHeader {
 
+    public static final int HEADER_LEN = 19;
     // v1 (MySQL 3.23)
     private long timestamp;
     private EventType eventType;
@@ -87,7 +88,7 @@ public class EventHeaderV4 implements EventHeader {
 
     @Override
     public long getHeaderLength() {
-        return 19;
+        return HEADER_LEN;
     }
 
     @Override
