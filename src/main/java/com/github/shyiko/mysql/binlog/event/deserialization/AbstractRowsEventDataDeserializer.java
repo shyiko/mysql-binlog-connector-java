@@ -22,6 +22,7 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Map;
@@ -75,6 +76,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private Long invalidDateAndTimeRepresentation;
     private boolean microsecondsPrecision;
     private boolean deserializeCharAndBinaryAsByteArray;
+    private boolean deserializeDateAndTimeAsString;
 
     public AbstractRowsEventDataDeserializer(Map<Long, TableMapEventData> tableMapEventByTableId) {
         this.tableMapEventByTableId = tableMapEventByTableId;
@@ -82,6 +84,9 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     void setDeserializeDateAndTimeAsLong(boolean value) {
         this.deserializeDateAndTimeAsLong = value;
+    }
+    void setDeserializeDateAndTimeAsString(boolean value) {
+        this.deserializeDateAndTimeAsString = value;
     }
 
     // value to return in case of 0000-00-00 00:00:00, 0000-00-00, etc.
@@ -247,6 +252,15 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     protected Serializable deserializeDate(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            if (value == 0) {
+                result = "0000-00-00";
+            } else {
+                result = String.format("%04d-%02d-%02d", value / (16 * 32), value / 32 % 16, value % 32);
+            }
+            return result;
+        }
         int day = value % 32;
         value >>>= 5;
         int month = value % 16;
@@ -260,6 +274,21 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     protected Serializable deserializeTime(ByteArrayInputStream inputStream) throws IOException {
         int value = inputStream.readInteger(3);
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            final int i32 = value;
+            final int u32 = Math.abs(i32);
+            if (i32 == 0) {
+                result = "00:00:00";
+            } else {
+                result = String.format("%s%02d:%02d:%02d",
+                    (i32 >= 0) ? "" : "-",
+                    u32 / 10000,
+                    (u32 % 10000) / 100,
+                    u32 % 100);
+            }
+            return result;
+        }
         int[] split = split(value, 100, 3);
         Long timestamp = asUnixTime(1970, 1, 1, split[2], split[1], split[0], 0);
         if (deserializeDateAndTimeAsLong) {
@@ -284,6 +313,28 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         */
         long time = bigEndianLong(inputStream.read(3), 0, 3);
         int fsp = deserializeFractionalSeconds(meta, inputStream);
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            int sign = bitSlice(time, 0, 1, 24);
+            if (sign == 0) {
+                time = time & 0xffffffL;
+                time = time - 0x800000L;
+            }
+            if (time == 0) {
+                result = "00:00:00";
+            } else {
+                long ultime = Math.abs(time);
+                result = String.format("%s%02d:%02d:%02d",
+                    sign != 0 ? "" : "-",
+                    (int) bitSlice(ultime, 2, 10, 24),
+                    (int) bitSlice(ultime, 12, 6, 24),
+                    (int) bitSlice(ultime, 18, 6, 24));
+            }
+            if (fsp > 0) {
+                result = String.format("%s.%6d", result, fsp);
+            }
+            return result;
+        }
         Long timestamp = asUnixTime(1970, 1, 1,
             bitSlice(time, 2, 10, 24),
             bitSlice(time, 12, 6, 24),
@@ -298,6 +349,16 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     protected Serializable deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
         long timestamp = inputStream.readLong(4) * 1000;
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            if (timestamp == 0) {
+                result = "0000-00-00 00:00:00";
+            } else {
+                String v = new Timestamp(timestamp).toString();
+                result = v.substring(0, v.length() - 2);
+            }
+            return result;
+        }
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, 0);
         }
@@ -307,6 +368,26 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     protected Serializable deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         long millis = bigEndianLong(inputStream.read(4), 0, 4);
         int fsp = deserializeFractionalSeconds(meta, inputStream);
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            String second;
+            if (millis == 0) {
+                second = "0000-00-00 00:00:00";
+            } else {
+                Timestamp time = new Timestamp(millis * 1000);
+                second = time.toString();
+                // 去掉毫秒精度.0
+                second = second.substring(0, second.length() - 2);
+            }
+            if (meta >= 1) {
+                String microSecond = usecondsToStr(fsp, meta);
+                microSecond = microSecond.substring(0, meta);
+                result = second + '.' + microSecond;
+            } else {
+                result = second;
+            }
+            return result;
+        }
         long timestamp = millis * 1000 + fsp / 1000;
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, fsp);
@@ -315,8 +396,26 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     protected Serializable deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
-        int[] split = split(inputStream.readLong(8), 100, 6);
+        Long  i64 = inputStream.readLong(8);
+        int[] split = split(i64, 100, 6);
         Long timestamp = asUnixTime(split[5], split[4], split[3], split[2], split[1], split[0], 0);
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            if (i64 == 0) {
+                result = "0000-00-00 00:00:00";
+            } else {
+                final int d = (int) (i64 / 1000000);
+                final int t = (int) (i64 % 1000000);
+                result = String.format("%04d-%02d-%02d %02d:%02d:%02d",
+                    d / 10000,
+                    (d % 10000) / 100,
+                    d % 100,
+                    t / 10000,
+                    (t % 10000) / 100,
+                    t % 100);
+            }
+            return result;
+        }
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, 0);
         }
@@ -339,8 +438,43 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             + fractional-seconds storage (size depends on meta)
         */
         long datetime = bigEndianLong(inputStream.read(5), 0, 5);
-        int yearMonth = bitSlice(datetime, 1, 17, 40);
         int fsp = deserializeFractionalSeconds(meta, inputStream);
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            int sign = bitSlice(datetime, 0, 0, 40);
+            if (sign == 0) {
+                datetime = datetime & 0xffffffffffL;
+                datetime = datetime - 0x8000000000L;
+            }
+            long intpart = datetime;
+            int frac = fsp;
+
+            String second = null;
+            if (intpart == 0) {
+                second = "0000-00-00 00:00:00";
+            } else {
+                long ymd = intpart >> 17;
+                long ym = ymd >> 5;
+                long hms = intpart % (1 << 17);
+                second = String.format("%04d-%02d-%02d %02d:%02d:%02d",
+                    (int) (ym / 13),
+                    (int) (ym % 13),
+                    (int) (ymd % (1 << 5)),
+                    (int) (hms >> 12),
+                    (int) ((hms >> 6) % (1 << 6)),
+                    (int) (hms % (1 << 6)));
+            }
+            if (meta >= 1) {
+                String microSecond = usecondsToStr(frac, meta);
+                microSecond = microSecond.substring(0, meta);
+                result = second + '.' + microSecond;
+            } else {
+                result = second;
+            }
+
+            return result;
+        }
+        int yearMonth = bitSlice(datetime, 1, 17, 40);
         Long timestamp = asUnixTime(
             yearMonth / 13,
             yearMonth % 13,
@@ -357,7 +491,17 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     protected Serializable deserializeYear(ByteArrayInputStream inputStream) throws IOException {
-        return 1900 + inputStream.readInteger(1);
+        int year = inputStream.readInteger(1);
+        if (deserializeDateAndTimeAsString) {
+            String result;
+            if (year == 0) {
+                result = "0000";
+            } else {
+                result = String.valueOf((short) (year + 1900));
+            }
+            return result;
+        }
+        return 1900 + year;
     }
 
     protected Serializable deserializeString(int length, ByteArrayInputStream inputStream) throws IOException {
@@ -450,6 +594,23 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         }
         result[length - 1] = (int) value;
         return result;
+    }
+
+    private String usecondsToStr(int frac, int meta) {
+        String sec = String.valueOf(frac);
+        if (meta > 6) {
+            throw new IllegalArgumentException("unknow useconds meta : " + meta);
+        }
+        if (sec.length() < 6) {
+            StringBuilder result = new StringBuilder(6);
+            int len = 6 - sec.length();
+            for (; len > 0; len--) {
+                result.append('0');
+            }
+            result.append(sec);
+            sec = result.toString();
+        }
+        return sec.substring(0, meta);
     }
 
     /**
