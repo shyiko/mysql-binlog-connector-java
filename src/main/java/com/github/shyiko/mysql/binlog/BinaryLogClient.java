@@ -64,10 +64,10 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -136,8 +136,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
-    private final List<EventListener> eventListeners = new LinkedList<EventListener>();
-    private final List<LifecycleListener> lifecycleListeners = new LinkedList<LifecycleListener>();
+    private final List<EventListener> eventListeners = new CopyOnWriteArrayList<EventListener>();
+    private final List<LifecycleListener> lifecycleListeners = new CopyOnWriteArrayList<LifecycleListener>();
 
     private SocketFactory socketFactory;
     private SSLSocketFactory sslSocketFactory;
@@ -542,10 +542,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 logger.info("Connected to " + hostname + ":" + port + " at " + position +
                     " (" + (blocking ? "sid:" + serverId + ", " : "") + "cid:" + connectionId + ")");
             }
-            synchronized (lifecycleListeners) {
-                for (LifecycleListener lifecycleListener : lifecycleListeners) {
-                    lifecycleListener.onConnect(this);
-                }
+            for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                lifecycleListener.onConnect(this);
             }
             if (keepAlive && !isKeepAliveThreadRunning()) {
                 spawnKeepAliveThread();
@@ -560,10 +558,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         } finally {
             connectLock.unlock();
             if (notifyWhenDisconnected) {
-                synchronized (lifecycleListeners) {
-                    for (LifecycleListener lifecycleListener : lifecycleListeners) {
-                        lifecycleListener.onDisconnect(this);
-                    }
+                for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                    lifecycleListener.onDisconnect(this);
                 }
             }
         }
@@ -899,10 +895,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                         throw e;
                     }
                     if (isConnected()) {
-                        synchronized (lifecycleListeners) {
-                            for (LifecycleListener lifecycleListener : lifecycleListeners) {
-                                lifecycleListener.onEventDeserializationFailure(this, e);
-                            }
+                        for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                            lifecycleListener.onEventDeserializationFailure(this, e);
                         }
                     }
                     continue;
@@ -916,10 +910,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             }
         } catch (Exception e) {
             if (isConnected()) {
-                synchronized (lifecycleListeners) {
-                    for (LifecycleListener lifecycleListener : lifecycleListeners) {
-                        lifecycleListener.onCommunicationFailure(this, e);
-                    }
+                for (LifecycleListener lifecycleListener : lifecycleListeners) {
+                    lifecycleListener.onCommunicationFailure(this, e);
                 }
             }
         } finally {
@@ -1016,22 +1008,16 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * where registered.
      */
     public void registerEventListener(EventListener eventListener) {
-        synchronized (eventListeners) {
-            eventListeners.add(eventListener);
-        }
+        eventListeners.add(eventListener);
     }
 
     /**
      * Unregister all event listener of specific type.
      */
     public void unregisterEventListener(Class<? extends EventListener> listenerClass) {
-        synchronized (eventListeners) {
-            Iterator<EventListener> iterator = eventListeners.iterator();
-            while (iterator.hasNext()) {
-                EventListener eventListener = iterator.next();
-                if (listenerClass.isInstance(eventListener)) {
-                    iterator.remove();
-                }
+        for (EventListener eventListener: eventListeners) {
+            if (listenerClass.isInstance(eventListener)) {
+                eventListeners.remove(eventListener);
             }
         }
     }
@@ -1040,23 +1026,19 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * Unregister single event listener.
      */
     public void unregisterEventListener(EventListener eventListener) {
-        synchronized (eventListeners) {
-            eventListeners.remove(eventListener);
-        }
+        eventListeners.remove(eventListener);
     }
 
     private void notifyEventListeners(Event event) {
         if (event.getData() instanceof EventDeserializer.EventDataWrapper) {
             event = new Event(event.getHeader(), ((EventDeserializer.EventDataWrapper) event.getData()).getExternal());
         }
-        synchronized (eventListeners) {
-            for (EventListener eventListener : eventListeners) {
-                try {
-                    eventListener.onEvent(event);
-                } catch (Exception e) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.log(Level.WARNING, eventListener + " choked on " + event, e);
-                    }
+        for (EventListener eventListener : eventListeners) {
+            try {
+                eventListener.onEvent(event);
+            } catch (Exception e) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.log(Level.WARNING, eventListener + " choked on " + event, e);
                 }
             }
         }
@@ -1074,22 +1056,16 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * where registered.
      */
     public void registerLifecycleListener(LifecycleListener lifecycleListener) {
-        synchronized (lifecycleListeners) {
-            lifecycleListeners.add(lifecycleListener);
-        }
+        lifecycleListeners.add(lifecycleListener);
     }
 
     /**
      * Unregister all lifecycle listener of specific type.
      */
     public void unregisterLifecycleListener(Class<? extends LifecycleListener> listenerClass) {
-        synchronized (lifecycleListeners) {
-            Iterator<LifecycleListener> iterator = lifecycleListeners.iterator();
-            while (iterator.hasNext()) {
-                LifecycleListener lifecycleListener = iterator.next();
-                if (listenerClass.isInstance(lifecycleListener)) {
-                    iterator.remove();
-                }
+        for (LifecycleListener lifecycleListener : lifecycleListeners) {
+            if (listenerClass.isInstance(lifecycleListener)) {
+                lifecycleListeners.remove(lifecycleListener);
             }
         }
     }
@@ -1098,9 +1074,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * Unregister single lifecycle listener.
      */
     public void unregisterLifecycleListener(LifecycleListener eventListener) {
-        synchronized (lifecycleListeners) {
-            lifecycleListeners.remove(eventListener);
-        }
+        lifecycleListeners.remove(eventListener);
     }
 
     /**
