@@ -401,7 +401,7 @@ public class BinaryLogClientIntegrationTest {
         try {
             assertEquals(writeAndCaptureRow(client, "datetime(6)", "'1989-03-21 01:02:03.123456'"), new Serializable[]{
                 generateTime(1989, 3, 21, 1, 2, 3, 123)});
-        } catch (Exception e) {
+        } finally {
             client.disconnect();
         }
     }
@@ -417,7 +417,7 @@ public class BinaryLogClientIntegrationTest {
         try {
             assertEquals(writeAndCaptureRow(client, "datetime(6)", "'1989-03-21 01:02:03.123456'"), new Serializable[]{
                 generateTime(1989, 3, 21, 1, 2, 3, 123) * 1000 + 456});
-        } catch (Exception e) {
+        } finally {
             client.disconnect();
         }
     }
