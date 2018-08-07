@@ -141,48 +141,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <!--
-                unfortunately net.ju-n.maven.plugins:vagrant-maven-plugin does not support vagrant 1.1+
-                at the moment, so I'm gonna use exec-maven-plugin instead
-            -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>1.1.1</version>
-                <executions>
-                    <execution>
-                        <id>start-vagrant-vm</id>
-                        <phase>pre-integration-test</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <workingDirectory>${vagrant.integration.box}</workingDirectory>
-                            <executable>${vagrant.bin}</executable>
-                            <arguments>
-                                <argument>up</argument>
-                            </arguments>
-                            <skip>${skipTests}</skip>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>destroy-vagrant-vm</id>
-                        <phase>post-integration-test</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <workingDirectory>${vagrant.integration.box}</workingDirectory>
-                            <executable>${vagrant.bin}</executable>
-                            <arguments>
-                                <argument>destroy</argument>
-                                <argument>--force</argument>
-                            </arguments>
-                            <skip>${skipTests}</skip>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>

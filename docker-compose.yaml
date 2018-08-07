@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  mysql-master:
+    image: "bitnami/mysql:5.7"
+    ports:
+      - '33061:3306'
+    environment:
+      - MYSQL_REPLICATION_MODE=master
+      - MYSQL_REPLICATION_USER=rsandbox
+      - MYSQL_REPLICATION_PASSWORD=rsandbox
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_USER=msandbox
+      - MYSQL_PASSWORD=msandbox
+      - MYSQL_DATABASE=msandbox
+
+  mysql-slave:
+    image: "bitnami/mysql:5.7"
+    ports:
+      - '33062:3306'
+    depends_on:
+      - mysql-master
+    environment:
+      - MYSQL_REPLICATION_MODE=slave
+      - MYSQL_REPLICATION_USER=rsandbox
+      - MYSQL_REPLICATION_PASSWORD=rsandbox
+      - MYSQL_MASTER_HOST=mysql-master
+      - MYSQL_MASTER_PORT_NUMBER=3306
+      - MYSQL_MASTER_ROOT_PASSWORD=root
+
+  mysql-bootstrap:
+    image: "bitnami/mysql:5.7"
+    depends_on:
+      - mysql-master
+      - mysql-slave
+    command: >
+      /bin/bash -c "
+      until mysql --host=mysql-master --port=3306 --user=root --password=root -e 'quit'; do
+        >&2 echo 'mysql-master is unavailable - sleeping'
+        sleep 1
+      done
+
+      >&2 echo 'mysql-master is up'
+
+      mysql --host=mysql-master --port=3306 --user=root --password=root -e \"GRANT ALL PRIVILEGES ON *.* TO 'msandbox'@'%' WITH GRANT OPTION;\"
+      "
