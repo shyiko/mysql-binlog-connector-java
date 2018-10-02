@@ -4,7 +4,7 @@
 
     <groupId>com.github.shyiko</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.7.3-3-FIVETRAN</version>
+    <version>0.7.3-4-FIVETRAN</version>
 
     <name>mysql-binlog-connector-java</name>
     <description>MySQL Binary Log connector</description>
