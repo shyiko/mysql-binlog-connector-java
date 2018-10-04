@@ -674,7 +674,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private ChecksumType fetchBinlogChecksum() throws IOException {
-        channel.write(new QueryCommand("show global variables like 'binlog_checksum'"));
+        channel.write(new QueryCommand("show variables like 'binlog_checksum'"));
         ResultSetRowPacket[] resultSet = readResultSet();
         if (resultSet.length == 0) {
             return ChecksumType.NONE;
