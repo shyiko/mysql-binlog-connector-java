@@ -26,7 +26,6 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.Map;
 
 /**
@@ -34,36 +33,36 @@ import java.util.Map;
  */
 public class EventDeserializer {
 
-    private final EventHeaderDeserializer eventHeaderDeserializer;
-    private final EventDataDeserializer defaultEventDataDeserializer;
-    private final Map<EventType, EventDataDeserializer> eventDataDeserializers;
+    private final EventHeaderDeserializer<?> eventHeaderDeserializer;
+    private final EventDataDeserializer<?> defaultEventDataDeserializer;
+    private final EventDataDeserializer<?>[] eventDataDeserializers;
 
     private EnumSet<CompatibilityMode> compatibilitySet = EnumSet.noneOf(CompatibilityMode.class);
     private int checksumLength;
 
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
-    private EventDataDeserializer tableMapEventDataDeserializer;
+    private EventDataDeserializer<?> tableMapEventDataDeserializer;
 
     public EventDeserializer() {
         this(new EventHeaderV4Deserializer(), new NullEventDataDeserializer());
     }
 
-    public EventDeserializer(EventHeaderDeserializer eventHeaderDeserializer) {
+    public EventDeserializer(EventHeaderDeserializer<?> eventHeaderDeserializer) {
         this(eventHeaderDeserializer, new NullEventDataDeserializer());
     }
 
-    public EventDeserializer(EventDataDeserializer defaultEventDataDeserializer) {
+    public EventDeserializer(EventDataDeserializer<?> defaultEventDataDeserializer) {
         this(new EventHeaderV4Deserializer(), defaultEventDataDeserializer);
     }
 
     public EventDeserializer(
-            EventHeaderDeserializer eventHeaderDeserializer,
-            EventDataDeserializer defaultEventDataDeserializer
-    ) {
+            EventHeaderDeserializer<?> eventHeaderDeserializer,
+            EventDataDeserializer<?> defaultEventDataDeserializer
+            ) {
         this.eventHeaderDeserializer = eventHeaderDeserializer;
         this.defaultEventDataDeserializer = defaultEventDataDeserializer;
-        this.eventDataDeserializers = new IdentityHashMap<EventType, EventDataDeserializer>();
+        this.eventDataDeserializers = new EventDataDeserializer[256];
         this.tableMapEventByTableId = new HashMap<Long, TableMapEventData>();
         registerDefaultEventDataDeserializers();
         afterEventDataDeserializerSet(null);
@@ -72,67 +71,81 @@ public class EventDeserializer {
     public EventDeserializer(
             EventHeaderDeserializer eventHeaderDeserializer,
             EventDataDeserializer defaultEventDataDeserializer,
-            Map<EventType, EventDataDeserializer> eventDataDeserializers,
+            Map<EventType, EventDataDeserializer> eventDataDeserializersMap,
             Map<Long, TableMapEventData> tableMapEventByTableId
-    ) {
+            ) {
         this.eventHeaderDeserializer = eventHeaderDeserializer;
         this.defaultEventDataDeserializer = defaultEventDataDeserializer;
-        this.eventDataDeserializers = eventDataDeserializers;
+
+        this.eventDataDeserializers = new EventDataDeserializer[256];
         this.tableMapEventByTableId = tableMapEventByTableId;
+
+        for (EventType type : eventDataDeserializersMap.keySet()) {
+            this.eventDataDeserializers[type.getEventNumber()] = eventDataDeserializersMap.get(type);
+        }
+
         afterEventDataDeserializerSet(null);
     }
 
+    public void registerEventDataDeserializer(EventType type, EventDataDeserializer<?> ser) {
+        eventDataDeserializers[type.getEventNumber()] = ser;
+    }
+
+    public void registerEventDataDeserializer(int eventNumber, EventDataDeserializer<?> ser) {
+        eventDataDeserializers[eventNumber] = ser;
+    }
+
     private void registerDefaultEventDataDeserializers() {
-        eventDataDeserializers.put(EventType.FORMAT_DESCRIPTION,
+        registerEventDataDeserializer(EventType.FORMAT_DESCRIPTION,
                 new FormatDescriptionEventDataDeserializer());
-        eventDataDeserializers.put(EventType.ROTATE,
+        registerEventDataDeserializer(EventType.ROTATE,
                 new RotateEventDataDeserializer());
-        eventDataDeserializers.put(EventType.INTVAR,
-            new IntVarEventDataDeserializer());
-        eventDataDeserializers.put(EventType.QUERY,
+        registerEventDataDeserializer(EventType.INTVAR,
+                new IntVarEventDataDeserializer());
+        registerEventDataDeserializer(EventType.QUERY,
                 new QueryEventDataDeserializer());
-        eventDataDeserializers.put(EventType.TABLE_MAP,
+        registerEventDataDeserializer(EventType.TABLE_MAP,
                 new TableMapEventDataDeserializer());
-        eventDataDeserializers.put(EventType.XID,
+        registerEventDataDeserializer(EventType.XID,
                 new XidEventDataDeserializer());
-        eventDataDeserializers.put(EventType.WRITE_ROWS,
+        registerEventDataDeserializer(EventType.WRITE_ROWS,
                 new WriteRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.UPDATE_ROWS,
+        registerEventDataDeserializer(EventType.UPDATE_ROWS,
                 new UpdateRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.DELETE_ROWS,
+        registerEventDataDeserializer(EventType.DELETE_ROWS,
                 new DeleteRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.EXT_WRITE_ROWS,
+        registerEventDataDeserializer(EventType.EXT_WRITE_ROWS,
                 new WriteRowsEventDataDeserializer(tableMapEventByTableId).
-                        setMayContainExtraInformation(true));
-        eventDataDeserializers.put(EventType.EXT_UPDATE_ROWS,
+                setMayContainExtraInformation(true));
+        registerEventDataDeserializer(EventType.EXT_UPDATE_ROWS,
                 new UpdateRowsEventDataDeserializer(tableMapEventByTableId).
-                        setMayContainExtraInformation(true));
-        eventDataDeserializers.put(EventType.EXT_DELETE_ROWS,
+                setMayContainExtraInformation(true));
+        registerEventDataDeserializer(EventType.EXT_DELETE_ROWS,
                 new DeleteRowsEventDataDeserializer(tableMapEventByTableId).
-                        setMayContainExtraInformation(true));
-        eventDataDeserializers.put(EventType.ROWS_QUERY,
+                setMayContainExtraInformation(true));
+        registerEventDataDeserializer(EventType.ROWS_QUERY,
                 new RowsQueryEventDataDeserializer());
-        eventDataDeserializers.put(EventType.GTID,
+        registerEventDataDeserializer(EventType.GTID,
                 new GtidEventDataDeserializer());
-       eventDataDeserializers.put(EventType.PREVIOUS_GTIDS,
-               new PreviousGtidSetDeserializer());
-        eventDataDeserializers.put(EventType.XA_PREPARE,
+        registerEventDataDeserializer(EventType.PREVIOUS_GTIDS,
+                new PreviousGtidSetDeserializer());
+        registerEventDataDeserializer(EventType.XA_PREPARE,
                 new XAPrepareEventDataDeserializer());
     }
 
-    public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
+    public void setEventDataDeserializer(EventType eventType, EventDataDeserializer<?> eventDataDeserializer) {
         ensureCompatibility(eventDataDeserializer);
-        eventDataDeserializers.put(eventType, eventDataDeserializer);
+        registerEventDataDeserializer(eventType, eventDataDeserializer);
         afterEventDataDeserializerSet(eventType);
     }
 
     private void afterEventDataDeserializerSet(EventType eventType) {
         if (eventType == null || eventType == EventType.TABLE_MAP) {
-            EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(EventType.TABLE_MAP);
+            EventDataDeserializer<?> eventDataDeserializer = getEventDataDeserializer(EventType.TABLE_MAP);
             if (eventDataDeserializer.getClass() != TableMapEventDataDeserializer.class &&
-                eventDataDeserializer.getClass() != EventDataWrapper.Deserializer.class) {
+                    eventDataDeserializer.getClass() != EventDataWrapper.Deserializer.class) {
                 tableMapEventDataDeserializer = new EventDataWrapper.Deserializer(
-                    new TableMapEventDataDeserializer(), eventDataDeserializer);
+                        new TableMapEventDataDeserializer(), eventDataDeserializer);
             } else {
                 tableMapEventDataDeserializer = null;
             }
@@ -148,42 +161,44 @@ public class EventDeserializer {
      */
     public void setCompatibilityMode(CompatibilityMode first, CompatibilityMode... rest) {
         this.compatibilitySet = EnumSet.of(first, rest);
-        for (EventDataDeserializer eventDataDeserializer : eventDataDeserializers.values()) {
-            ensureCompatibility(eventDataDeserializer);
+        for (EventDataDeserializer<?> eventDataDeserializer : eventDataDeserializers) {
+            if (eventDataDeserializer != null) {
+                ensureCompatibility(eventDataDeserializer);
+            }
         }
     }
 
-    private void ensureCompatibility(EventDataDeserializer eventDataDeserializer) {
+    private void ensureCompatibility(EventDataDeserializer<?> eventDataDeserializer) {
         if (eventDataDeserializer instanceof AbstractRowsEventDataDeserializer) {
             AbstractRowsEventDataDeserializer deserializer =
-                (AbstractRowsEventDataDeserializer) eventDataDeserializer;
+                    (AbstractRowsEventDataDeserializer) eventDataDeserializer;
             boolean deserializeDateAndTimeAsLong =
-                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG) ||
-                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO);
+                    compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG) ||
+                    compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO);
             deserializer.setDeserializeDateAndTimeAsLong(deserializeDateAndTimeAsLong);
             deserializer.setMicrosecondsPrecision(
-                compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO)
-            );
+                    compatibilitySet.contains(CompatibilityMode.DATE_AND_TIME_AS_LONG_MICRO)
+                    );
             if (compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_ZERO)) {
                 deserializer.setInvalidDateAndTimeRepresentation(0L);
             }
             if (compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE)) {
                 if (!deserializeDateAndTimeAsLong) {
                     throw new IllegalArgumentException("INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE requires " +
-                        "DATE_AND_TIME_AS_LONG or DATE_AND_TIME_AS_LONG_MICRO");
+                            "DATE_AND_TIME_AS_LONG or DATE_AND_TIME_AS_LONG_MICRO");
                 }
                 deserializer.setInvalidDateAndTimeRepresentation(-1L);
             }
             if (compatibilitySet.contains(CompatibilityMode.INVALID_DATE_AND_TIME_AS_MIN_VALUE)) {
                 if (!deserializeDateAndTimeAsLong) {
                     throw new IllegalArgumentException("INVALID_DATE_AND_TIME_AS_MIN_VALUE requires " +
-                        "DATE_AND_TIME_AS_LONG or DATE_AND_TIME_AS_LONG_MICRO");
+                            "DATE_AND_TIME_AS_LONG or DATE_AND_TIME_AS_LONG_MICRO");
                 }
                 deserializer.setInvalidDateAndTimeRepresentation(Long.MIN_VALUE);
             }
             deserializer.setDeserializeCharAndBinaryAsByteArray(
-                compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY)
-            );
+                    compatibilitySet.contains(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY)
+                    );
         }
     }
 
@@ -244,8 +259,12 @@ public class EventDeserializer {
         return eventData;
     }
 
-    public EventDataDeserializer getEventDataDeserializer(EventType eventType) {
-        EventDataDeserializer eventDataDeserializer = eventDataDeserializers.get(eventType);
+    public EventDataDeserializer<?> getEventDataDeserializer(EventType eventType) {
+        return getEventDataDeserializer(eventType.getEventNumber());
+    }
+
+    public EventDataDeserializer<?> getEventDataDeserializer(int eventNumber) {
+        EventDataDeserializer<?> eventDataDeserializer = eventDataDeserializers[eventNumber];
         return eventDataDeserializer != null ? eventDataDeserializer : defaultEventDataDeserializer;
     }
 
@@ -327,10 +346,10 @@ public class EventDeserializer {
          */
         public static class Deserializer implements EventDataDeserializer {
 
-            private EventDataDeserializer internal;
-            private EventDataDeserializer external;
+            private EventDataDeserializer<?> internal;
+            private EventDataDeserializer<?> external;
 
-            public Deserializer(EventDataDeserializer internal, EventDataDeserializer external) {
+            public Deserializer(EventDataDeserializer<?> internal, EventDataDeserializer<?> external) {
                 this.internal = internal;
                 this.external = external;
             }

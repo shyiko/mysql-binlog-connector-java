@@ -196,26 +196,65 @@ public enum EventType {
 
     public static boolean isRowMutation(EventType eventType) {
         return EventType.isWrite(eventType) ||
-               EventType.isUpdate(eventType) ||
-               EventType.isDelete(eventType);
+                EventType.isUpdate(eventType) ||
+                EventType.isDelete(eventType);
     }
 
     public static boolean isWrite(EventType eventType) {
         return eventType == PRE_GA_WRITE_ROWS ||
-               eventType == WRITE_ROWS ||
-               eventType == EXT_WRITE_ROWS;
+                eventType == WRITE_ROWS ||
+                eventType == EXT_WRITE_ROWS;
     }
 
     public static boolean isUpdate(EventType eventType) {
         return eventType == PRE_GA_UPDATE_ROWS ||
-               eventType == UPDATE_ROWS ||
-               eventType == EXT_UPDATE_ROWS;
+                eventType == UPDATE_ROWS ||
+                eventType == EXT_UPDATE_ROWS;
     }
 
     public static boolean isDelete(EventType eventType) {
         return eventType == PRE_GA_DELETE_ROWS ||
-               eventType == DELETE_ROWS ||
-               eventType == EXT_DELETE_ROWS;
+                eventType == DELETE_ROWS ||
+                eventType == EXT_DELETE_ROWS;
+    }
+
+    private static EventType[] byEventNumber;
+
+    private int eventNumber;
+
+    private EventType() {
+        setEventNumber(ordinal());
+    }
+
+    private EventType(int eventNumber) {
+        setEventNumber(eventNumber);
+    }
+
+    private void setEventNumber(int number) {
+        this.eventNumber = number;
+        if (byEventNumber == null) {
+            byEventNumber = new EventType[256];
+        }
+        byEventNumber[number] = this;
+    }
+
+    /**
+     * public method get EventType by event number
+     *
+     * @param eventNumber
+     * @return EventType
+     */
+    public static EventType getByEventNumber(int eventNumber) {
+        return byEventNumber[eventNumber];
+    }
+
+    /**
+     * Returns event numbe of EventType
+     *
+     * @return int event number
+     */
+    public int getEventNumber() {
+        return eventNumber;
     }
 
 }
