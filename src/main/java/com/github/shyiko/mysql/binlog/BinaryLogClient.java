@@ -976,8 +976,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void addGtidToSet(String gtid) {
-        if ( gtid == null )
+        if (gtid == null) {
             return;
+        }
 
         synchronized (gtidSetAccessLock) {
             gtidSet.add(currentGtid);
@@ -989,14 +990,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (eventHeader.getEventType() == EventType.GTID) {
             GtidEventData gtidEventData = (GtidEventData) unwrapEventData(event.getData());
             currentGtid = gtidEventData.getGtid();
-        } else if ( gtidSet != null ) {
+        } else if (gtidSet != null) {
             if (eventHeader.getEventType() == EventType.XID) {
                 addGtidToSet(currentGtid);
-            } else if ( eventHeader.getEventType() == EventType.QUERY) {
+            } else if (eventHeader.getEventType() == EventType.QUERY) {
                 // MyISAM doesn't emit XID events, instead has a QUERY-event with SQL "commit"
                 QueryEventData qed = (QueryEventData) unwrapEventData(event.getData());
                 String sql = qed.getSql();
-                if ( sql != null && sql.toUpperCase().startsWith("COMMIT") ) {
+                if (sql != null && sql.toUpperCase().startsWith("COMMIT")) {
                     addGtidToSet(currentGtid);
                 }
             }
