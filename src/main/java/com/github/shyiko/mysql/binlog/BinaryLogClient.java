@@ -553,6 +553,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             synchronized (gtidSetAccessLock) {
                 if (gtidSet != null) {
                     ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+                    ensureEventDataDeserializer(EventType.QUERY, QueryEventDataDeserializer.class);
                 }
             }
             listenForEventPackets();
