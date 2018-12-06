@@ -133,6 +133,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
     private boolean gtidSetFallbackToPurged;
+    private String currentGtid;
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -635,6 +636,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void requestBinaryLogStream() throws IOException {
         long serverId = blocking ? this.serverId : 0; // http://bugs.mysql.com/bug.php?id=71178
         Command dumpBinaryLogCommand;
+        currentGtid = null;
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
                 dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
@@ -962,19 +964,37 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    private EventData unwrapEventData(EventData eventData) {
+        if (eventData instanceof EventDeserializer.EventDataWrapper) {
+            return ((EventDeserializer.EventDataWrapper) eventData).getInternal();
+        } else {
+            return eventData;
+        }
+    }
+
+    private void addGtidToSet(String gtid) {
+        if ( gtid == null )
+            return;
+
+        synchronized (gtidSetAccessLock) {
+            gtidSet.add(currentGtid);
+        }
+    }
+
     private void updateGtidSet(Event event) {
         EventHeader eventHeader = event.getHeader();
         if (eventHeader.getEventType() == EventType.GTID) {
-            synchronized (gtidSetAccessLock) {
-                if (gtidSet != null) {
-                    EventData eventData = event.getData();
-                    GtidEventData gtidEventData;
-                    if (eventData instanceof EventDeserializer.EventDataWrapper) {
-                        gtidEventData = (GtidEventData) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
-                    } else {
-                        gtidEventData = (GtidEventData) eventData;
-                    }
-                    gtidSet.add(gtidEventData.getGtid());
+            GtidEventData gtidEventData = (GtidEventData) unwrapEventData(event.getData());
+            currentGtid = gtidEventData.getGtid();
+        } else if ( gtidSet != null ) {
+            if (eventHeader.getEventType() == EventType.XID) {
+                addGtidToSet(currentGtid);
+            } else if ( eventHeader.getEventType() == EventType.QUERY) {
+                // MyISAM doesn't emit XID events, instead has a QUERY-event with SQL "commit"
+                QueryEventData qed = (QueryEventData) unwrapEventData(event.getData());
+                String sql = qed.getSql();
+                if ( sql != null && sql.toUpperCase().startsWith("COMMIT") ) {
+                    addGtidToSet(currentGtid);
                 }
             }
         }
