@@ -1,6 +1,22 @@
+/*
+ * Copyright 2013 Stanley Shyiko
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.github.shyiko.mysql.binlog;
 
-import com.github.shyiko.mysql.binlog.event.*;
+import com.github.shyiko.mysql.binlog.event.XidEventData;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -15,6 +31,11 @@ import java.util.logging.Logger;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.AssertJUnit.assertNotNull;
 
+/**
+ * MySQL replication stream client.
+ *
+ * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+ */
 public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrationTest {
     private final Logger logger = Logger.getLogger(getClass().getSimpleName());
 
@@ -27,7 +48,7 @@ public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrati
                 public void execute(Statement statement) throws SQLException {
                     ResultSet rs = statement.executeQuery("select @@GLOBAL.GTID_MODE as gtid_mode");
                     rs.next();
-                    if ( rs.getString("gtid_mode").equals("ON") ) {
+                    if ("ON".equals(rs.getString("gtid_mode"))) {
                         return;
                     }
 
@@ -85,7 +106,6 @@ public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrati
                 initialGTIDSet[0] = rs.getString("Executed_Gtid_Set");
             }
         });
-
 
         EventDeserializer eventDeserializer = new EventDeserializer();
         try {

@@ -989,8 +989,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void updateGtidSet(Event event) {
         synchronized (gtidSetAccessLock) {
-            if (gtidSet == null)
+            if (gtidSet == null) {
                 return;
+            }
         }
 
         EventHeader eventHeader = event.getHeader();
@@ -1008,7 +1009,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             case QUERY:
                 QueryEventData qed = (QueryEventData) unwrapEventData(event.getData());
                 String sql = qed.getSql();
-                if ( sql == null ) {
+                if (sql == null) {
                     break;
                 }
 
@@ -1022,6 +1023,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     //auto-commit query, likely DDL
                     addGtidToSet(currentGtid);
                 }
+            default:
         }
     }
 

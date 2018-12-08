@@ -34,7 +34,6 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.ServerException;
 import com.github.shyiko.mysql.binlog.network.SocketFactory;
-import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
 import org.mockito.InOrder;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -727,20 +726,6 @@ public class BinaryLogClientIntegrationTest {
         }));
     }
 
-    protected class QueryEventFailureSimulator extends QueryEventDataDeserializer {
-        private boolean failureSimulated;
-
-        @Override
-        public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
-            QueryEventData eventData = super.deserialize(inputStream);
-            if (!failureSimulated) {
-                failureSimulated = true;
-                throw new SocketException();
-            }
-            return eventData;
-        }
-    }
-
     private void testCommunicationFailureInTheMiddleOfEventDataDeserialization(final IOException ex) throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
         eventDeserializer.setEventDataDeserializer(EventType.QUERY, new QueryEventFailureSimulator());
@@ -1103,8 +1088,9 @@ public class BinaryLogClientIntegrationTest {
             Statement statement = connection.createStatement();
             try {
                 callback.execute(statement);
-                if ( !autocommit )
+                if (!autocommit) {
                     connection.commit();
+                }
             } finally {
                 statement.close();
             }
@@ -1166,4 +1152,22 @@ public class BinaryLogClientIntegrationTest {
 
         void execute(T obj) throws SQLException;
     }
+
+    /**
+     * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+     */
+    protected class QueryEventFailureSimulator extends QueryEventDataDeserializer {
+        private boolean failureSimulated;
+
+        @Override
+        public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
+            QueryEventData eventData = super.deserialize(inputStream);
+            if (!failureSimulated) {
+                failureSimulated = true;
+                throw new SocketException();
+            }
+            return eventData;
+        }
+    }
+
 }
