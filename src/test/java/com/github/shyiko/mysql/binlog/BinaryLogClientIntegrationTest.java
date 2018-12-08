@@ -34,6 +34,7 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.ServerException;
 import com.github.shyiko.mysql.binlog.network.SocketFactory;
+import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
 import org.mockito.InOrder;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -97,7 +98,7 @@ import static org.testng.Assert.fail;
  */
 public class BinaryLogClientIntegrationTest {
 
-    private static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
+    protected static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
 
     private final Logger logger = Logger.getLogger(getClass().getSimpleName());
 
@@ -107,9 +108,9 @@ public class BinaryLogClientIntegrationTest {
 
     private final TimeZone timeZoneBeforeTheTest = TimeZone.getDefault();
 
-    private MySQLConnection master, slave;
-    private BinaryLogClient client;
-    private CountDownEventListener eventListener;
+    protected MySQLConnection master, slave;
+    protected BinaryLogClient client;
+    protected CountDownEventListener eventListener;
 
     @BeforeClass
     public void setUp() throws Exception {
@@ -726,26 +727,27 @@ public class BinaryLogClientIntegrationTest {
         }));
     }
 
+    protected class QueryEventFailureSimulator extends QueryEventDataDeserializer {
+        private boolean failureSimulated;
+
+        @Override
+        public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
+            QueryEventData eventData = super.deserialize(inputStream);
+            if (!failureSimulated) {
+                failureSimulated = true;
+                throw new SocketException();
+            }
+            return eventData;
+        }
+    }
+
     private void testCommunicationFailureInTheMiddleOfEventDataDeserialization(final IOException ex) throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
-        eventDeserializer.setEventDataDeserializer(EventType.QUERY, new QueryEventDataDeserializer() {
-
-            private boolean failureSimulated;
-
-            @Override
-            public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
-                QueryEventData eventData = super.deserialize(inputStream);
-                if (!failureSimulated) {
-                    failureSimulated = true;
-                    throw new SocketException();
-                }
-                return eventData;
-            }
-        });
+        eventDeserializer.setEventDataDeserializer(EventType.QUERY, new QueryEventFailureSimulator());
         testCommunicationFailure(eventDeserializer);
     }
 
-    private void testCommunicationFailure(EventDeserializer eventDeserializer) throws Exception {
+    protected void testCommunicationFailure(EventDeserializer eventDeserializer) throws Exception {
         try {
             client.disconnect();
             final BinaryLogClient clientWithKeepAlive = new BinaryLogClient(slave.hostname, slave.port,
@@ -1096,15 +1098,20 @@ public class BinaryLogClientIntegrationTest {
             return password;
         }
 
-        public void execute(Callback<Statement> callback) throws SQLException {
-            connection.setAutoCommit(false);
+        public void execute(Callback<Statement> callback, boolean autocommit) throws SQLException {
+            connection.setAutoCommit(autocommit);
             Statement statement = connection.createStatement();
             try {
                 callback.execute(statement);
-                connection.commit();
+                if ( !autocommit )
+                    connection.commit();
             } finally {
                 statement.close();
             }
+        }
+
+        public void execute(Callback<Statement> callback) throws SQLException {
+            execute(callback, false);
         }
 
         public void execute(final String...statements) throws SQLException {

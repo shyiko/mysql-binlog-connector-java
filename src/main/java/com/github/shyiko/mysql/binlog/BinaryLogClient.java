@@ -136,6 +136,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private final Object gtidSetAccessLock = new Object();
     private boolean gtidSetFallbackToPurged;
     private String currentGtid;
+    private boolean inGTIDTransaction;
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -640,6 +641,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         long serverId = blocking ? this.serverId : 0; // http://bugs.mysql.com/bug.php?id=71178
         Command dumpBinaryLogCommand;
         currentGtid = null;
+        inGTIDTransaction = false;
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
                 dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
@@ -982,25 +984,48 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
         synchronized (gtidSetAccessLock) {
             gtidSet.add(currentGtid);
+            System.out.println(gtidSet.toString());
         }
     }
 
     private void updateGtidSet(Event event) {
+        synchronized (gtidSetAccessLock) {
+            if (gtidSet == null)
+                return;
+        }
+
         EventHeader eventHeader = event.getHeader();
         if (eventHeader.getEventType() == EventType.GTID) {
             GtidEventData gtidEventData = (GtidEventData) unwrapEventData(event.getData());
             currentGtid = gtidEventData.getGtid();
-        } else if (gtidSet != null) {
-            if (eventHeader.getEventType() == EventType.XID) {
+            return;
+        }
+
+        switch(eventHeader.getEventType()) {
+            case XID:
+                logger.info("adding xid-commit gtid to set: " + currentGtid);
                 addGtidToSet(currentGtid);
-            } else if (eventHeader.getEventType() == EventType.QUERY) {
-                // MyISAM doesn't emit XID events, instead has a QUERY-event with SQL "commit"
+                inGTIDTransaction = false;
+                break;
+            case QUERY:
                 QueryEventData qed = (QueryEventData) unwrapEventData(event.getData());
                 String sql = qed.getSql();
-                if (sql != null && sql.toUpperCase().startsWith("COMMIT")) {
+                if ( sql == null ) {
+                    break;
+                }
+
+                sql = sql.toUpperCase();
+                if (sql.startsWith("BEGIN")) {
+                    inGTIDTransaction = true;
+                } else if (sql.startsWith("COMMIT")) {
+                    logger.info("adding query-commit gtid to set: " + currentGtid);
+                    addGtidToSet(currentGtid);
+                    inGTIDTransaction = false;
+                } else if (!inGTIDTransaction) {
+                    //auto-commit query, likely DDL
+                    logger.info("adding auto-commit gtid to set: " + currentGtid);
                     addGtidToSet(currentGtid);
                 }
-            }
         }
     }
 
