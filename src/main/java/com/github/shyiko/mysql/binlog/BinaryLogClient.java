@@ -984,7 +984,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
         synchronized (gtidSetAccessLock) {
             gtidSet.add(currentGtid);
-            System.out.println(gtidSet.toString());
         }
     }
 
@@ -1003,7 +1002,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
         switch(eventHeader.getEventType()) {
             case XID:
-                logger.info("adding xid-commit gtid to set: " + currentGtid);
                 addGtidToSet(currentGtid);
                 inGTIDTransaction = false;
                 break;
@@ -1018,12 +1016,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 if (sql.startsWith("BEGIN")) {
                     inGTIDTransaction = true;
                 } else if (sql.startsWith("COMMIT")) {
-                    logger.info("adding query-commit gtid to set: " + currentGtid);
                     addGtidToSet(currentGtid);
                     inGTIDTransaction = false;
                 } else if (!inGTIDTransaction) {
                     //auto-commit query, likely DDL
-                    logger.info("adding auto-commit gtid to set: " + currentGtid);
                     addGtidToSet(currentGtid);
                 }
         }

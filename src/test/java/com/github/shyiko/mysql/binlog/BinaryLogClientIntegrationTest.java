@@ -1149,6 +1149,12 @@ public class BinaryLogClientIntegrationTest {
                 throw new IOException(e);
             }
         }
+
+        public void reconnect() throws IOException, SQLException {
+            close();
+
+            this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port, username, password);
+        }
     }
 
     /**
