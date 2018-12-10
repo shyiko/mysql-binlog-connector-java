@@ -22,12 +22,14 @@ import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.GtidEventData;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
@@ -133,6 +135,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
     private boolean gtidSetFallbackToPurged;
+    private String currentGtid;
+    private boolean inGTIDTransaction;
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -552,6 +556,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             synchronized (gtidSetAccessLock) {
                 if (gtidSet != null) {
                     ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+                    ensureEventDataDeserializer(EventType.QUERY, QueryEventDataDeserializer.class);
                 }
             }
             listenForEventPackets();
@@ -635,6 +640,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void requestBinaryLogStream() throws IOException {
         long serverId = blocking ? this.serverId : 0; // http://bugs.mysql.com/bug.php?id=71178
         Command dumpBinaryLogCommand;
+        currentGtid = null;
+        inGTIDTransaction = false;
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
                 dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
@@ -962,21 +969,61 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    private EventData unwrapEventData(EventData eventData) {
+        if (eventData instanceof EventDeserializer.EventDataWrapper) {
+            return ((EventDeserializer.EventDataWrapper) eventData).getInternal();
+        } else {
+            return eventData;
+        }
+    }
+
+    private void addGtidToSet(String gtid) {
+        if (gtid == null) {
+            return;
+        }
+
+        synchronized (gtidSetAccessLock) {
+            gtidSet.add(currentGtid);
+        }
+    }
+
     private void updateGtidSet(Event event) {
+        synchronized (gtidSetAccessLock) {
+            if (gtidSet == null) {
+                return;
+            }
+        }
+
         EventHeader eventHeader = event.getHeader();
         if (eventHeader.getEventType() == EventType.GTID) {
-            synchronized (gtidSetAccessLock) {
-                if (gtidSet != null) {
-                    EventData eventData = event.getData();
-                    GtidEventData gtidEventData;
-                    if (eventData instanceof EventDeserializer.EventDataWrapper) {
-                        gtidEventData = (GtidEventData) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
-                    } else {
-                        gtidEventData = (GtidEventData) eventData;
-                    }
-                    gtidSet.add(gtidEventData.getGtid());
+            GtidEventData gtidEventData = (GtidEventData) unwrapEventData(event.getData());
+            currentGtid = gtidEventData.getGtid();
+            return;
+        }
+
+        switch(eventHeader.getEventType()) {
+            case XID:
+                addGtidToSet(currentGtid);
+                inGTIDTransaction = false;
+                break;
+            case QUERY:
+                QueryEventData qed = (QueryEventData) unwrapEventData(event.getData());
+                String sql = qed.getSql();
+                if (sql == null) {
+                    break;
                 }
-            }
+
+                sql = sql.toUpperCase();
+                if (sql.startsWith("BEGIN")) {
+                    inGTIDTransaction = true;
+                } else if (sql.startsWith("COMMIT")) {
+                    addGtidToSet(currentGtid);
+                    inGTIDTransaction = false;
+                } else if (!inGTIDTransaction) {
+                    //auto-commit query, likely DDL
+                    addGtidToSet(currentGtid);
+                }
+            default:
         }
     }
 
