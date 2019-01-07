@@ -46,7 +46,7 @@ public class BinaryLogFileReaderIntegrationTest {
     }
 
     @Test
-    public void testNoChecksum() throws Exception {
+    public void testChecksumNONE() throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
         BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
                 new FileInputStream("src/test/resources/mysql-bin.sakila.gz")), eventDeserializer);
@@ -54,7 +54,7 @@ public class BinaryLogFileReaderIntegrationTest {
     }
 
     @Test
-    public void testCRCChecksum() throws Exception {
+    public void testChecksumCRC32() throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
         BinaryLogFileReader reader = new BinaryLogFileReader(
                 new FileInputStream("src/test/resources/mysql-bin.000001"), eventDeserializer);
