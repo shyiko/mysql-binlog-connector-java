@@ -16,20 +16,20 @@
 package com.github.shyiko.mysql.binlog;
 
 import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.GtidEventData;
-import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
+import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.EventDataWrapper;
 import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.RotateEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.jmx.BinaryLogClientMXBean;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
@@ -135,8 +135,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
     private boolean gtidSetFallbackToPurged;
-    private String currentGtid;
-    private boolean inGTIDTransaction;
+    private String gtid;
+    private boolean tx;
 
     private EventDeserializer eventDeserializer = new EventDeserializer();
 
@@ -520,6 +520,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 if (heartbeatInterval > 0) {
                     enableHeartbeat();
                 }
+                gtid = null;
+                tx = false;
                 requestBinaryLogStream();
             } catch (IOException e) {
                 disconnectChannel();
@@ -640,8 +642,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void requestBinaryLogStream() throws IOException {
         long serverId = blocking ? this.serverId : 0; // http://bugs.mysql.com/bug.php?id=71178
         Command dumpBinaryLogCommand;
-        currentGtid = null;
-        inGTIDTransaction = false;
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
                 dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
@@ -656,7 +656,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
              Class<? extends EventDataDeserializer> eventDataDeserializerClass) {
         EventDataDeserializer eventDataDeserializer = eventDeserializer.getEventDataDeserializer(eventType);
         if (eventDataDeserializer.getClass() != eventDataDeserializerClass &&
-            eventDataDeserializer.getClass() != EventDeserializer.EventDataWrapper.Deserializer.class) {
+            eventDataDeserializer.getClass() != EventDataWrapper.Deserializer.class) {
             EventDataDeserializer internalEventDataDeserializer;
             try {
                 internalEventDataDeserializer = eventDataDeserializerClass.newInstance();
@@ -664,7 +664,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 throw new RuntimeException(e);
             }
             eventDeserializer.setEventDataDeserializer(eventType,
-                new EventDeserializer.EventDataWrapper.Deserializer(internalEventDataDeserializer,
+                new EventDataWrapper.Deserializer(internalEventDataDeserializer,
                     eventDataDeserializer));
         }
     }
@@ -948,13 +948,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         EventHeader eventHeader = event.getHeader();
         EventType eventType = eventHeader.getEventType();
         if (eventType == EventType.ROTATE) {
-            EventData eventData = event.getData();
-            RotateEventData rotateEventData;
-            if (eventData instanceof EventDeserializer.EventDataWrapper) {
-                rotateEventData = (RotateEventData) ((EventDeserializer.EventDataWrapper) eventData).getInternal();
-            } else {
-                rotateEventData = (RotateEventData) eventData;
-            }
+            RotateEventData rotateEventData = (RotateEventData) EventDataWrapper.internal(event.getData());
             binlogFilename = rotateEventData.getBinlogFilename();
             binlogPosition = rotateEventData.getBinlogPosition();
         } else
@@ -969,61 +963,48 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private EventData unwrapEventData(EventData eventData) {
-        if (eventData instanceof EventDeserializer.EventDataWrapper) {
-            return ((EventDeserializer.EventDataWrapper) eventData).getInternal();
-        } else {
-            return eventData;
-        }
-    }
-
-    private void addGtidToSet(String gtid) {
-        if (gtid == null) {
-            return;
-        }
-
-        synchronized (gtidSetAccessLock) {
-            gtidSet.add(currentGtid);
-        }
-    }
-
     private void updateGtidSet(Event event) {
         synchronized (gtidSetAccessLock) {
             if (gtidSet == null) {
                 return;
             }
         }
-
         EventHeader eventHeader = event.getHeader();
-        if (eventHeader.getEventType() == EventType.GTID) {
-            GtidEventData gtidEventData = (GtidEventData) unwrapEventData(event.getData());
-            currentGtid = gtidEventData.getGtid();
-            return;
-        }
-
         switch(eventHeader.getEventType()) {
+            case GTID:
+                GtidEventData gtidEventData = (GtidEventData) EventDataWrapper.internal(event.getData());
+                gtid = gtidEventData.getGtid();
+                break;
             case XID:
-                addGtidToSet(currentGtid);
-                inGTIDTransaction = false;
+                commitGtid();
+                tx = false;
                 break;
             case QUERY:
-                QueryEventData qed = (QueryEventData) unwrapEventData(event.getData());
-                String sql = qed.getSql();
+                QueryEventData queryEventData = (QueryEventData) EventDataWrapper.internal(event.getData());
+                String sql = queryEventData.getSql();
                 if (sql == null) {
                     break;
                 }
-
-                sql = sql.toUpperCase();
-                if (sql.startsWith("BEGIN")) {
-                    inGTIDTransaction = true;
-                } else if (sql.startsWith("COMMIT")) {
-                    addGtidToSet(currentGtid);
-                    inGTIDTransaction = false;
-                } else if (!inGTIDTransaction) {
-                    //auto-commit query, likely DDL
-                    addGtidToSet(currentGtid);
+                if ("BEGIN".equals(sql)) {
+                    tx = true;
+                } else
+                if ("COMMIT".equals(sql) || "ROLLBACK".equals(sql)) {
+                    commitGtid();
+                    tx = false;
+                } else
+                if (!tx) {
+                    // auto-commit query, likely DDL
+                    commitGtid();
                 }
             default:
+        }
+    }
+
+    private void commitGtid() {
+        if (gtid != null) {
+            synchronized (gtidSetAccessLock) {
+                gtidSet.add(gtid);
+            }
         }
     }
 
@@ -1077,8 +1058,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void notifyEventListeners(Event event) {
-        if (event.getData() instanceof EventDeserializer.EventDataWrapper) {
-            event = new Event(event.getHeader(), ((EventDeserializer.EventDataWrapper) event.getData()).getExternal());
+        if (event.getData() instanceof EventDataWrapper) {
+            event = new Event(event.getHeader(), ((EventDataWrapper) event.getData()).getExternal());
         }
         for (EventListener eventListener : eventListeners) {
             try {

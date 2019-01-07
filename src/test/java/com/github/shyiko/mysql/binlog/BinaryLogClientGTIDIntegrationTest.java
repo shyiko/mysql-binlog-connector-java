@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2018 Stanley Shyiko
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package com.github.shyiko.mysql.binlog;
 
-import com.github.shyiko.mysql.binlog.event.XidEventData;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
+import com.github.shyiko.mysql.binlog.event.XidEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -26,18 +26,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.AssertJUnit.assertNotNull;
 
 /**
- * MySQL replication stream client.
- *
- * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+ * @author <a href="https://github.com/osheroff">Ben Osheroff</a>
  */
 public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrationTest {
-    private final Logger logger = Logger.getLogger(getClass().getSimpleName());
 
     @BeforeClass
     private void enableGTID() throws SQLException {
@@ -51,7 +47,6 @@ public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrati
                     if ("ON".equals(rs.getString("gtid_mode"))) {
                         return;
                     }
-
                     statement.execute("SET @@GLOBAL.ENFORCE_GTID_CONSISTENCY = ON;");
                     statement.execute("SET @@GLOBAL.GTID_MODE = OFF_PERMISSIVE;");
                     statement.execute("SET @@GLOBAL.GTID_MODE = ON_PERMISSIVE;");
@@ -61,7 +56,7 @@ public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrati
         }
     }
 
-    @AfterClass
+    @AfterClass(alwaysRun = true)
     private void disableGTID() throws SQLException {
         MySQLConnection[] servers = {slave, master};
         for (MySQLConnection m : servers) {

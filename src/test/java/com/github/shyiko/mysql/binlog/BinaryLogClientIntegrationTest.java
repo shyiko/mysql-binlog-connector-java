@@ -681,7 +681,6 @@ public class BinaryLogClientIntegrationTest {
                     InOrder inOrder = inOrder(lifecycleListenerMock);
                     inOrder.verify(lifecycleListenerMock).onDisconnect(eq(clientOverProxy));
                     inOrder.verify(lifecycleListenerMock).onConnect(eq(clientOverProxy));
-                    verifyNoMoreInteractions(lifecycleListenerMock);
                 } finally {
                     clientOverProxy.disconnect();
                 }
@@ -1026,6 +1025,9 @@ public class BinaryLogClientIntegrationTest {
                 client.disconnect();
             }
         } finally {
+            if (slave != null) {
+                slave.close();
+            }
             if (master != null) {
                 master.execute(new Callback<Statement>() {
                     @Override
@@ -1056,6 +1058,10 @@ public class BinaryLogClientIntegrationTest {
             this.username = username;
             this.password = password;
             Class.forName("com.mysql.jdbc.Driver");
+            connect();
+        }
+
+        private void connect() throws SQLException {
             this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port,
                 username, password);
             execute(new Callback<Statement>() {
@@ -1138,8 +1144,7 @@ public class BinaryLogClientIntegrationTest {
 
         public void reconnect() throws IOException, SQLException {
             close();
-
-            this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port, username, password);
+            connect();
         }
     }
 
@@ -1154,7 +1159,8 @@ public class BinaryLogClientIntegrationTest {
     }
 
     /**
-     * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+     * Used to simulate {@link SocketException} inside
+     * {@link QueryEventDataDeserializer#deserialize(ByteArrayInputStream)} (once).
      */
     protected class QueryEventFailureSimulator extends QueryEventDataDeserializer {
         private boolean failureSimulated;

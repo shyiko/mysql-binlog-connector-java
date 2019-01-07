@@ -348,6 +348,12 @@ public class EventDeserializer {
             return sb.toString();
         }
 
+        public static EventData internal(EventData eventData) {
+            return eventData instanceof EventDeserializer.EventDataWrapper ?
+                ((EventDeserializer.EventDataWrapper) eventData).getInternal() :
+                eventData;
+        }
+
         /**
          * {@link com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.EventDataWrapper} deserializer.
          */
