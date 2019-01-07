@@ -44,6 +44,7 @@ public class EventDeserializer {
     private final Map<Long, TableMapEventData> tableMapEventByTableId;
 
     private EventDataDeserializer tableMapEventDataDeserializer;
+    private EventDataDeserializer formatDescEventDataDeserializer;
 
     public EventDeserializer() {
         this(new EventHeaderV4Deserializer(), new NullEventDataDeserializer());
@@ -137,8 +138,22 @@ public class EventDeserializer {
                 tableMapEventDataDeserializer = null;
             }
         }
+        if (eventType == null || eventType == EventType.FORMAT_DESCRIPTION) {
+            EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(EventType.FORMAT_DESCRIPTION);
+            if (eventDataDeserializer.getClass() != FormatDescriptionEventDataDeserializer.class &&
+                eventDataDeserializer.getClass() != EventDataWrapper.Deserializer.class) {
+                formatDescEventDataDeserializer = new EventDataWrapper.Deserializer(
+                    new FormatDescriptionEventDataDeserializer(), eventDataDeserializer);
+            } else {
+                formatDescEventDataDeserializer = null;
+            }
+        }
     }
 
+    /**
+     * @deprecated resolved based on FORMAT_DESCRIPTION
+     */
+    @Deprecated
     public void setChecksumType(ChecksumType checksumType) {
         this.checksumLength = checksumType.getLength();
     }
@@ -196,19 +211,27 @@ public class EventDeserializer {
         }
         EventHeader eventHeader = eventHeaderDeserializer.deserialize(inputStream);
         EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
-        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
-            eventDataDeserializer = new FormatDescriptionEventDataDeserializer();
-            setChecksumType(ChecksumType.NONE);
+        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION && formatDescEventDataDeserializer != null) {
+            eventDataDeserializer = formatDescEventDataDeserializer;
+            checksumLength = 0;
         } else if (eventHeader.getEventType() == EventType.TABLE_MAP && tableMapEventDataDeserializer != null) {
             eventDataDeserializer = tableMapEventDataDeserializer;
         }
         EventData eventData = deserializeEventData(inputStream, eventHeader, eventDataDeserializer);
         if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
-            // 1 byte means checksum algo, 4 byte is crc checksum content
-            if (((FormatDescriptionEventData) eventData).getEventLength() + 1 + 4 == eventHeader.getDataLength()) {
-                setChecksumType(ChecksumType.CRC32);
+            FormatDescriptionEventData formatDescriptionEvent;
+            if (eventData instanceof EventDataWrapper) {
+                EventDataWrapper eventDataWrapper = (EventDataWrapper) eventData;
+                formatDescriptionEvent = (FormatDescriptionEventData) eventDataWrapper.getInternal();
+                if (formatDescEventDataDeserializer != null) {
+                    eventData = eventDataWrapper.getExternal();
+                }
             } else {
-                setChecksumType(ChecksumType.NONE);
+                formatDescriptionEvent = (FormatDescriptionEventData) eventData;
+            }
+            if (eventHeader.getDataLength() != formatDescriptionEvent.getDataLength()) {
+                // -1 byte to compensate for "checksum type" field
+                checksumLength = (int) (eventHeader.getDataLength() - formatDescriptionEvent.getDataLength() - 1);
             }
         } else if (eventHeader.getEventType() == EventType.TABLE_MAP) {
             TableMapEventData tableMapEvent;
@@ -253,6 +276,7 @@ public class EventDeserializer {
      * @see CompatibilityMode#DATE_AND_TIME_AS_LONG
      * @see CompatibilityMode#DATE_AND_TIME_AS_LONG_MICRO
      * @see CompatibilityMode#INVALID_DATE_AND_TIME_AS_ZERO
+     * @see CompatibilityMode#INVALID_DATE_AND_TIME_AS_MIN_VALUE
      * @see CompatibilityMode#CHAR_AND_BINARY_AS_BYTE_ARRAY
      */
     public enum CompatibilityMode {
@@ -276,6 +300,8 @@ public class EventDeserializer {
         /**
          * Return -1 instead of null if year/month/day is 0.
          * Affects DATETIME/DATETIME_V2/DATE/TIME/TIME_V2.
+         *
+         * @deprecated
          */
         INVALID_DATE_AND_TIME_AS_NEGATIVE_ONE,
         /**

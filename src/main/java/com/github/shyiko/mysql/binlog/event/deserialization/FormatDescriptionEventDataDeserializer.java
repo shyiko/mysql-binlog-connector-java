@@ -22,6 +22,7 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 
 /**
+ * @see <a href="https://dev.mysql.com/doc/internals/en/format-description-event.html">FORMAT_DESCRIPTION_EVENT</a>
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class FormatDescriptionEventDataDeserializer implements EventDataDeserializer<FormatDescriptionEventData> {
@@ -33,10 +34,8 @@ public class FormatDescriptionEventDataDeserializer implements EventDataDeserial
         eventData.setServerVersion(inputStream.readString(50).trim());
         inputStream.skip(4); // redundant, present in a header
         eventData.setHeaderLength(inputStream.readInteger(1));
-        // https://dev.mysql.com/doc/internals/en/format-description-event.html
-        // next part: a array indexed by `Binlog Event Type - 1` to extract the length of the event specific header.
         inputStream.skip(EventType.FORMAT_DESCRIPTION.ordinal() - 1);
-        eventData.setEventLength(inputStream.readInteger(1));
+        eventData.setDataLength(inputStream.readInteger(1));
         return eventData;
     }
 }

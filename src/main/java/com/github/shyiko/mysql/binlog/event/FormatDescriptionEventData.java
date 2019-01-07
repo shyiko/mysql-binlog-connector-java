@@ -23,7 +23,7 @@ public class FormatDescriptionEventData implements EventData {
     private int binlogVersion;
     private String serverVersion;
     private int headerLength;
-    private int eventLength;
+    private int dataLength;
 
     public int getBinlogVersion() {
         return binlogVersion;
@@ -49,12 +49,12 @@ public class FormatDescriptionEventData implements EventData {
         this.headerLength = headerLength;
     }
 
-    public void setEventLength(int eventLength) {
-        this.eventLength = eventLength;
+    public void setDataLength(int dataLength) {
+        this.dataLength = dataLength;
     }
 
-    public int getEventLength() {
-        return eventLength;
+    public int getDataLength() {
+        return dataLength;
     }
 
     @Override
@@ -64,7 +64,7 @@ public class FormatDescriptionEventData implements EventData {
         sb.append("{binlogVersion=").append(binlogVersion);
         sb.append(", serverVersion='").append(serverVersion).append('\'');
         sb.append(", headerLength=").append(headerLength);
-        sb.append(", eventLength=").append(eventLength);
+        sb.append(", dataLength=").append(dataLength);
         sb.append('}');
         return sb.toString();
     }
