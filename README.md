@@ -36,7 +36,12 @@ Get the latest JAR(s) from [here](http://search.maven.org/#search%7Cga%7C1%7Cg%3
 
 ```java
 File binlogFile = ...
-BinaryLogFileReader reader = new BinaryLogFileReader(binlogFile);
+EventDeserializer eventDeserializer = new EventDeserializer();
+eventDeserializer.setCompatibilityMode(
+    EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
+    EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY
+);
+BinaryLogFileReader reader = new BinaryLogFileReader(binlogFile, eventDeserializer);
 try {
     for (Event event; (event = reader.readEvent()) != null; ) {
         ...
@@ -52,6 +57,12 @@ try {
 
 ```java
 BinaryLogClient client = new BinaryLogClient("hostname", 3306, "username", "password");
+EventDeserializer eventDeserializer = new EventDeserializer();
+eventDeserializer.setCompatibilityMode(
+    EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
+    EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY
+);
+client.setEventDeserializer(eventDeserializer);
 client.registerEventListener(new EventListener() {
 
     @Override
