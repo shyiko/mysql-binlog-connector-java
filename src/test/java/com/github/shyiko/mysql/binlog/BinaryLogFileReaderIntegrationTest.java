@@ -48,16 +48,16 @@ public class BinaryLogFileReaderIntegrationTest {
     @Test
     public void testChecksumNONE() throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
-        BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
-                new FileInputStream("src/test/resources/mysql-bin.sakila.gz")), eventDeserializer);
-        readAll(reader, 1462);
+        BinaryLogFileReader reader = new BinaryLogFileReader(
+                new FileInputStream("src/test/resources/mysql-bin.checksum-none"), eventDeserializer);
+        readAll(reader, 191);
     }
 
     @Test
     public void testChecksumCRC32() throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
         BinaryLogFileReader reader = new BinaryLogFileReader(
-                new FileInputStream("src/test/resources/mysql-bin.000001"), eventDeserializer);
+                new FileInputStream("src/test/resources/mysql-bin.checksum-crc32"), eventDeserializer);
         readAll(reader, 303);
     }
 

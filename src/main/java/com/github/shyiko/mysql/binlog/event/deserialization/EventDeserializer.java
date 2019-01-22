@@ -210,43 +210,83 @@ public class EventDeserializer {
             return null;
         }
         EventHeader eventHeader = eventHeaderDeserializer.deserialize(inputStream);
-        EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
-        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION && formatDescEventDataDeserializer != null) {
-            eventDataDeserializer = formatDescEventDataDeserializer;
-            checksumLength = 0;
-        } else if (eventHeader.getEventType() == EventType.TABLE_MAP && tableMapEventDataDeserializer != null) {
-            eventDataDeserializer = tableMapEventDataDeserializer;
-        }
-        EventData eventData = deserializeEventData(inputStream, eventHeader, eventDataDeserializer);
-        if (eventHeader.getEventType() == EventType.FORMAT_DESCRIPTION) {
-            FormatDescriptionEventData formatDescriptionEvent;
-            if (eventData instanceof EventDataWrapper) {
-                EventDataWrapper eventDataWrapper = (EventDataWrapper) eventData;
-                formatDescriptionEvent = (FormatDescriptionEventData) eventDataWrapper.getInternal();
-                if (formatDescEventDataDeserializer != null) {
-                    eventData = eventDataWrapper.getExternal();
-                }
-            } else {
-                formatDescriptionEvent = (FormatDescriptionEventData) eventData;
-            }
-            if (eventHeader.getDataLength() != formatDescriptionEvent.getDataLength()) {
-                // -1 byte to compensate for "checksum type" field
-                checksumLength = (int) (eventHeader.getDataLength() - formatDescriptionEvent.getDataLength() - 1);
-            }
-        } else if (eventHeader.getEventType() == EventType.TABLE_MAP) {
-            TableMapEventData tableMapEvent;
-            if (eventData instanceof EventDataWrapper) {
-                EventDataWrapper eventDataWrapper = (EventDataWrapper) eventData;
-                tableMapEvent = (TableMapEventData) eventDataWrapper.getInternal();
-                if (tableMapEventDataDeserializer != null) {
-                    eventData = eventDataWrapper.getExternal();
-                }
-            } else {
-                tableMapEvent = (TableMapEventData) eventData;
-            }
-            tableMapEventByTableId.put(tableMapEvent.getTableId(), tableMapEvent);
+        EventData eventData;
+        switch (eventHeader.getEventType()) {
+            case FORMAT_DESCRIPTION:
+                eventData = deserializeFormatDescriptionEventData(inputStream, eventHeader);
+                break;
+            case TABLE_MAP:
+                eventData = deserializeTableMapEventData(inputStream, eventHeader);
+                break;
+            default:
+                EventDataDeserializer eventDataDeserializer = getEventDataDeserializer(eventHeader.getEventType());
+                eventData = deserializeEventData(inputStream, eventHeader, eventDataDeserializer);
         }
         return new Event(eventHeader, eventData);
+    }
+
+    private EventData deserializeFormatDescriptionEventData(ByteArrayInputStream inputStream, EventHeader eventHeader)
+            throws EventDataDeserializationException {
+        EventDataDeserializer eventDataDeserializer =
+            formatDescEventDataDeserializer != null ?
+                formatDescEventDataDeserializer :
+                getEventDataDeserializer(EventType.FORMAT_DESCRIPTION);
+        int eventBodyLength = (int) eventHeader.getDataLength();
+        EventData eventData;
+        try {
+            inputStream.enterBlock(eventBodyLength);
+            try {
+                eventData = eventDataDeserializer.deserialize(inputStream);
+                // https://dev.mysql.com/worklog/task/?id=2540#tabs-2540-4
+                // +-----------+------------+-----------+------------------------+----------+
+                // | Header    | Payload (dataLength)   | Checksum Type (1 byte) | Checksum |
+                // +-----------+------------+-----------+------------------------+----------+
+                //             |                    (eventBodyLength)                       |
+                //             +------------------------------------------------------------+
+                FormatDescriptionEventData formatDescriptionEvent;
+                if (eventData instanceof EventDataWrapper) {
+                    EventDataWrapper eventDataWrapper = (EventDataWrapper) eventData;
+                    formatDescriptionEvent = (FormatDescriptionEventData) eventDataWrapper.getInternal();
+                    if (formatDescEventDataDeserializer != null) {
+                        eventData = eventDataWrapper.getExternal();
+                    }
+                } else {
+                    formatDescriptionEvent = (FormatDescriptionEventData) eventData;
+                }
+                int checksumBlockLength = eventBodyLength - formatDescriptionEvent.getDataLength();
+                if (checksumBlockLength > 0) {
+                    inputStream.skip(inputStream.available() - checksumBlockLength);
+                    int checksumType = inputStream.read();
+                    checksumLength = ChecksumType.byOrdinal(checksumType).getLength();
+                }
+            } finally {
+                inputStream.skipToTheEndOfTheBlock();
+            }
+        } catch (IOException e) {
+            throw new EventDataDeserializationException(eventHeader, e);
+        }
+        return eventData;
+    }
+
+    public EventData deserializeTableMapEventData(ByteArrayInputStream inputStream, EventHeader eventHeader)
+            throws IOException {
+        EventDataDeserializer eventDataDeserializer =
+            tableMapEventDataDeserializer != null ?
+                tableMapEventDataDeserializer :
+                getEventDataDeserializer(EventType.TABLE_MAP);
+        EventData eventData = deserializeEventData(inputStream, eventHeader, eventDataDeserializer);
+        TableMapEventData tableMapEvent;
+        if (eventData instanceof EventDataWrapper) {
+            EventDataWrapper eventDataWrapper = (EventDataWrapper) eventData;
+            tableMapEvent = (TableMapEventData) eventDataWrapper.getInternal();
+            if (tableMapEventDataDeserializer != null) {
+                eventData = eventDataWrapper.getExternal();
+            }
+        } else {
+            tableMapEvent = (TableMapEventData) eventData;
+        }
+        tableMapEventByTableId.put(tableMapEvent.getTableId(), tableMapEvent);
+        return eventData;
     }
 
     private EventData deserializeEventData(ByteArrayInputStream inputStream, EventHeader eventHeader,
