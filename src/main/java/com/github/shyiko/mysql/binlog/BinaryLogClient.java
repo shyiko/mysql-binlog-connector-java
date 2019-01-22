@@ -135,6 +135,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private GtidSet gtidSet;
     private final Object gtidSetAccessLock = new Object();
     private boolean gtidSetFallbackToPurged;
+    private boolean useBinlogFilenamePositionInGtidMode;
     private String gtid;
     private boolean tx;
 
@@ -307,9 +308,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * to "" (provided it's null) forcing MySQL to send events starting from the oldest known binlog (keep in mind
      * that connection will fail if gtid_purged is anything but empty (unless
      * {@link #setGtidSetFallbackToPurged(boolean)} is set to true))).
-     * <p>NOTE #2: {@link #setBinlogFilename(String)} and {@link #setBinlogPosition(long)} can be used to specify the
-     * exact position from which MySQL server should start streaming events (taking into account GTID set).
-     * <p>NOTE #3: GTID set is automatically updated with each incoming GTID event (provided GTID mode is on).
+     * <p>NOTE #2: GTID set is automatically updated with each incoming GTID event (provided GTID mode is on).
      * @see #getGtidSet()
      * @see #setGtidSetFallbackToPurged(boolean)
      */
@@ -335,6 +334,22 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public void setGtidSetFallbackToPurged(boolean gtidSetFallbackToPurged) {
         this.gtidSetFallbackToPurged = gtidSetFallbackToPurged;
+    }
+
+    /**
+     * @see #setUseBinlogFilenamePositionInGtidMode(boolean)
+     */
+    public boolean isUseBinlogFilenamePositionInGtidMode() {
+        return useBinlogFilenamePositionInGtidMode;
+    }
+
+    /**
+     * @param useBinlogFilenamePositionInGtidMode true if MySQL server should start streaming events from a given
+     * {@link #getBinlogFilename()} and {@link #getBinlogPosition()} instead of "the oldest known binlog" when
+     * {@link #getGtidSet()} is set, false otherwise (default).
+     */
+    public void setUseBinlogFilenamePositionInGtidMode(boolean useBinlogFilenamePositionInGtidMode) {
+        this.useBinlogFilenamePositionInGtidMode = useBinlogFilenamePositionInGtidMode;
     }
 
     /**
@@ -644,7 +659,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         Command dumpBinaryLogCommand;
         synchronized (gtidSetAccessLock) {
             if (gtidSet != null) {
-                dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId, binlogFilename, binlogPosition, gtidSet);
+                dumpBinaryLogCommand = new DumpBinaryLogGtidCommand(serverId,
+                    useBinlogFilenamePositionInGtidMode ? binlogFilename : "",
+                    useBinlogFilenamePositionInGtidMode ? binlogPosition : 4,
+                    gtidSet);
             } else {
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
             }
