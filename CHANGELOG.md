@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.18.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.17.0...0.18.0) - 2019-01-21
+
+### Added
+- `BinaryLogClient` flag (`useBinlogFilenamePositionInGtidMode`) to control initial (requested on `connect()`) binlog position when GtidSet is set ([#254](https://github.com/shyiko/mysql-binlog-connector-java/issues/254)).
+
+### Fixed
+- Checksum detection ([#256](https://github.com/shyiko/mysql-binlog-connector-java/issues/256)).
+
 ## [0.17.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.16.1...0.17.0) - 2019-01-07
 
 ### Added
