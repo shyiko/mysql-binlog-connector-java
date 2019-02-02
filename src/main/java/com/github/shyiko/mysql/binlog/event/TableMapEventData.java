@@ -28,6 +28,7 @@ public class TableMapEventData implements EventData {
     private byte[] columnTypes;
     private int[] columnMetadata;
     private BitSet columnNullability;
+    private TableMapEventMetadata eventMetadata;
 
     public long getTableId() {
         return tableId;
@@ -77,6 +78,10 @@ public class TableMapEventData implements EventData {
         this.columnNullability = columnNullability;
     }
 
+    public TableMapEventMetadata getEventMetadata() { return eventMetadata; }
+
+    public void setEventMetadata(TableMapEventMetadata eventMetadata) { this.eventMetadata = eventMetadata; }
+
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
@@ -93,6 +98,7 @@ public class TableMapEventData implements EventData {
             sb.append(i == 0 ? "" : ", ").append(columnMetadata[i]);
         }
         sb.append(", columnNullability=").append(columnNullability);
+        sb.append(", eventMetadata=").append(eventMetadata);
         sb.append('}');
         return sb.toString();
     }
