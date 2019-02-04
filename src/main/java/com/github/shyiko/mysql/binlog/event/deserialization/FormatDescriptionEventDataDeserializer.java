@@ -29,6 +29,7 @@ public class FormatDescriptionEventDataDeserializer implements EventDataDeserial
 
     @Override
     public FormatDescriptionEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
+        int eventBodyLength = inputStream.available();
         FormatDescriptionEventData eventData = new FormatDescriptionEventData();
         eventData.setBinlogVersion(inputStream.readInteger(2));
         eventData.setServerVersion(inputStream.readString(50).trim());
@@ -36,6 +37,11 @@ public class FormatDescriptionEventDataDeserializer implements EventDataDeserial
         eventData.setHeaderLength(inputStream.readInteger(1));
         inputStream.skip(EventType.FORMAT_DESCRIPTION.ordinal() - 1);
         eventData.setDataLength(inputStream.readInteger(1));
+        int checksumBlockLength = eventBodyLength - eventData.getDataLength();
+        if (checksumBlockLength > 0) {
+            inputStream.skip(inputStream.available() - checksumBlockLength);
+            eventData.setChecksumType(ChecksumType.byOrdinal(inputStream.read()));
+        }
         return eventData;
     }
 }

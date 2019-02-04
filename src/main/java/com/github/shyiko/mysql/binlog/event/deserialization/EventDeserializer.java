@@ -253,12 +253,7 @@ public class EventDeserializer {
                 } else {
                     formatDescriptionEvent = (FormatDescriptionEventData) eventData;
                 }
-                int checksumBlockLength = eventBodyLength - formatDescriptionEvent.getDataLength();
-                if (checksumBlockLength > 0) {
-                    inputStream.skip(inputStream.available() - checksumBlockLength);
-                    int checksumType = inputStream.read();
-                    checksumLength = ChecksumType.byOrdinal(checksumType).getLength();
-                }
+                checksumLength = formatDescriptionEvent.getChecksumType().getLength();
             } finally {
                 inputStream.skipToTheEndOfTheBlock();
             }

@@ -15,6 +15,8 @@
  */
 package com.github.shyiko.mysql.binlog.event;
 
+import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
+
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
@@ -24,6 +26,7 @@ public class FormatDescriptionEventData implements EventData {
     private String serverVersion;
     private int headerLength;
     private int dataLength;
+    private ChecksumType checksumType = ChecksumType.NONE;
 
     public int getBinlogVersion() {
         return binlogVersion;
@@ -57,6 +60,14 @@ public class FormatDescriptionEventData implements EventData {
         return dataLength;
     }
 
+    public ChecksumType getChecksumType() {
+        return checksumType;
+    }
+
+    public void setChecksumType(ChecksumType checksumType) {
+        this.checksumType = checksumType;
+    }
+
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
@@ -65,6 +76,7 @@ public class FormatDescriptionEventData implements EventData {
         sb.append(", serverVersion='").append(serverVersion).append('\'');
         sb.append(", headerLength=").append(headerLength);
         sb.append(", dataLength=").append(dataLength);
+        sb.append(", checksumType=").append(checksumType);
         sb.append('}');
         return sb.toString();
     }
