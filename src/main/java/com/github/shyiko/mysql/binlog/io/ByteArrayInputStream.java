@@ -90,10 +90,6 @@ public class ByteArrayInputStream extends InputStream {
         return bytes;
     }
 
-    public ByteArrayInputStream readAsNewStream(int length) throws IOException {
-        return new ByteArrayInputStream(read(length));
-    }
-
     public void fill(byte[] bytes, int offset, int length) throws IOException {
         int remaining = length;
         while (remaining != 0) {

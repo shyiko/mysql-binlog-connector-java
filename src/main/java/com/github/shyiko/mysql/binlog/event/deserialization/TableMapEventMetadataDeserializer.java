@@ -30,66 +30,66 @@ import java.util.Map;
 /**
  * @author <a href="mailto:ahmedahamid@yahoo.com">Ahmed Abdul Hamid</a>
  */
-public class TableMapEventMetadataDeserializer implements EventDataDeserializer<TableMapEventMetadata> {
+public class TableMapEventMetadataDeserializer {
 
-    private final int numberOfColumns;
-
-    public TableMapEventMetadataDeserializer(int numberOfColumns) {
-        this.numberOfColumns = numberOfColumns;
-    }
-
-    @Override
-    public TableMapEventMetadata deserialize(ByteArrayInputStream inputStream) throws IOException {
-
-        if (inputStream.available() <= 0) {
+    public TableMapEventMetadata deserialize(ByteArrayInputStream inputStream, int numberOfColumns) throws IOException {
+        int remainingBytes = inputStream.available();
+        if (remainingBytes <= 0) {
             return null;
         }
 
-        TableMapEventMetadata eventData = new TableMapEventMetadata();
+        TableMapEventMetadata result = new TableMapEventMetadata();
 
-        while (inputStream.available() > 0) {
+        for (; remainingBytes > 0; inputStream.enterBlock(remainingBytes)) {
             MetadataFieldType fieldType = MetadataFieldType.byCode(inputStream.readInteger(1));
             int fieldLength = inputStream.readPackedInteger();
 
+            remainingBytes = inputStream.available();
+            inputStream.enterBlock(fieldLength);
+
             switch (fieldType) {
                 case SIGNEDNESS:
-                    eventData.setSignedness(readSignedness(inputStream, numberOfColumns));
+                    result.setSignedness(readSignedness(inputStream, numberOfColumns));
                     break;
                 case DEFAULT_CHARSET:
-                    eventData.setDefaultCharset(readDefaultCharset(inputStream.readAsNewStream(fieldLength)));
+                    result.setDefaultCharset(readDefaultCharset(inputStream));
                     break;
                 case COLUMN_CHARSET:
-                    eventData.setColumnCharsets(readIntegers(inputStream.readAsNewStream(fieldLength)));
+                    result.setColumnCharsets(readIntegers(inputStream));
                     break;
                 case COLUMN_NAME:
-                    eventData.setColumnNames(readColumnNames(inputStream.readAsNewStream(fieldLength)));
+                    result.setColumnNames(readColumnNames(inputStream));
                     break;
                 case SET_STR_VALUE:
-                    eventData.setSetStrValues(readTypeValues(inputStream.readAsNewStream(fieldLength)));
+                    result.setSetStrValues(readTypeValues(inputStream));
                     break;
                 case ENUM_STR_VALUE:
-                    eventData.setEnumStrValues(readTypeValues(inputStream.readAsNewStream(fieldLength)));
+                    result.setEnumStrValues(readTypeValues(inputStream));
                     break;
                 case GEOMETRY_TYPE:
-                    eventData.setGeometryTypes(readIntegers(inputStream.readAsNewStream(fieldLength)));
+                    result.setGeometryTypes(readIntegers(inputStream));
                     break;
                 case SIMPLE_PRIMARY_KEY:
-                    eventData.setSimplePrimaryKeys(readIntegers(inputStream.readAsNewStream(fieldLength)));
+                    result.setSimplePrimaryKeys(readIntegers(inputStream));
                     break;
                 case PRIMARY_KEY_WITH_PREFIX:
-                    eventData.setPrimaryKeysWithPrefix(readIntegerPairs(inputStream.readAsNewStream(fieldLength)));
+                    result.setPrimaryKeysWithPrefix(readIntegerPairs(inputStream));
                     break;
                 case ENUM_AND_SET_DEFAULT_CHARSET:
-                    eventData.setEnumAndSetDefaultCharset(readDefaultCharset(inputStream.readAsNewStream(fieldLength)));
+                    result.setEnumAndSetDefaultCharset(readDefaultCharset(inputStream));
                     break;
                 case ENUM_AND_SET_COLUMN_CHARSET:
-                    eventData.setEnumAndSetColumnCharsets(readIntegers(inputStream.readAsNewStream(fieldLength)));
+                    result.setEnumAndSetColumnCharsets(readIntegers(inputStream));
                     break;
                 default:
+                    // set the remaining bytes before throwing so the main event deserializer
+                    // knows how many bytes to skip in order to skip this entire Table Map event
+                    inputStream.enterBlock(remainingBytes);
                     throw new IOException("Unsupported table metadata field type " + fieldType);
             }
+            remainingBytes -= fieldLength;
         }
-        return eventData;
+        return result;
     }
 
     private static BitSet readSignedness(ByteArrayInputStream inputStream, int length) throws IOException {
