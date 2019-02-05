@@ -26,7 +26,7 @@ public class FormatDescriptionEventData implements EventData {
     private String serverVersion;
     private int headerLength;
     private int dataLength;
-    private ChecksumType checksumType = ChecksumType.NONE;
+    private ChecksumType checksumType;
 
     public int getBinlogVersion() {
         return binlogVersion;

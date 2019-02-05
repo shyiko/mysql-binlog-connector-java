@@ -38,10 +38,12 @@ public class FormatDescriptionEventDataDeserializer implements EventDataDeserial
         inputStream.skip(EventType.FORMAT_DESCRIPTION.ordinal() - 1);
         eventData.setDataLength(inputStream.readInteger(1));
         int checksumBlockLength = eventBodyLength - eventData.getDataLength();
+        ChecksumType checksumType = ChecksumType.NONE;
         if (checksumBlockLength > 0) {
             inputStream.skip(inputStream.available() - checksumBlockLength);
-            eventData.setChecksumType(ChecksumType.byOrdinal(inputStream.read()));
+            checksumType = ChecksumType.byOrdinal(inputStream.read());
         }
+        eventData.setChecksumType(checksumType);
         return eventData;
     }
 }
