@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.18.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.18.0...0.18.1) - 2019-02-04
+
+### Fixed
+- Checksum detection when custom FORMAT_DESCRIPTION deserializer is set ([#258](https://github.com/shyiko/mysql-binlog-connector-java/issues/258)).
+
 ## [0.18.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.17.0...0.18.0) - 2019-01-21
 
 ### Added
