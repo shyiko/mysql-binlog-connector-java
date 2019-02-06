@@ -82,8 +82,6 @@ public class TableMapEventMetadataDeserializer {
                     result.setEnumAndSetColumnCharsets(readIntegers(inputStream));
                     break;
                 default:
-                    // set the remaining bytes before throwing so the main event deserializer
-                    // knows how many bytes to skip in order to skip this entire Table Map event
                     inputStream.enterBlock(remainingBytes);
                     throw new IOException("Unsupported table metadata field type " + fieldType);
             }

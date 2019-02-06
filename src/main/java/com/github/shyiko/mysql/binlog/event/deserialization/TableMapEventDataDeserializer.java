@@ -40,7 +40,8 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
         inputStream.readPackedInteger(); // metadata length
         eventData.setColumnMetadata(readMetadata(inputStream, eventData.getColumnTypes()));
         eventData.setColumnNullability(inputStream.readBitSet(numberOfColumns, true));
-        eventData.setEventMetadata(metadataDeserializer.deserialize(inputStream, numberOfColumns));
+        eventData.setEventMetadata(metadataDeserializer.deserialize(
+            new ByteArrayInputStream(inputStream.read(inputStream.available())), numberOfColumns));
         return eventData;
     }
 
