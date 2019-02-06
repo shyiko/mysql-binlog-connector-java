@@ -25,6 +25,8 @@ import java.io.IOException;
  */
 public class TableMapEventDataDeserializer implements EventDataDeserializer<TableMapEventData> {
 
+    private final TableMapEventMetadataDeserializer metadataDeserializer = new TableMapEventMetadataDeserializer();
+
     @Override
     public TableMapEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
         TableMapEventData eventData = new TableMapEventData();
@@ -38,6 +40,8 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
         inputStream.readPackedInteger(); // metadata length
         eventData.setColumnMetadata(readMetadata(inputStream, eventData.getColumnTypes()));
         eventData.setColumnNullability(inputStream.readBitSet(numberOfColumns, true));
+        eventData.setEventMetadata(metadataDeserializer.deserialize(
+            new ByteArrayInputStream(inputStream.read(inputStream.available())), numberOfColumns));
         return eventData;
     }
 
