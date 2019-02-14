@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
+import com.github.shyiko.mysql.binlog.event.TableMapEventMetadata;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
@@ -40,8 +41,15 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
         inputStream.readPackedInteger(); // metadata length
         eventData.setColumnMetadata(readMetadata(inputStream, eventData.getColumnTypes()));
         eventData.setColumnNullability(inputStream.readBitSet(numberOfColumns, true));
-        eventData.setEventMetadata(metadataDeserializer.deserialize(
-            new ByteArrayInputStream(inputStream.read(inputStream.available())), numberOfColumns));
+        int metadataLength = inputStream.available();
+        TableMapEventMetadata metadata = null;
+        if (metadataLength > 0) {
+            metadata = metadataDeserializer.deserialize(
+                new ByteArrayInputStream(inputStream.read(metadataLength)),
+                numberOfColumns
+            );
+        }
+        eventData.setEventMetadata(metadata);
         return eventData;
     }
 
