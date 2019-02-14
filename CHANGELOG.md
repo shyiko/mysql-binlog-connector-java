@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.19.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.18.1...0.19.0) - 2019-02-13
+
+### Added
+- [MySQL 8.0.1+ table metadata](https://mysqlhighavailability.com/more-metadata-is-written-into-binary-log/) support ([#251](https://github.com/shyiko/mysql-binlog-connector-java/issues/251)).
+
+### Fixed
+- `connect`/`disconnect` keepalive thread race condition ([#260](https://github.com/shyiko/mysql-binlog-connector-java/issues/260)).
+
 ## [0.18.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.18.0...0.18.1) - 2019-02-04
 
 ### Fixed
