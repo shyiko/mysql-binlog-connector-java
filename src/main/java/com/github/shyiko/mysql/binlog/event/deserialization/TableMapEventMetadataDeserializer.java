@@ -32,7 +32,7 @@ import java.util.Map;
  */
 public class TableMapEventMetadataDeserializer {
 
-    public TableMapEventMetadata deserialize(ByteArrayInputStream inputStream, int numberOfColumns) throws IOException {
+    public TableMapEventMetadata deserialize(ByteArrayInputStream inputStream, int numberOfIntegerColumns) throws IOException {
         int remainingBytes = inputStream.available();
         if (remainingBytes <= 0) {
             return null;
@@ -49,7 +49,7 @@ public class TableMapEventMetadataDeserializer {
 
             switch (fieldType) {
                 case SIGNEDNESS:
-                    result.setSignedness(readSignedness(inputStream, numberOfColumns));
+                    result.setSignedness(readSignedness(inputStream, numberOfIntegerColumns));
                     break;
                 case DEFAULT_CHARSET:
                     result.setDefaultCharset(readDefaultCharset(inputStream));

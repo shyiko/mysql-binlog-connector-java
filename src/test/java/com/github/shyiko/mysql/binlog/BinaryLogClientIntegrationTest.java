@@ -990,6 +990,22 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
+    @Test
+    public void testMysql8TableMetadata() throws Exception {
+        master.execute("create table test_metameta ( " +
+                "a date, b date, c date, d date, e date, f date, g date, " +
+                "h date, i date, j int)");
+        master.execute("insert into test_metameta set j = 5");
+
+        final BinaryLogClient binaryLogClient = new BinaryLogClient(
+            master.hostname, master.port, master.username, master.password
+        );
+        binaryLogClient.registerEventListener(eventListener);
+        binaryLogClient.connect(DEFAULT_TIMEOUT);
+
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+    }
+
     @AfterMethod
     public void afterEachTest() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
