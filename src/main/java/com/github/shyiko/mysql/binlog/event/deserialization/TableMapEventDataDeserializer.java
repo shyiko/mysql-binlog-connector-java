@@ -55,8 +55,8 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
 
     private int numericColumnCount(byte[] types) {
         int count = 0;
-        for ( int i = 0 ; i < types.length; i++) {
-            switch ( ColumnType.byCode(types[i] & 0xff)) {
+        for (int i = 0; i < types.length; i++) {
+            switch (ColumnType.byCode(types[i] & 0xff)) {
                 case TINY:
                 case SHORT:
                 case INT24:
@@ -66,6 +66,9 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
                 case FLOAT:
                 case DOUBLE:
                     count++;
+                    break;
+                default:
+                    break;
             }
         }
         return count;
