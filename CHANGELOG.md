@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.19.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.19.0...0.19.1) - 2019-03-28
+
+### Fixed
+- `TABLE_MAP` event data deserialization on MySQL 8 ([#264](https://github.com/shyiko/mysql-binlog-connector-java/issues/264)).
+
 ## [0.19.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.18.1...0.19.0) - 2019-02-13
 
 ### Added
