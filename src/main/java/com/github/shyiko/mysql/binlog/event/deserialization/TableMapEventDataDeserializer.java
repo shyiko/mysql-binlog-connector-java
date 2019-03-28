@@ -46,11 +46,32 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
         if (metadataLength > 0) {
             metadata = metadataDeserializer.deserialize(
                 new ByteArrayInputStream(inputStream.read(metadataLength)),
-                numberOfColumns
+                numericColumnCount(eventData.getColumnTypes())
             );
         }
         eventData.setEventMetadata(metadata);
         return eventData;
+    }
+
+    private int numericColumnCount(byte[] types) {
+        int count = 0;
+        for (int i = 0; i < types.length; i++) {
+            switch (ColumnType.byCode(types[i] & 0xff)) {
+                case TINY:
+                case SHORT:
+                case INT24:
+                case LONG:
+                case LONGLONG:
+                case NEWDECIMAL:
+                case FLOAT:
+                case DOUBLE:
+                    count++;
+                    break;
+                default:
+                    break;
+            }
+        }
+        return count;
     }
 
     private int[] readMetadata(ByteArrayInputStream inputStream, byte[] columnTypes) throws IOException {
