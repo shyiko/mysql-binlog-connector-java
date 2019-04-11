@@ -306,12 +306,14 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     protected Serializable deserializeTimestampV2(int meta, ByteArrayInputStream inputStream) throws IOException {
         long millis = bigEndianLong(inputStream.read(4), 0, 4);
-        int fsp = deserializeFractionalSeconds(meta, inputStream);
-        long timestamp = millis * 1000 + fsp / 1000;
+        int fsp = deserializeFractionalSeconds(meta, inputStream);        
         if (deserializeDateAndTimeAsLong) {
+            long timestamp = millis * 1000 + fsp / 1000;
             return castTimestamp(timestamp, fsp);
         }
-        return new java.sql.Timestamp(timestamp);
+        java.sql.Timestamp ts = new java.sql.Timestamp(timestamp);
+        ts.setNanos(fsp * 1000);
+        return ts;
     }
 
     protected Serializable deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
