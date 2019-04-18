@@ -46,6 +46,7 @@ import com.github.shyiko.mysql.binlog.network.protocol.Packet;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
 import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
+import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateNativePasswordCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.Command;
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogGtidCommand;
@@ -722,8 +723,40 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 ErrorPacket errorPacket = new ErrorPacket(bytes);
                 throw new AuthenticationException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                     errorPacket.getSqlState());
+            } else if (authenticationResult[0] == (byte) 0xFE) {
+                switchAuthentication(authenticationResult);
+            } else {
+                throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
             }
-            throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
+        }
+    }
+
+    private void switchAuthentication(byte[] authenticationResult) throws IOException {
+        /*
+            Azure-MySQL likes to tell us to switch authentication methods, even though
+            we haven't advertised that we support any.  It uses this for some-odd
+            reason to send the real password scramble.
+        */
+        ByteArrayInputStream buffer = new ByteArrayInputStream(authenticationResult);
+        buffer.read(1);
+
+        String authName = buffer.readZeroTerminatedString();
+        if ("mysql_native_password".equals(authName)) {
+            String scramble = buffer.readZeroTerminatedString();
+
+            Command switchCommand = new AuthenticateNativePasswordCommand(scramble, password);
+            channel.writeBuffered(switchCommand, 3);
+            byte[] authResult = channel.read();
+
+            if (authResult[0] != (byte) 0x00) {
+                byte[] bytes = Arrays.copyOfRange(authResult, 1, authResult.length);
+                ErrorPacket errorPacket = new ErrorPacket(bytes);
+                throw new AuthenticationException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
+                    errorPacket.getSqlState());
+            }
+            return;
+        } else {
+            throw new AuthenticationException("Unsupported authentication type: " + authName);
         }
     }
 
