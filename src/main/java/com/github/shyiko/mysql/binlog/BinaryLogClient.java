@@ -754,7 +754,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 throw new AuthenticationException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                     errorPacket.getSqlState());
             }
-            return;
         } else {
             throw new AuthenticationException("Unsupported authentication type: " + authName);
         }
