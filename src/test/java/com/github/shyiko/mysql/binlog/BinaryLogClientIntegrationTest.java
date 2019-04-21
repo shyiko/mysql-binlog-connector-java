@@ -451,8 +451,7 @@ public class BinaryLogClientIntegrationTest {
             final String... values) throws Exception {
         CapturingEventListener capturingEventListener = new CapturingEventListener();
         client.registerEventListener(capturingEventListener);
-        // ensure "capturingEventListener -> eventListener" order
-        client.unregisterEventListener(eventListener);
+        CountDownEventListener eventListener = new CountDownEventListener();
         client.registerEventListener(eventListener);
         try {
             master.execute(new Callback<Statement>() {
@@ -472,6 +471,7 @@ public class BinaryLogClientIntegrationTest {
             });
             eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
         } finally {
+            client.unregisterEventListener(eventListener);
             client.unregisterEventListener(capturingEventListener);
         }
         List<Serializable[]> writtenRows =
@@ -648,6 +648,7 @@ public class BinaryLogClientIntegrationTest {
         eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     public void testAutomaticFailover() throws Exception {
         TCPReverseProxy tcpReverseProxy = new TCPReverseProxy(33262, slave.port);
@@ -731,6 +732,7 @@ public class BinaryLogClientIntegrationTest {
         testCommunicationFailure(eventDeserializer);
     }
 
+    @SuppressWarnings("deprecation")
     protected void testCommunicationFailure(EventDeserializer eventDeserializer) throws Exception {
         try {
             client.disconnect();
@@ -1071,8 +1073,8 @@ public class BinaryLogClientIntegrationTest {
         }
 
         private void connect() throws SQLException {
-            this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port,
-                username, password);
+            this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port +
+                "?serverTimezone=UTC", username, password);
             execute(new Callback<Statement>() {
 
                 @Override
