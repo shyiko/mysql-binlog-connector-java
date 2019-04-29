@@ -42,12 +42,41 @@ public class BinaryLogFileReaderIntegrationTest {
     public void testNextEvent() throws Exception {
         BinaryLogFileReader reader = new BinaryLogFileReader(new GZIPInputStream(
                 new FileInputStream("src/test/resources/mysql-bin.sakila.gz")));
+        readAll(reader, 1462);
+    }
+
+    @Test
+    public void testChecksumNONE() throws Exception {
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        BinaryLogFileReader reader = new BinaryLogFileReader(
+                new FileInputStream("src/test/resources/mysql-bin.checksum-none"), eventDeserializer);
+        readAll(reader, 191);
+    }
+
+    @Test
+    public void testChecksumCRC32() throws Exception {
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        BinaryLogFileReader reader = new BinaryLogFileReader(
+                new FileInputStream("src/test/resources/mysql-bin.checksum-crc32"), eventDeserializer);
+        readAll(reader, 303);
+    }
+
+    @Test
+    public void testChecksumCRC32WithCustomEventDataDeserializer() throws Exception {
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        eventDeserializer.setEventDataDeserializer(EventType.FORMAT_DESCRIPTION, new NullEventDataDeserializer());
+        BinaryLogFileReader reader = new BinaryLogFileReader(
+                new FileInputStream("src/test/resources/mysql-bin.checksum-crc32"), eventDeserializer);
+        readAll(reader, 303);
+    }
+
+    private void readAll(BinaryLogFileReader reader, int expect) throws IOException {
         try {
             int numberOfEvents = 0;
             while ((reader.readEvent()) != null) {
                 numberOfEvents++;
             }
-            assertEquals(numberOfEvents, 1462);
+            assertEquals(numberOfEvents, expect);
         } finally {
             reader.close();
         }

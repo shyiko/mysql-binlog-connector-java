@@ -84,6 +84,16 @@ public class GtidSet {
     }
 
     /**
+     * Add or replace the UUIDSet
+     * @param uuidSet UUIDSet to be added
+     * @return the old {@link UUIDSet} for the server given in uuidSet param,
+     *         or {@code null} if there are no UUIDSet for the given server.
+     */
+    public UUIDSet putUUIDSet(UUIDSet uuidSet) {
+        return map.put(uuidSet.getUUID(), uuidSet);
+    }
+
+    /**
      * @param gtid GTID ("source_id:transaction_id")
      * @return whether or not gtid was added to the set (false if it was already there)
      */
@@ -170,7 +180,7 @@ public class GtidSet {
         private String uuid;
         private List<Interval> intervals;
 
-        UUIDSet(String uuid, List<Interval> intervals) {
+        public UUIDSet(String uuid, List<Interval> intervals) {
             this.uuid = uuid;
             this.intervals = intervals;
             if (intervals.size() > 1) {
@@ -339,7 +349,7 @@ public class GtidSet {
         private long start;
         private long end;
 
-        Interval(long start, long end) {
+        public Interval(long start, long end) {
             this.start = start;
             this.end = end;
         }

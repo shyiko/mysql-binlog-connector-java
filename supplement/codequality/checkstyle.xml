@@ -41,7 +41,7 @@
         <!-- http://checkstyle.sourceforge.net/config_javadoc.html -->
         <module name="JavadocType">
             <property name="authorFormat"
-                      value='^&lt;a href=\"mailto:.+@[^@]+[.][^@]{2,}\"&gt;([a-zA-Z]+ ?){2,4}&lt;/a&gt;$'/>
+                      value='^&lt;a href=\"[^"]+\"&gt;([a-zA-Z]+ ?){2,4}&lt;/a&gt;$'/>
             <!-- <a href="mailto:email address">full name</a> -->
             <property name="scope" value="package"/>
         </module>

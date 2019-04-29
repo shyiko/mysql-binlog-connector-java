@@ -15,24 +15,35 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
+import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.FormatDescriptionEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
 
 /**
+ * @see <a href="https://dev.mysql.com/doc/internals/en/format-description-event.html">FORMAT_DESCRIPTION_EVENT</a>
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class FormatDescriptionEventDataDeserializer implements EventDataDeserializer<FormatDescriptionEventData> {
 
     @Override
     public FormatDescriptionEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
+        int eventBodyLength = inputStream.available();
         FormatDescriptionEventData eventData = new FormatDescriptionEventData();
         eventData.setBinlogVersion(inputStream.readInteger(2));
         eventData.setServerVersion(inputStream.readString(50).trim());
         inputStream.skip(4); // redundant, present in a header
         eventData.setHeaderLength(inputStream.readInteger(1));
-        // lengths for all event types
+        inputStream.skip(EventType.FORMAT_DESCRIPTION.ordinal() - 1);
+        eventData.setDataLength(inputStream.readInteger(1));
+        int checksumBlockLength = eventBodyLength - eventData.getDataLength();
+        ChecksumType checksumType = ChecksumType.NONE;
+        if (checksumBlockLength > 0) {
+            inputStream.skip(inputStream.available() - checksumBlockLength);
+            checksumType = ChecksumType.byOrdinal(inputStream.read());
+        }
+        eventData.setChecksumType(checksumType);
         return eventData;
     }
 }
