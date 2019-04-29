@@ -23,11 +23,18 @@
     </scm>
     <developers>
         <developer>
-            <id>sshyiko</id>
+            <id>shyiko</id>
             <email>stanley.shyiko@gmail.com</email>
             <name>Stanley Shyiko</name>
         </developer>
     </developers>
+    <distributionManagement>
+        <repository>
+            <id>maven-central</id>
+            <name>Sonatype Nexus Staging</name>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -58,7 +65,7 @@
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>5.1.21</version>
+            <version>8.0.15</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -79,10 +86,31 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
+                <version>3.5.1</version>
                 <configuration>
                     <source>1.6</source>
                     <target>1.6</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.0.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <!-- for class.getPackage().getImplementationVersion() -->
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>2.8.2</version>
+                <configuration>
+                    <skip>true</skip>
                 </configuration>
             </plugin>
             <plugin>
@@ -155,6 +183,67 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>2.9.1</version>
+                <configuration>
+                    <failsOnError>true</failsOnError>
+                    <configLocation>supplement/codequality/checkstyle.xml</configLocation>
+                    <headerLocation>supplement/codequality/license.header</headerLocation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <consoleOutput>true</consoleOutput>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>checkstyle</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.github.shyiko</groupId>
+                        <artifactId>checkstyle-nonstandard</artifactId>
+                        <version>0.1.0</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>com.github.shyiko.usage-maven-plugin</groupId>
+                <artifactId>usage-maven-plugin</artifactId>
+                <version>1.0.0</version>
+                <configuration>
+                    <usage>
+                        # build everything (append "-DskipTests=true" if you wish to skip tests)
+                        ./mvnw clean package
+
+                        # run unit + integration tests, validate codebase using checkstyle
+                        ./mvnw -P coverage clean verify
+                        # use -Dvagrant.integration.box= to switch between MySQL sandboxes
+
+                        # for aggregated coverage over different mysql releases use
+                        ./mvnw clean
+                        ./mvnw -P coverage verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.5.27-sandbox-prepackaged
+                        ./mvnw -P coverage verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.6.12-sandbox-prepackaged
+                        ./mvnw -P coverage verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.7.15-sandbox-prepackaged
+                        ./mvnw -P coverage,mysql-8-compat verify \
+                            -Dvagrant.integration.box=supplement/vagrant/mysql-8.0.1-sandbox-prepackaged
+
+                        # submit coverage report to coveralls
+                        ./mvnw -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
+
+                        # publish a new version
+                        ./mvnw versions:set -DnewVersion=&lt;version&gt;
+                        ./mvnw -Ddeploy=maven-central
+                        git tag &lt;version&gt; &amp;&amp; git push origin &lt;version&gt;
+                    </usage>
+                </configuration>
+            </plugin>
         </plugins>
         <extensions>
             <extension>
@@ -167,13 +256,24 @@
 
     <profiles>
         <profile>
+            <id>mysql-8-compat</id>
+            <dependencies>
+                <dependency>
+                    <groupId>mysql</groupId>
+                    <artifactId>mysql-connector-java</artifactId>
+                    <version>8.0.7-dmr</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
             <id>coverage</id>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>0.6.3.201306030806</version>
+                        <version>0.7.9</version>
                         <configuration>
                             <destFile>${basedir}/target/coverage-reports/jacoco-unit.exec</destFile>
                             <dataFile>${basedir}/target/coverage-reports/jacoco-unit.exec</dataFile>
@@ -207,13 +307,20 @@
             </build>
         </profile>
         <profile>
-            <id>with-sources-and-javadocs</id>
+            <id>deploy-to-maven-central</id>
+            <activation>
+                <property>
+                    <name>deploy</name>
+                    <value>maven-central</value>
+                </property>
+            </activation>
             <build>
+                <defaultGoal>clean deploy</defaultGoal>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>
-                        <version>2.2.1</version>
+                        <version>3.0.1</version>
                         <executions>
                             <execution>
                                 <id>attach-sources</id>
@@ -227,46 +334,24 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>2.9</version>
+                        <version>2.10.4</version>
                         <executions>
                             <execution>
                                 <id>attach-javadocs</id>
                                 <goals>
                                     <goal>jar</goal>
                                 </goals>
+                                <configuration>
+                                    <additionalparam>-Xdoclint:none</additionalparam>
+                                    <quiet>true</quiet>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>snapshot</id>
-            <activation>
-                <property>
-                    <name>deploy</name>
-                    <value>snapshot</value>
-                </property>
-            </activation>
-            <build>
-                <defaultGoal>clean deploy</defaultGoal>
-            </build>
-        </profile>
-        <profile>
-            <id>release</id>
-            <activation>
-                <property>
-                    <name>deploy</name>
-                    <value>release</value>
-                </property>
-            </activation>
-            <build>
-                <defaultGoal>clean release:clean release:prepare release:perform</defaultGoal>
-                <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.4</version>
+                        <version>1.6</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
@@ -278,11 +363,15 @@
                         </executions>
                     </plugin>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-release-plugin</artifactId>
-                        <version>2.2.2</version>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.7</version>
+                        <extensions>true</extensions>
                         <configuration>
-                            <mavenExecutorId>forked-path</mavenExecutorId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <serverId>maven-central</serverId>
+                            <skipStagingRepositoryClose>true</skipStagingRepositoryClose>
+                            <!--<autoReleaseAfterClose>true</autoReleaseAfterClose>-->
                         </configuration>
                     </plugin>
                 </plugins>

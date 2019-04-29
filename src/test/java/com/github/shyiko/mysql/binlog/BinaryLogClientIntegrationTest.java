@@ -89,7 +89,7 @@ import static org.testng.Assert.*;
  */
 public class BinaryLogClientIntegrationTest {
 
-    private static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
+    protected static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
 
     private final Logger logger = Logger.getLogger("donkey");
 
@@ -99,9 +99,9 @@ public class BinaryLogClientIntegrationTest {
 
     private final TimeZone timeZoneBeforeTheTest = TimeZone.getDefault();
 
-    private MySQLConnection master, slave;
-    private BinaryLogClient client;
-    private CountDownEventListener eventListener;
+    protected MySQLConnection master, slave;
+    protected BinaryLogClient client;
+    protected CountDownEventListener eventListener;
 
     @BeforeClass
     public void setUp() throws Exception {
@@ -153,6 +153,9 @@ public class BinaryLogClientIntegrationTest {
     public void testWriteUpdateDeleteEvents() throws Exception {
         CapturingEventListener capturingEventListener = new CapturingEventListener();
         client.registerEventListener(capturingEventListener);
+        // ensure "capturingEventListener -> eventListener" order
+        client.unregisterEventListener(eventListener);
+        client.registerEventListener(eventListener);
         try {
             master.execute(new Callback<Statement>() {
                 @Override
@@ -344,7 +347,7 @@ public class BinaryLogClientIntegrationTest {
 
     @Test
     public void testDeserializationOfGEOMETRY() throws Exception {
-        assertEquals(writeAndCaptureRow("geometry", "GeomFromText('POINT(40.717957 -73.736501)')"),
+        assertEquals(writeAndCaptureRow("geometry", "ST_GeomFromText('POINT(40.717957 -73.736501)')"),
             new Serializable[]{new byte[] {0, 0, 0, 0, 1, 1, 0, 0, 0, -106, 119, -43, 3, -26, 91, 68,
                 64, 42, 30, 23, -43, 34, 111, 82, -64}});
     }
@@ -390,7 +393,7 @@ public class BinaryLogClientIntegrationTest {
         try {
             assertEquals(writeAndCaptureRow(client, "datetime(6)", "'1989-03-21 01:02:03.123456'"), new Serializable[]{
                 generateTime(1989, 3, 21, 1, 2, 3, 123)});
-        } catch (Exception e) {
+        } finally {
             client.disconnect();
         }
     }
@@ -406,7 +409,7 @@ public class BinaryLogClientIntegrationTest {
         try {
             assertEquals(writeAndCaptureRow(client, "datetime(6)", "'1989-03-21 01:02:03.123456'"), new Serializable[]{
                 generateTime(1989, 3, 21, 1, 2, 3, 123) * 1000 + 456});
-        } catch (Exception e) {
+        } finally {
             client.disconnect();
         }
     }
@@ -440,6 +443,8 @@ public class BinaryLogClientIntegrationTest {
             final String... values) throws Exception {
         CapturingEventListener capturingEventListener = new CapturingEventListener();
         client.registerEventListener(capturingEventListener);
+        CountDownEventListener eventListener = new CountDownEventListener();
+        client.registerEventListener(eventListener);
         try {
             master.execute(new Callback<Statement>() {
                 @Override
@@ -458,6 +463,7 @@ public class BinaryLogClientIntegrationTest {
             });
             eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
         } finally {
+            client.unregisterEventListener(eventListener);
             client.unregisterEventListener(capturingEventListener);
         }
         List<Serializable[]> writtenRows =
@@ -526,7 +532,8 @@ public class BinaryLogClientIntegrationTest {
                 @Override
                 public void execute(Statement statement) throws SQLException {
                     statement.execute("create table geometry_table (location geometry)");
-                    statement.execute("insert into geometry_table values(GeomFromText('POINT(40.717957 -73.736501)'))");
+                    statement.execute(
+                        "insert into geometry_table values(ST_GeomFromText('POINT(40.717957 -73.736501)'))");
                     statement.execute("drop table geometry_table");
                 }
             });
@@ -633,6 +640,7 @@ public class BinaryLogClientIntegrationTest {
         eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     public void testAutomaticFailover() throws Exception {
         TCPReverseProxy tcpReverseProxy = new TCPReverseProxy(33262, slave.port);
@@ -666,7 +674,6 @@ public class BinaryLogClientIntegrationTest {
                     InOrder inOrder = inOrder(lifecycleListenerMock);
                     inOrder.verify(lifecycleListenerMock).onDisconnect(eq(clientOverProxy));
                     inOrder.verify(lifecycleListenerMock).onConnect(eq(clientOverProxy));
-                    verifyNoMoreInteractions(lifecycleListenerMock);
                 } finally {
                     clientOverProxy.disconnect();
                 }
@@ -713,24 +720,12 @@ public class BinaryLogClientIntegrationTest {
 
     private void testCommunicationFailureInTheMiddleOfEventDataDeserialization(final IOException ex) throws Exception {
         EventDeserializer eventDeserializer = new EventDeserializer();
-        eventDeserializer.setEventDataDeserializer(EventType.QUERY, new QueryEventDataDeserializer() {
-
-            private boolean failureSimulated;
-
-            @Override
-            public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
-                QueryEventData eventData = super.deserialize(inputStream);
-                if (!failureSimulated) {
-                    failureSimulated = true;
-                    throw new SocketException();
-                }
-                return eventData;
-            }
-        });
+        eventDeserializer.setEventDataDeserializer(EventType.QUERY, new QueryEventFailureSimulator());
         testCommunicationFailure(eventDeserializer);
     }
 
-    private void testCommunicationFailure(EventDeserializer eventDeserializer) throws Exception {
+    @SuppressWarnings("deprecation")
+    protected void testCommunicationFailure(EventDeserializer eventDeserializer) throws Exception {
         try {
             client.disconnect();
             final BinaryLogClient clientWithKeepAlive = new BinaryLogClient(slave.hostname, slave.port,
@@ -989,6 +984,15 @@ public class BinaryLogClientIntegrationTest {
         }
     }
 
+    @Test
+    public void testMySQL8TableMetadata() throws Exception {
+        master.execute("create table test_metameta ( " +
+                "a date, b date, c date, d date, e date, f date, g date, " +
+                "h date, i date, j int)");
+        master.execute("insert into test_metameta set j = 5");
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+    }
+
     @AfterMethod
     public void afterEachTest() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
@@ -1024,6 +1028,9 @@ public class BinaryLogClientIntegrationTest {
                 client.disconnect();
             }
         } finally {
+            if (slave != null) {
+                slave.close();
+            }
             if (master != null) {
                 master.execute(new Callback<Statement>() {
                     @Override
@@ -1054,8 +1061,12 @@ public class BinaryLogClientIntegrationTest {
             this.username = username;
             this.password = password;
             Class.forName("com.mysql.jdbc.Driver");
-            this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port,
-                username, password);
+            connect();
+        }
+
+        private void connect() throws SQLException {
+            this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port +
+                "?serverTimezone=UTC", username, password);
             execute(new Callback<Statement>() {
 
                 @Override
@@ -1081,15 +1092,21 @@ public class BinaryLogClientIntegrationTest {
             return password;
         }
 
-        public void execute(Callback<Statement> callback) throws SQLException {
-            connection.setAutoCommit(false);
+        public void execute(Callback<Statement> callback, boolean autocommit) throws SQLException {
+            connection.setAutoCommit(autocommit);
             Statement statement = connection.createStatement();
             try {
                 callback.execute(statement);
-                connection.commit();
+                if (!autocommit) {
+                    connection.commit();
+                }
             } finally {
                 statement.close();
             }
+        }
+
+        public void execute(Callback<Statement> callback) throws SQLException {
+            execute(callback, false);
         }
 
         public void execute(final String...statements) throws SQLException {
@@ -1127,6 +1144,11 @@ public class BinaryLogClientIntegrationTest {
                 throw new IOException(e);
             }
         }
+
+        public void reconnect() throws IOException, SQLException {
+            close();
+            connect();
+        }
     }
 
     /**
@@ -1138,4 +1160,23 @@ public class BinaryLogClientIntegrationTest {
 
         void execute(T obj) throws SQLException;
     }
+
+    /**
+     * Used to simulate {@link SocketException} inside
+     * {@link QueryEventDataDeserializer#deserialize(ByteArrayInputStream)} (once).
+     */
+    protected class QueryEventFailureSimulator extends QueryEventDataDeserializer {
+        private boolean failureSimulated;
+
+        @Override
+        public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
+            QueryEventData eventData = super.deserialize(inputStream);
+            if (!failureSimulated) {
+                failureSimulated = true;
+                throw new SocketException();
+            }
+            return eventData;
+        }
+    }
+
 }

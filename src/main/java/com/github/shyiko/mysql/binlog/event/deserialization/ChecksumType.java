@@ -36,4 +36,10 @@ public enum ChecksumType {
         return length;
     }
 
+    private static final ChecksumType[] VALUES = values();
+
+    public static ChecksumType byOrdinal(int ordinal) {
+        return VALUES[ordinal];
+    }
+
 }

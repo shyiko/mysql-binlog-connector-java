@@ -207,6 +207,11 @@ public class JsonBinaryValueIntegrationTest {
     }
 
     @Test
+    public void testJsonWithEmptyKey() throws Exception {
+        assertJSONMatchOriginal("{\"bitrate\":{\"\":0}}");
+    }
+
+    @Test
     public void testJsonArray() throws Exception {
         assertJSONMatchOriginal(
             "[" +

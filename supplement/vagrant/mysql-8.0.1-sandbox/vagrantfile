@@ -1,0 +1,24 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = 'deb/jessie-i386'
+    config.vm.provision :shell, :inline => %Q(
+        sed -i.bak -r 's/(us.)?(archive|security).ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list
+        apt-get update && apt-get install -y make libaio1 libnuma1 libtinfo5 # lib* required by mysql
+        echo 'Downloading MySQL distribution ...'
+        wget --no-check-certificate --progress=dot:mega --content-disposition \
+            https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.1-dmr-linux-glibc2.12-i686.tar.gz \
+            2>&1 | grep --line-buffered -o '[0-9]*%'
+        wget -O - https://github.com/datacharmer/mysql-sandbox/releases/download/3.2.13/MySQL-Sandbox-3.2.13.tar.gz | tar xzv
+        (cd MySQL-Sandbox-3.2.13 && perl Makefile.PL && make && make install)
+        su -c "make_replication_sandbox ~/mysql-8.0.1-dmr-linux-glibc2.12-i686.tar.gz \
+            --remote_access='%' --how_many_slaves=1 --sandbox_base_port=33061 \
+            --master_options='-c binlog_format=ROW' \
+            --slave_options='-c binlog_format=ROW -c log-slave-updates=TRUE'" vagrant
+        rm -f *.tar.gz
+        sed -i -e "s/exit\ 0/\\/home\\/vagrant\\/sandboxes\\/rsandbox_mysql-8_0_1\\/restart_all; exit 0/g" /etc/rc.local
+    )
+    config.vm.network :forwarded_port, guest: 33061, host: 33061
+    config.vm.network :forwarded_port, guest: 33062, host: 33062
+    config.vm.provider "virtualbox" do |v|
+      v.memory = 1024
+    end
+end

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stanley Shyiko
+ * Copyright 2017 Juan Olivares
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.jmx;
+package com.github.shyiko.mysql.binlog.event;
 
 /**
- * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+ * @author <a href="https://github.com/jolivares">Juan Olivares</a>
  */
-public interface BinaryLogClientStatisticsMXBean {
+public class PreviousGtidSetEventData implements EventData {
 
-    String getLastEvent();
-    long getSecondsSinceLastEvent();
-    long getSecondsBehindMaster();
-    long getTotalNumberOfEventsSeen();
-    long getTotalBytesReceived();
-    long getNumberOfSkippedEvents();
-    long getNumberOfDisconnects();
-    void reset();
+    private final String gtidSet;
+
+    public PreviousGtidSetEventData(String gtidSet) {
+        this.gtidSet = gtidSet;
+    }
+
+    public String getGtidSet() {
+        return gtidSet;
+    }
+
+    @Override
+    public String toString() {
+        return "PreviousGtidSetEventData {gtidSet='" + gtidSet + "'}";
+    }
 
 }

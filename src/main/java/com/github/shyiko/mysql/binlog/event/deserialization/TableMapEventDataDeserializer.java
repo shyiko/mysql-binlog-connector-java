@@ -16,6 +16,7 @@
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
+import com.github.shyiko.mysql.binlog.event.TableMapEventMetadata;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
@@ -24,6 +25,8 @@ import java.io.IOException;
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class TableMapEventDataDeserializer implements EventDataDeserializer<TableMapEventData> {
+
+    private final TableMapEventMetadataDeserializer metadataDeserializer = new TableMapEventMetadataDeserializer();
 
     @Override
     public TableMapEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
@@ -38,7 +41,37 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
         inputStream.readPackedInteger(); // metadata length
         eventData.setColumnMetadata(readMetadata(inputStream, eventData.getColumnTypes()));
         eventData.setColumnNullability(inputStream.readBitSet(numberOfColumns, true));
+        int metadataLength = inputStream.available();
+        TableMapEventMetadata metadata = null;
+        if (metadataLength > 0) {
+            metadata = metadataDeserializer.deserialize(
+                new ByteArrayInputStream(inputStream.read(metadataLength)),
+                numericColumnCount(eventData.getColumnTypes())
+            );
+        }
+        eventData.setEventMetadata(metadata);
         return eventData;
+    }
+
+    private int numericColumnCount(byte[] types) {
+        int count = 0;
+        for (int i = 0; i < types.length; i++) {
+            switch (ColumnType.byCode(types[i] & 0xff)) {
+                case TINY:
+                case SHORT:
+                case INT24:
+                case LONG:
+                case LONGLONG:
+                case NEWDECIMAL:
+                case FLOAT:
+                case DOUBLE:
+                    count++;
+                    break;
+                default:
+                    break;
+            }
+        }
+        return count;
     }
 
     private int[] readMetadata(ByteArrayInputStream inputStream, byte[] columnTypes) throws IOException {

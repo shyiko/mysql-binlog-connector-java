@@ -79,7 +79,7 @@ public class AuthenticateCommand implements Command {
     /**
      * see mysql/sql/password.c scramble(...)
      */
-    private static byte[] passwordCompatibleWithMySQL411(String password, String salt) {
+    public static byte[] passwordCompatibleWithMySQL411(String password, String salt) {
         MessageDigest sha;
         try {
             sha = MessageDigest.getInstance("SHA-1");

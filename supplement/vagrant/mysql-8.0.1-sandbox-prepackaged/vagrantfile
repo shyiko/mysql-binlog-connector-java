@@ -1,0 +1,9 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = 'shyiko/mysql-sandbox-prepackaged'
+    config.vm.box_version = '8.0.1'
+    config.vm.network :forwarded_port, guest: 33061, host: 33061
+    config.vm.network :forwarded_port, guest: 33062, host: 33062
+    config.vm.provider "virtualbox" do |v|
+      v.memory = 1024
+    end
+end

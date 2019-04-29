@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.shyiko.mysql.binlog.jmx;
+package com.github.shyiko.mysql.binlog.network.protocol.command;
+
+import java.io.IOException;
 
 /**
- * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
+ * @author <a href="mailto:ben.osheroff@gmail.com">Ben Osheroff</a>
  */
-public interface BinaryLogClientStatisticsMXBean {
+public class AuthenticateNativePasswordCommand implements Command {
+    private final String scramble, password;
 
-    String getLastEvent();
-    long getSecondsSinceLastEvent();
-    long getSecondsBehindMaster();
-    long getTotalNumberOfEventsSeen();
-    long getTotalBytesReceived();
-    long getNumberOfSkippedEvents();
-    long getNumberOfDisconnects();
-    void reset();
-
+    public AuthenticateNativePasswordCommand(String scramble, String password) {
+        this.scramble = scramble;
+        this.password = password;
+    }
+    @Override
+    public byte[] toByteArray() throws IOException {
+        return AuthenticateCommand.passwordCompatibleWithMySQL411(password, scramble);
+    }
 }
