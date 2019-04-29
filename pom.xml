@@ -28,13 +28,6 @@
             <name>Stanley Shyiko</name>
         </developer>
     </developers>
-    <distributionManagement>
-        <repository>
-            <id>maven-central</id>
-            <name>Sonatype Nexus Staging</name>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-        </repository>
-    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -182,67 +175,6 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>2.9.1</version>
-                <configuration>
-                    <failsOnError>true</failsOnError>
-                    <configLocation>supplement/codequality/checkstyle.xml</configLocation>
-                    <headerLocation>supplement/codequality/license.header</headerLocation>
-                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
-                    <consoleOutput>true</consoleOutput>
-                </configuration>
-                <executions>
-                    <execution>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>checkstyle</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.github.shyiko</groupId>
-                        <artifactId>checkstyle-nonstandard</artifactId>
-                        <version>0.1.0</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-            <plugin>
-                <groupId>com.github.shyiko.usage-maven-plugin</groupId>
-                <artifactId>usage-maven-plugin</artifactId>
-                <version>1.0.0</version>
-                <configuration>
-                    <usage>
-                        # build everything (append "-DskipTests=true" if you wish to skip tests)
-                        ./mvnw clean package
-
-                        # run unit + integration tests, validate codebase using checkstyle
-                        ./mvnw -P coverage clean verify
-                        # use -Dvagrant.integration.box= to switch between MySQL sandboxes
-
-                        # for aggregated coverage over different mysql releases use
-                        ./mvnw clean
-                        ./mvnw -P coverage verify \
-                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.5.27-sandbox-prepackaged
-                        ./mvnw -P coverage verify \
-                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.6.12-sandbox-prepackaged
-                        ./mvnw -P coverage verify \
-                            -Dvagrant.integration.box=supplement/vagrant/mysql-5.7.15-sandbox-prepackaged
-                        ./mvnw -P coverage,mysql-8-compat verify \
-                            -Dvagrant.integration.box=supplement/vagrant/mysql-8.0.1-sandbox-prepackaged
-
-                        # submit coverage report to coveralls
-                        ./mvnw -P coverage coveralls:jacoco -DrepoToken=&lt;coveralls.io&gt;
-
-                        # publish a new version
-                        ./mvnw versions:set -DnewVersion=&lt;version&gt;
-                        ./mvnw -Ddeploy=maven-central
-                        git tag &lt;version&gt; &amp;&amp; git push origin &lt;version&gt;
-                    </usage>
-                </configuration>
             </plugin>
         </plugins>
         <extensions>
