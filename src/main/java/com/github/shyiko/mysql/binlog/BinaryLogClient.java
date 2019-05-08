@@ -748,7 +748,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             String scramble = buffer.readZeroTerminatedString();
 
             Command switchCommand = new AuthenticateNativePasswordCommand(scramble, password);
-            channel.writeBuffered(switchCommand, (usingSSLSocket? 4 : 3));
+            channel.writeBuffered(switchCommand, (usingSSLSocket ? 4 : 3));
             byte[] authResult = channel.read();
 
             if (authResult[0] != (byte) 0x00) {
