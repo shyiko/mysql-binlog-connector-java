@@ -61,16 +61,6 @@ public class PacketChannel implements Channel {
         return inputStream.read(length);
     }
 
-    public void write(Command command, int packetNumber) throws IOException {
-        byte[] body = command.toByteArray();
-        outputStream.writeInteger(body.length, 3); // packet length
-        outputStream.writeInteger(packetNumber, 1);
-        outputStream.write(body, 0, body.length);
-        // though it has no effect in case of default (underlying) output stream (SocketOutputStream),
-        // it may be necessary in case of non-default one
-        outputStream.flush();
-    }
-
     /*
        Azure's MySQL has bizarre network properties that force us to write an
        auth-response challenge in one shot, lest their hair catch on fire and
@@ -86,8 +76,8 @@ public class PacketChannel implements Channel {
         socket.getOutputStream().write(buffer.toByteArray());
     }
 
-    public void write(Command command) throws IOException {
-        write(command, 0);
+    public void writeBuffered(Command command) throws IOException {
+        writeBuffered(command, 0);
     }
 
     public void upgradeToSSL(SSLSocketFactory sslSocketFactory, HostnameVerifier hostnameVerifier) throws IOException {
