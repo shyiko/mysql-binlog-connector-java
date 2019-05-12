@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.  
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.20.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.20.0...0.20.1) - 2019-05-12
+
+### Added
+- `mysql_native_password` auth support + SSL (Azure) ([#274](https://github.com/shyiko/mysql-binlog-connector-java/pull/274)).
+
 ## [0.20.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.19.1...0.20.0) - 2019-04-20
 
 ### Added
