@@ -646,7 +646,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void enableHeartbeat() throws IOException {
-        channel.writeBuffered(new QueryCommand("set @master_heartbeat_period=" + heartbeatInterval * 1000000));
+        channel.write(new QueryCommand("set @master_heartbeat_period=" + heartbeatInterval * 1000000));
         byte[] statementResult = channel.read();
         if (statementResult[0] == (byte) 0xFF /* error */) {
             byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
@@ -669,7 +669,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition);
             }
         }
-        channel.writeBuffered(dumpBinaryLogCommand);
+        channel.write(dumpBinaryLogCommand);
     }
 
     private void ensureEventDataDeserializer(EventType eventType,
@@ -703,7 +703,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             if (serverSupportsSSL) {
                 SSLRequestCommand sslRequestCommand = new SSLRequestCommand();
                 sslRequestCommand.setCollation(collation);
-                channel.writeBuffered(sslRequestCommand, packetNumber++);
+                channel.write(sslRequestCommand, packetNumber++);
                 SSLSocketFactory sslSocketFactory =
                     this.sslSocketFactory != null ?
                         this.sslSocketFactory :
@@ -718,7 +718,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
             greetingPacket.getScramble());
         authenticateCommand.setCollation(collation);
-        channel.writeBuffered(authenticateCommand, packetNumber);
+        channel.write(authenticateCommand, packetNumber);
         byte[] authenticationResult = channel.read();
         if (authenticationResult[0] != (byte) 0x00 /* ok */) {
             if (authenticationResult[0] == (byte) 0xFF /* error */) {
@@ -748,7 +748,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             String scramble = buffer.readZeroTerminatedString();
 
             Command switchCommand = new AuthenticateNativePasswordCommand(scramble, password);
-            channel.writeBuffered(switchCommand, (usingSSLSocket ? 4 : 3));
+            channel.write(switchCommand, (usingSSLSocket ? 4 : 3));
             byte[] authResult = channel.read();
 
             if (authResult[0] != (byte) 0x00) {
@@ -790,7 +790,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                             connectionLost = System.currentTimeMillis() - eventLastSeen > keepAliveInterval;
                         } else {
                             try {
-                                channel.writeBuffered(new PingCommand());
+                                channel.write(new PingCommand());
                             } catch (IOException e) {
                                 connectionLost = true;
                             }
@@ -894,7 +894,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private String fetchGtidPurged() throws IOException {
-        channel.writeBuffered(new QueryCommand("show global variables like 'gtid_purged'"));
+        channel.write(new QueryCommand("show global variables like 'gtid_purged'"));
         ResultSetRowPacket[] resultSet = readResultSet();
         if (resultSet.length != 0) {
             return resultSet[0].getValue(1).toUpperCase();
@@ -904,7 +904,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void fetchBinlogFilenameAndPosition() throws IOException {
         ResultSetRowPacket[] resultSet;
-        channel.writeBuffered(new QueryCommand("show master status"));
+        channel.write(new QueryCommand("show master status"));
         resultSet = readResultSet();
         if (resultSet.length == 0) {
             throw new IOException("Failed to determine binlog filename/position");
@@ -915,7 +915,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private ChecksumType fetchBinlogChecksum() throws IOException {
-        channel.writeBuffered(new QueryCommand("show global variables like 'binlog_checksum'"));
+        channel.write(new QueryCommand("show global variables like 'binlog_checksum'"));
         ResultSetRowPacket[] resultSet = readResultSet();
         if (resultSet.length == 0) {
             return ChecksumType.NONE;
@@ -924,7 +924,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void confirmSupportOfChecksum(ChecksumType checksumType) throws IOException {
-        channel.writeBuffered(new QueryCommand("set @master_binlog_checksum= @@global.binlog_checksum"));
+        channel.write(new QueryCommand("set @master_binlog_checksum= @@global.binlog_checksum"));
         byte[] statementResult = channel.read();
         if (statementResult[0] == (byte) 0xFF /* error */) {
             byte[] bytes = Arrays.copyOfRange(statementResult, 1, statementResult.length);
