@@ -692,6 +692,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private void authenticate(GreetingPacket greetingPacket) throws IOException {
         int collation = greetingPacket.getServerCollation();
         int packetNumber = 1;
+
+        boolean usingSSLSocket = false;
         if (sslMode != SSLMode.DISABLED) {
             boolean serverSupportsSSL = (greetingPacket.getServerCapabilities() & ClientCapabilities.SSL) != 0;
             if (!serverSupportsSSL && (sslMode == SSLMode.REQUIRED || sslMode == SSLMode.VERIFY_CA ||
@@ -709,6 +711,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                             DEFAULT_REQUIRED_SSL_MODE_SOCKET_FACTORY :
                             DEFAULT_VERIFY_CA_SSL_MODE_SOCKET_FACTORY;
                 channel.upgradeToSSL(sslSocketFactory, null);
+                usingSSLSocket = true;
             }
         }
         AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
@@ -723,14 +726,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 throw new AuthenticationException(errorPacket.getErrorMessage(), errorPacket.getErrorCode(),
                     errorPacket.getSqlState());
             } else if (authenticationResult[0] == (byte) 0xFE) {
-                switchAuthentication(authenticationResult);
+                switchAuthentication(authenticationResult, usingSSLSocket);
             } else {
                 throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
             }
         }
     }
 
-    private void switchAuthentication(byte[] authenticationResult) throws IOException {
+    private void switchAuthentication(byte[] authenticationResult, boolean usingSSLSocket) throws IOException {
         /*
             Azure-MySQL likes to tell us to switch authentication methods, even though
             we haven't advertised that we support any.  It uses this for some-odd
@@ -744,7 +747,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             String scramble = buffer.readZeroTerminatedString();
 
             Command switchCommand = new AuthenticateNativePasswordCommand(scramble, password);
-            channel.writeBuffered(switchCommand, 3);
+            channel.write(switchCommand, (usingSSLSocket ? 4 : 3));
             byte[] authResult = channel.read();
 
             if (authResult[0] != (byte) 0x00) {

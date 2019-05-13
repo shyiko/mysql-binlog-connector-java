@@ -63,27 +63,22 @@ public class PacketChannel implements Channel {
 
     public void write(Command command, int packetNumber) throws IOException {
         byte[] body = command.toByteArray();
-        outputStream.writeInteger(body.length, 3); // packet length
-        outputStream.writeInteger(packetNumber, 1);
-        outputStream.write(body, 0, body.length);
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        buffer.writeInteger(body.length, 3); // packet length
+        buffer.writeInteger(packetNumber, 1);
+        buffer.write(body, 0, body.length);
+        outputStream.write(buffer.toByteArray());
         // though it has no effect in case of default (underlying) output stream (SocketOutputStream),
         // it may be necessary in case of non-default one
         outputStream.flush();
     }
 
-    /*
-       Azure's MySQL has bizarre network properties that force us to write an
-       auth-response challenge in one shot, lest their hair catch on fire and
-       forcibly disconnect us.
+    /**
+     * @deprecated use {@link #write(Command, int)} instead
      */
+    @Deprecated
     public void writeBuffered(Command command, int packetNumber) throws IOException {
-        byte[] body = command.toByteArray();
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        buffer.writeInteger(body.length, 3); // packet length
-        buffer.writeInteger(packetNumber, 1);
-        buffer.write(body, 0, body.length);
-        buffer.flush();
-        socket.getOutputStream().write(buffer.toByteArray());
+        write(command, packetNumber);
     }
 
     public void write(Command command) throws IOException {
