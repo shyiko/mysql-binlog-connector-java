@@ -1,0 +1,32 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = "ubuntu/xenial64"
+    # config.vm.box = "ubuntu/bionic64"
+    config.vm.provision :shell, :inline => %Q(
+
+apt-get update
+apt-get install -y libdbi-perl libdbd-mysql-perl psmisc
+
+VERSION=1.31.0
+OS=linux
+origin=https://github.com/datacharmer/dbdeployer/releases/download/v$VERSION
+wget $origin/dbdeployer-$VERSION.$OS.tar.gz
+tar -xzf dbdeployer-$VERSION.$OS.tar.gz
+chmod +x dbdeployer-$VERSION.$OS
+sudo mv dbdeployer-$VERSION.$OS /usr/local/bin/dbdeployer
+
+wget https://downloads.mariadb.org/f/mariadb-10.3.15/bintar-linux-x86_64/mariadb-10.3.15-linux-x86_64.tar.gz
+
+mkdir -p /home/vagrant/mariadb
+
+dbdeployer --flavor=mariadb --sandbox-binary=mariadb unpack mariadb-10.3.15-linux-x86_64.tar.gz
+
+dbdeployer --flavor=mariadb --sandbox-binary=mariadb deploy replication --bind-address='0.0.0.0' --remote-access="%" --base-port=33061 --nodes=2 --my-cnf-options log_slave_updates --my-cnf-options log_bin --my-cnf-options binlog_format=ROW 10.3.15
+
+sed -i -e "s/exit\ 0/\\/home\\/vagrant\\/sandboxes\\/rsandbox_10_3_15\\/restart_all; exit 0/g" /etc/rc.local
+    )
+    config.vm.network :forwarded_port, guest: 33063, host: 33061
+    config.vm.network :forwarded_port, guest: 33064, host: 33062
+    config.vm.provider "virtualbox" do |v|
+      v.memory = 1024
+    end
+end

@@ -23,6 +23,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.concurrent.TimeUnit;
 
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -37,7 +38,11 @@ import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrationTestBase {
 
     @BeforeClass
-    private void enableGTID() throws SQLException {
+    private void enableGTID() throws Exception {
+        if (masterMysqlVersion.contains(MARIADB_VERSION_SUBSTR)) {
+            throw new SkipException("Skipping GTID test for MariaDB");
+        }
+
         MySQLConnection[] servers = {slave, master};
         for (MySQLConnection m : servers) {
             m.execute(new Callback<Statement>() {
@@ -59,6 +64,10 @@ public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrati
 
     @AfterClass(alwaysRun = true)
     private void disableGTID() throws SQLException {
+        if (masterMysqlVersion.contains(MARIADB_VERSION_SUBSTR)) {
+            return;
+        }
+
         MySQLConnection[] servers = {slave, master};
         for (MySQLConnection m : servers) {
             m.execute(new Callback<Statement>() {

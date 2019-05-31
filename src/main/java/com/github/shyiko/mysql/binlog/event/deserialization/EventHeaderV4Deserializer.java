@@ -26,8 +26,6 @@ import java.io.IOException;
  */
 public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventHeaderV4> {
 
-    private static final EventType[] EVENT_TYPES = EventType.values();
-
     @Override
     public EventHeaderV4 deserialize(ByteArrayInputStream inputStream) throws IOException {
         EventHeaderV4 header = new EventHeaderV4();
@@ -40,11 +38,11 @@ public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventH
         return header;
     }
 
-    private static EventType getEventType(int ordinal) throws IOException {
-        if (ordinal >= EVENT_TYPES.length) {
-            throw new IOException("Unknown event type " + ordinal);
+    private static EventType getEventType(int index) throws IOException {
+        if (EventType.EVENT_TYPES.get(index) == null) {
+            throw new IOException("Unknown event type " + index);
         }
-        return EVENT_TYPES[ordinal];
+        return EventType.EVENT_TYPES.get(index);
     }
 
 }

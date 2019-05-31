@@ -43,7 +43,8 @@ public class ByteArrayInputStream extends InputStream {
     public int readInteger(int length) throws IOException {
         int result = 0;
         for (int i = 0; i < length; ++i) {
-            result |= (this.read() << (i << 3));
+            int a = this.read();
+            result |= (a << (i << 3));
         }
         return result;
     }

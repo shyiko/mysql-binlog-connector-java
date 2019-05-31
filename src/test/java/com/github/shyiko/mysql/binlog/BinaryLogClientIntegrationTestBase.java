@@ -43,12 +43,16 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
  */
 public class BinaryLogClientIntegrationTestBase {
 
-    protected static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
+    public static final String MARIADB_VERSION_SUBSTR = "MariaDB";
+
+    protected static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(20);
     protected final TimeZone timeZoneBeforeTheTest = TimeZone.getDefault();
 
     protected MySQLConnection master, slave;
     protected BinaryLogClient client;
     protected CountDownEventListener eventListener;
+    protected String masterMysqlVersion;
+    protected String slaveMysqlVersion;
 
     @BeforeClass
     public void setUp() throws Exception {
@@ -69,7 +73,9 @@ public class BinaryLogClientIntegrationTestBase {
         client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
         client.setKeepAlive(false);
         client.registerEventListener(new TraceEventListener());
-        client.registerEventListener(eventListener = new CountDownEventListener());
+
+        eventListener = new CountDownEventListener();
+        client.registerEventListener(eventListener);
         client.registerLifecycleListener(new TraceLifecycleListener());
         client.connect(DEFAULT_TIMEOUT);
         master.execute(new Callback<Statement>() {
@@ -81,6 +87,21 @@ public class BinaryLogClientIntegrationTestBase {
             }
         });
         eventListener.waitFor(EventType.QUERY, 2, DEFAULT_TIMEOUT);
+
+        master.query("select version();", new Callback<ResultSet>() {
+            @Override
+            public void execute(ResultSet rs) throws SQLException {
+                rs.next();
+                masterMysqlVersion = rs.getString(1);
+            }
+        });
+        slave.query("select version();", new Callback<ResultSet>() {
+            @Override
+            public void execute(ResultSet rs) throws SQLException {
+                rs.next();
+                slaveMysqlVersion = rs.getString(1);
+            }
+        });
     }
 
     @AfterClass(alwaysRun = true)

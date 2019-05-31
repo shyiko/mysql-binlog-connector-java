@@ -32,7 +32,12 @@ public class EventTypeTest {
     @Test
     public void testIsWrite() throws Exception {
         List<EventType> writeEventTypes =
-            Arrays.asList(EventType.PRE_GA_WRITE_ROWS, EventType.WRITE_ROWS, EventType.EXT_WRITE_ROWS);
+            Arrays.asList(
+                EventType.PRE_GA_WRITE_ROWS,
+                EventType.WRITE_ROWS_V1,
+                EventType.WRITE_ROWS,
+                EventType.MARIA_WRITE_ROWS_COMPRESSED_V1,
+                EventType.MARIA_WRITE_ROWS_COMPRESSED);
         for (EventType writeEventType : writeEventTypes) {
             assertTrue(EventType.isWrite(writeEventType));
         }
@@ -46,7 +51,12 @@ public class EventTypeTest {
     @Test
     public void testIsUpdate() throws Exception {
         List<EventType> writeEventTypes =
-            Arrays.asList(EventType.PRE_GA_UPDATE_ROWS, EventType.UPDATE_ROWS, EventType.EXT_UPDATE_ROWS);
+            Arrays.asList(
+                EventType.PRE_GA_UPDATE_ROWS,
+                EventType.UPDATE_ROWS_V1,
+                EventType.UPDATE_ROWS,
+                EventType.MARIA_UPDATE_ROWS_COMPRESSED_V1,
+                EventType.MARIA_UPDATE_ROWS_COMPRESSED);
         for (EventType writeEventType : writeEventTypes) {
             assertTrue(EventType.isUpdate(writeEventType));
         }
@@ -60,7 +70,12 @@ public class EventTypeTest {
     @Test
     public void testIsDelete() throws Exception {
         List<EventType> writeEventTypes =
-            Arrays.asList(EventType.PRE_GA_DELETE_ROWS, EventType.DELETE_ROWS, EventType.EXT_DELETE_ROWS);
+            Arrays.asList(
+                EventType.PRE_GA_DELETE_ROWS,
+                EventType.DELETE_ROWS_V1,
+                EventType.DELETE_ROWS,
+                EventType.MARIA_DELETE_ROWS_COMPRESSED_V1,
+                EventType.MARIA_DELETE_ROWS_COMPRESSED);
         for (EventType writeEventType : writeEventTypes) {
             assertTrue(EventType.isDelete(writeEventType));
         }

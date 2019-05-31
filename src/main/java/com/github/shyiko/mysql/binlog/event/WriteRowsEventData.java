@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class WriteRowsEventData implements EventData {
+public class WriteRowsEventData implements EventData, RowEventData {
 
     private long tableId;
     private BitSet includedColumns;
