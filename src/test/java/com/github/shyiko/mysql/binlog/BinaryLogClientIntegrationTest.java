@@ -15,69 +15,6 @@
  */
 package com.github.shyiko.mysql.binlog;
 
-import com.github.shyiko.mysql.binlog.event.ByteArrayEventData;
-import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
-import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventData;
-import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
-import com.github.shyiko.mysql.binlog.event.EventType;
-import com.github.shyiko.mysql.binlog.event.QueryEventData;
-import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
-import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
-import com.github.shyiko.mysql.binlog.event.deserialization.ByteArrayEventDataDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventHeaderV4Deserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.QueryEventDataDeserializer;
-import com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream;
-import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-import com.github.shyiko.mysql.binlog.network.AuthenticationException;
-import com.github.shyiko.mysql.binlog.network.ServerException;
-import com.github.shyiko.mysql.binlog.network.SocketFactory;
-import org.mockito.InOrder;
-import org.testng.SkipException;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
-
-import javax.xml.bind.DatatypeConverter;
-import java.io.Closeable;
-import java.io.EOFException;
-import java.io.FilterInputStream;
-import java.io.FilterOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.Serializable;
-import java.math.BigDecimal;
-import java.math.MathContext;
-import java.net.Socket;
-import java.net.SocketException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLSyntaxErrorException;
-import java.sql.Statement;
-import java.util.AbstractMap;
-import java.util.BitSet;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
-import java.util.ResourceBundle;
-import java.util.TimeZone;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import static com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.CompatibilityMode;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -92,12 +29,69 @@ import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
+import java.io.EOFException;
+import java.io.FilterInputStream;
+import java.io.FilterOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.net.Socket;
+import java.net.SocketException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.Statement;
+import java.util.AbstractMap;
+import java.util.BitSet;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.ResourceBundle;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.xml.bind.DatatypeConverter;
+
+import org.mockito.InOrder;
+import org.testng.SkipException;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
+import com.github.shyiko.mysql.binlog.event.ByteArrayEventData;
+import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventData;
+import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
+import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
+import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
+import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
+import com.github.shyiko.mysql.binlog.event.deserialization.ByteArrayEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventHeaderV4Deserializer;
+import com.github.shyiko.mysql.binlog.io.BufferedSocketInputStream;
+import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
+import com.github.shyiko.mysql.binlog.network.AuthenticationException;
+import com.github.shyiko.mysql.binlog.network.ServerException;
+import com.github.shyiko.mysql.binlog.network.SocketFactory;
+
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class BinaryLogClientIntegrationTest {
-
-    protected static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
+public class BinaryLogClientIntegrationTest extends BinaryLogClientIntegrationTestBase {
 
     private final Logger logger = Logger.getLogger(getClass().getSimpleName());
 
@@ -105,47 +99,40 @@ public class BinaryLogClientIntegrationTest {
         logger.setLevel(Level.FINEST);
     }
 
-    private final TimeZone timeZoneBeforeTheTest = TimeZone.getDefault();
+    public void waitForLatestBinlogEvent(BinaryLogClient client) throws Exception {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final Random r = new Random();
+        final String tableName = "table" + r.nextInt(9999999);
+        final String markerQuery = "drop table if exists " + tableName;
 
-    protected MySQLConnection master, slave;
-    protected BinaryLogClient client;
-    protected CountDownEventListener eventListener;
+        BinaryLogClient.EventListener markerInterceptor = new BinaryLogClient.EventListener() {
+            @Override
+            public void onEvent(Event event) {
+                if (event.getHeader().getEventType() == EventType.QUERY) {
+                    EventData data = event.getData();
+                    if (data != null && ((QueryEventData) data).getSql().contains(tableName)) {
+                        latch.countDown();
+                    }
+                }
+            }
+        };
+        client.registerEventListener(markerInterceptor);
 
-    @BeforeClass
-    public void setUp() throws Exception {
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
-        ResourceBundle bundle = ResourceBundle.getBundle("jdbc");
-        String prefix = "jdbc.mysql.replication.";
-        master = new MySQLConnection(bundle.getString(prefix + "master.hostname"),
-                Integer.parseInt(bundle.getString(prefix + "master.port")),
-                bundle.getString(prefix + "master.username"), bundle.getString(prefix + "master.password"));
-        slave = new MySQLConnection(bundle.getString(prefix + "slave.hostname"),
-                Integer.parseInt(bundle.getString(prefix + "slave.port")),
-                bundle.getString(prefix + "slave.superUsername"), bundle.getString(prefix + "slave.superPassword"));
-        client = new BinaryLogClient(slave.hostname, slave.port, slave.username, slave.password);
-        EventDeserializer eventDeserializer = new EventDeserializer();
-        eventDeserializer.setCompatibilityMode(CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY,
-            CompatibilityMode.DATE_AND_TIME_AS_LONG);
-        client.setEventDeserializer(eventDeserializer);
-        client.setServerId(client.getServerId() - 1); // avoid clashes between BinaryLogClient instances
-        client.setKeepAlive(false);
-        client.registerEventListener(new TraceEventListener());
-        client.registerEventListener(eventListener = new CountDownEventListener());
-        client.registerLifecycleListener(new TraceLifecycleListener());
-        client.connect(DEFAULT_TIMEOUT);
         master.execute(new Callback<Statement>() {
             @Override
             public void execute(Statement statement) throws SQLException {
-                statement.execute("drop database if exists mbcj_test");
-                statement.execute("create database mbcj_test");
-                statement.execute("use mbcj_test");
+                statement.execute(markerQuery);
             }
         });
-        eventListener.waitFor(EventType.QUERY, 2, DEFAULT_TIMEOUT);
+        assertTrue(latch.await(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
+        client.unregisterEventListener(markerInterceptor);
+        eventListener.reset();
     }
 
     @BeforeMethod
     public void beforeEachTest() throws Exception {
+        waitForLatestBinlogEvent(client);
+        eventListener.reset();
         master.execute(new Callback<Statement>() {
             @Override
             public void execute(Statement statement) throws SQLException {
@@ -154,6 +141,33 @@ public class BinaryLogClientIntegrationTest {
             }
         });
         eventListener.waitFor(EventType.QUERY, 2, DEFAULT_TIMEOUT);
+        eventListener.reset();
+    }
+
+    @AfterMethod
+    public void afterEachTest() throws Exception {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String markerQuery = "drop table if exists _EOS_marker";
+        BinaryLogClient.EventListener markerInterceptor = new BinaryLogClient.EventListener() {
+            @Override
+            public void onEvent(Event event) {
+                if (event.getHeader().getEventType() == EventType.QUERY) {
+                    EventData data = event.getData();
+                    if (data != null && ((QueryEventData) data).getSql().contains("_EOS_marker")) {
+                        latch.countDown();
+                    }
+                }
+            }
+        };
+        client.registerEventListener(markerInterceptor);
+        master.execute(new Callback<Statement>() {
+            @Override
+            public void execute(Statement statement) throws SQLException {
+                statement.execute(markerQuery);
+            }
+        });
+        assertTrue(latch.await(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
+        client.unregisterEventListener(markerInterceptor);
         eventListener.reset();
     }
 
@@ -362,6 +376,7 @@ public class BinaryLogClientIntegrationTest {
 
     @Test
     public void testFSP() throws Exception {
+//        Assume.assumeTrue(!masterMysqlVersion.contains(MARIADB_VERSION_SUBSTR));
         try {
             master.execute(new Callback<Statement>() {
                 @Override
@@ -372,13 +387,15 @@ public class BinaryLogClientIntegrationTest {
         } catch (SQLSyntaxErrorException e) {
             throw new SkipException("MySQL < 5.6.4+");
         }
-        assertEquals(writeAndCaptureRow("datetime(0)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+//        assertEquals(writeAndCaptureRow("datetime(0)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+//            generateTime(1989, 3, 21, 1, 2, 4, 0)});
+        assertEquals(writeAndCaptureRow("datetime(0)", "'1989-03-21 01:02:04.000000'"), new Serializable[]{
             generateTime(1989, 3, 21, 1, 2, 4, 0)});
-        assertEquals(writeAndCaptureRow("datetime(1)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+        assertEquals(writeAndCaptureRow("datetime(1)", "'1989-03-21 01:02:03.800000'"), new Serializable[]{
             generateTime(1989, 3, 21, 1, 2, 3, 800)});
-        assertEquals(writeAndCaptureRow("datetime(2)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+        assertEquals(writeAndCaptureRow("datetime(2)", "'1989-03-21 01:02:03.780000'"), new Serializable[]{
             generateTime(1989, 3, 21, 1, 2, 3, 780)});
-        assertEquals(writeAndCaptureRow("datetime(3)", "'1989-03-21 01:02:03.777777'"), new Serializable[]{
+        assertEquals(writeAndCaptureRow("datetime(3)", "'1989-03-21 01:02:03.778000'"), new Serializable[]{
             generateTime(1989, 3, 21, 1, 2, 3, 778)});
         assertEquals(writeAndCaptureRow("datetime(3)", "'1989-03-21 01:02:03.777'"), new Serializable[]{
             generateTime(1989, 3, 21, 1, 2, 3, 777)});
@@ -775,11 +792,11 @@ public class BinaryLogClientIntegrationTest {
         try {
             client.disconnect();
             final BinaryLogClient binaryLogClient = new BinaryLogClient(slave.hostname, slave.port,
-                    slave.username, slave.password);
+                                                                        slave.username, slave.password);
             binaryLogClient.registerEventListener(new TraceEventListener());
             binaryLogClient.registerEventListener(eventListener);
             EventDeserializer deserializer = new EventDeserializer();
-            deserializer.setEventDataDeserializer(EventType.QUERY, new ByteArrayEventDataDeserializer());
+//            deserializer.setEventDataDeserializer(EventType.QUERY, new ByteArrayEventDataDeserializer());
             // TABLE_MAP and ROTATE events are both used internally, but that doesn't mean it shouldn't be possible to
             // specify different EventDataDeserializer|s
             deserializer.setEventDataDeserializer(EventType.TABLE_MAP, new ByteArrayEventDataDeserializer());
@@ -789,6 +806,7 @@ public class BinaryLogClientIntegrationTest {
                 eventListener.reset();
                 binaryLogClient.connect(DEFAULT_TIMEOUT);
                 eventListener.waitFor(EventType.FORMAT_DESCRIPTION, 1, DEFAULT_TIMEOUT);
+
                 master.execute(new Callback<Statement>() {
                     @Override
                     public void execute(Statement statement) throws SQLException {
@@ -801,9 +819,9 @@ public class BinaryLogClientIntegrationTest {
                         statement.execute("flush logs");
                     }
                 });
-                eventListener.waitFor(EventType.QUERY, 1, DEFAULT_TIMEOUT);
+//                eventListener.waitFor(EventType.QUERY, 1, DEFAULT_TIMEOUT);
                 eventListener.waitFor(EventType.ROTATE, 3, DEFAULT_TIMEOUT); /* 2 with timestamp 0 */
-                eventListener.waitFor(ByteArrayEventData.class, 5, DEFAULT_TIMEOUT);
+                eventListener.waitFor(ByteArrayEventData.class, 4, DEFAULT_TIMEOUT);
             } finally {
                 binaryLogClient.disconnect();
             }
@@ -999,192 +1017,6 @@ public class BinaryLogClientIntegrationTest {
                 "h date, i date, j int)");
         master.execute("insert into test_metameta set j = 5");
         eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
-    }
-
-    @AfterMethod
-    public void afterEachTest() throws Exception {
-        final CountDownLatch latch = new CountDownLatch(1);
-        final String markerQuery = "drop table if exists _EOS_marker";
-        BinaryLogClient.EventListener markerInterceptor = new BinaryLogClient.EventListener() {
-            @Override
-            public void onEvent(Event event) {
-                if (event.getHeader().getEventType() == EventType.QUERY) {
-                    EventData data = event.getData();
-                    if (data != null && ((QueryEventData) data).getSql().contains("_EOS_marker")) {
-                        latch.countDown();
-                    }
-                }
-            }
-        };
-        client.registerEventListener(markerInterceptor);
-        master.execute(new Callback<Statement>() {
-            @Override
-            public void execute(Statement statement) throws SQLException {
-                statement.execute(markerQuery);
-            }
-        });
-        assertTrue(latch.await(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
-        client.unregisterEventListener(markerInterceptor);
-        eventListener.reset();
-    }
-
-    @AfterClass(alwaysRun = true)
-    public void tearDown() throws Exception {
-        TimeZone.setDefault(timeZoneBeforeTheTest);
-        try {
-            if (client != null) {
-                client.disconnect();
-            }
-        } finally {
-            if (slave != null) {
-                slave.close();
-            }
-            if (master != null) {
-                master.execute(new Callback<Statement>() {
-                    @Override
-                    public void execute(Statement statement) throws SQLException {
-                        statement.execute("drop database mbcj_test");
-                    }
-                });
-                master.close();
-            }
-        }
-    }
-
-    /**
-     * Representation of a MySQL connection.
-     */
-    public static final class MySQLConnection implements Closeable {
-
-        private final String hostname;
-        private final int port;
-        private final String username;
-        private final String password;
-        private Connection connection;
-
-        public MySQLConnection(String hostname, int port, String username, String password)
-            throws ClassNotFoundException, SQLException {
-            this.hostname = hostname;
-            this.port = port;
-            this.username = username;
-            this.password = password;
-            Class.forName("com.mysql.jdbc.Driver");
-            connect();
-        }
-
-        private void connect() throws SQLException {
-            this.connection = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port +
-                "?serverTimezone=UTC", username, password);
-            execute(new Callback<Statement>() {
-
-                @Override
-                public void execute(Statement statement) throws SQLException {
-                    statement.execute("SET time_zone = '+00:00'");
-                }
-            });
-        }
-
-        public String hostname() {
-            return hostname;
-        }
-
-        public int port() {
-            return port;
-        }
-
-        public String username() {
-            return username;
-        }
-
-        public String password() {
-            return password;
-        }
-
-        public void execute(Callback<Statement> callback, boolean autocommit) throws SQLException {
-            connection.setAutoCommit(autocommit);
-            Statement statement = connection.createStatement();
-            try {
-                callback.execute(statement);
-                if (!autocommit) {
-                    connection.commit();
-                }
-            } finally {
-                statement.close();
-            }
-        }
-
-        public void execute(Callback<Statement> callback) throws SQLException {
-            execute(callback, false);
-        }
-
-        public void execute(final String...statements) throws SQLException {
-            execute(new Callback<Statement>() {
-                @Override
-                public void execute(Statement statement) throws SQLException {
-                    for (String command : statements) {
-                        statement.execute(command);
-                    }
-                }
-            });
-        }
-
-        public void query(String sql, Callback<ResultSet> callback) throws SQLException {
-            connection.setAutoCommit(false);
-            Statement statement = connection.createStatement();
-            try {
-                ResultSet rs = statement.executeQuery(sql);
-                try {
-                    callback.execute(rs);
-                    connection.commit();
-                } finally {
-                    rs.close();
-                }
-            } finally {
-                statement.close();
-            }
-        }
-
-        @Override
-        public void close() throws IOException {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                throw new IOException(e);
-            }
-        }
-
-        public void reconnect() throws IOException, SQLException {
-            close();
-            connect();
-        }
-    }
-
-    /**
-     * Callback used in the {@link MySQLConnection#execute(Callback)} method.
-     *
-     * @param <T> the type of argument
-     */
-    public interface Callback<T> {
-
-        void execute(T obj) throws SQLException;
-    }
-
-    /**
-     * Used to simulate {@link SocketException} inside
-     * {@link QueryEventDataDeserializer#deserialize(ByteArrayInputStream)} (once).
-     */
-    protected class QueryEventFailureSimulator extends QueryEventDataDeserializer {
-        private boolean failureSimulated;
-
-        @Override
-        public QueryEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
-            QueryEventData eventData = super.deserialize(inputStream);
-            if (!failureSimulated) {
-                failureSimulated = true;
-                throw new SocketException();
-            }
-            return eventData;
-        }
     }
 
 }

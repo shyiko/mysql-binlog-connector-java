@@ -18,6 +18,7 @@ package com.github.shyiko.mysql.binlog;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,6 +36,15 @@ public class CountDownEventListener implements BinaryLogClient.EventListener {
 
     @Override
     public void onEvent(Event event) {
+        if (event.getHeader().getEventType() == EventType.QUERY) {
+            try {
+                QueryEventData data =  event.getData();
+                if (data.getSql().startsWith("# Dum")) {
+                    return;
+                }
+            } catch (Exception e) { }
+        }
+
         incrementCounter(getCounter(countersByType, event.getHeader().getEventType()));
         EventData data = event.getData();
         if (data != null) {

@@ -17,6 +17,7 @@ package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.BinaryLogClientIntegrationTest;
+import com.github.shyiko.mysql.binlog.BinaryLogClientIntegrationTestBase;
 import com.github.shyiko.mysql.binlog.CapturingEventListener;
 import com.github.shyiko.mysql.binlog.CountDownEventListener;
 import com.github.shyiko.mysql.binlog.TraceEventListener;
@@ -27,12 +28,14 @@ import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import org.skyscreamer.jsonassert.JSONAssert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.Serializable;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLSyntaxErrorException;
 import java.sql.Statement;
@@ -44,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static com.github.shyiko.mysql.binlog.BinaryLogClientIntegrationTestBase.MARIADB_VERSION_SUBSTR;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -55,6 +59,8 @@ public class JsonBinaryValueIntegrationTest {
     private static final long DEFAULT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
 
     private final Logger logger = Logger.getLogger(getClass().getSimpleName());
+
+    private String masterMysqlVersion;
 
     {
         logger.setLevel(Level.FINEST);
@@ -102,6 +108,17 @@ public class JsonBinaryValueIntegrationTest {
         }
         eventListener.waitFor(EventType.QUERY, 3, DEFAULT_TIMEOUT);
         eventListener.reset();
+
+        master.query("select version();", new BinaryLogClientIntegrationTestBase.Callback<ResultSet>() {
+            @Override
+            public void execute(ResultSet rs) throws SQLException {
+                rs.next();
+                masterMysqlVersion = rs.getString(1);
+            }
+        });
+        if (masterMysqlVersion.contains(MARIADB_VERSION_SUBSTR)) {
+            throw new SkipException("Skipping GTID test for MariaDB");
+        }
     }
 
     @Test

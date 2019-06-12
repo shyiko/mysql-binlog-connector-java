@@ -96,28 +96,28 @@ public class EventDeserializer {
                 new TableMapEventDataDeserializer());
         eventDataDeserializers.put(EventType.XID,
                 new XidEventDataDeserializer());
-        eventDataDeserializers.put(EventType.WRITE_ROWS,
+        eventDataDeserializers.put(EventType.WRITE_ROWS_V1,
                 new WriteRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.UPDATE_ROWS,
+        eventDataDeserializers.put(EventType.UPDATE_ROWS_V1,
                 new UpdateRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.DELETE_ROWS,
+        eventDataDeserializers.put(EventType.DELETE_ROWS_V1,
                 new DeleteRowsEventDataDeserializer(tableMapEventByTableId));
-        eventDataDeserializers.put(EventType.EXT_WRITE_ROWS,
+        eventDataDeserializers.put(EventType.WRITE_ROWS,
                 new WriteRowsEventDataDeserializer(tableMapEventByTableId).
                         setMayContainExtraInformation(true));
-        eventDataDeserializers.put(EventType.EXT_UPDATE_ROWS,
+        eventDataDeserializers.put(EventType.UPDATE_ROWS,
                 new UpdateRowsEventDataDeserializer(tableMapEventByTableId).
                         setMayContainExtraInformation(true));
-        eventDataDeserializers.put(EventType.EXT_DELETE_ROWS,
+        eventDataDeserializers.put(EventType.DELETE_ROWS,
                 new DeleteRowsEventDataDeserializer(tableMapEventByTableId).
                         setMayContainExtraInformation(true));
-        eventDataDeserializers.put(EventType.ROWS_QUERY,
+        eventDataDeserializers.put(EventType.ROWS_QUERY_LOG,
                 new RowsQueryEventDataDeserializer());
-        eventDataDeserializers.put(EventType.GTID,
+        eventDataDeserializers.put(EventType.GTID_LOG,
                 new GtidEventDataDeserializer());
-       eventDataDeserializers.put(EventType.PREVIOUS_GTIDS,
+       eventDataDeserializers.put(EventType.PREVIOUS_GTIDS_LOG,
                new PreviousGtidSetDeserializer());
-        eventDataDeserializers.put(EventType.XA_PREPARE,
+        eventDataDeserializers.put(EventType.XA_PREPARE_LOG,
                 new XAPrepareEventDataDeserializer());
     }
 
@@ -305,6 +305,10 @@ public class EventDeserializer {
     public EventDataDeserializer getEventDataDeserializer(EventType eventType) {
         EventDataDeserializer eventDataDeserializer = eventDataDeserializers.get(eventType);
         return eventDataDeserializer != null ? eventDataDeserializer : defaultEventDataDeserializer;
+    }
+
+    public Map<Long, TableMapEventData> getTableMapEventByTableId() {
+        return tableMapEventByTableId;
     }
 
     /**

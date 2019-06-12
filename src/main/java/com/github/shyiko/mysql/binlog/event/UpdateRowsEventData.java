@@ -24,7 +24,7 @@ import java.util.Map;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class UpdateRowsEventData implements EventData {
+public class UpdateRowsEventData implements EventData, RowEventData {
 
     private long tableId;
     private BitSet includedColumnsBeforeUpdate;

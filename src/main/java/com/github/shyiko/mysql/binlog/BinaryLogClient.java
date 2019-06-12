@@ -422,9 +422,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * <p>
      * If set (recommended)
      * <ul>
-     * <li> HEARTBEAT event will be emitted every "heartbeatInterval".
+     * <li> HEARTBEAT_LOG event will be emitted every "heartbeatInterval".
      * <li> if {@link #setKeepAlive(boolean)} is on then keepAlive thread will attempt to reconnect if no
-     *   HEARTBEAT events were received within {@link #setKeepAliveInterval(long)} (instead of trying to send
+     *   HEARTBEAT_LOG events were received within {@link #setKeepAliveInterval(long)} (instead of trying to send
      *   PING every {@link #setKeepAliveInterval(long)}, which is fundamentally flawed -
      *   https://github.com/shyiko/mysql-binlog-connector-java/issues/118).
      * </ul>
@@ -574,7 +574,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
             synchronized (gtidSetAccessLock) {
                 if (gtidSet != null) {
-                    ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+                    ensureEventDataDeserializer(EventType.GTID_LOG, GtidEventDataDeserializer.class);
                     ensureEventDataDeserializer(EventType.QUERY, QueryEventDataDeserializer.class);
                 }
             }
@@ -1035,7 +1035,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
         EventHeader eventHeader = event.getHeader();
         switch(eventHeader.getEventType()) {
-            case GTID:
+            case GTID_LOG:
                 GtidEventData gtidEventData = (GtidEventData) EventDataWrapper.internal(event.getData());
                 gtid = gtidEventData.getGtid();
                 break;

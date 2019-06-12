@@ -1,0 +1,6 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = 'jinfwhuang/mariadb-sandbox-prepackaged'
+    config.vm.box_version = '10.3.15'
+    config.vm.network :forwarded_port, guest: 33063, host: 33061
+    config.vm.network :forwarded_port, guest: 33064, host: 33062
+end

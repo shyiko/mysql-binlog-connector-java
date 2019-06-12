@@ -57,6 +57,7 @@ public class EventHeaderV4 implements EventHeader {
         this.serverId = serverId;
     }
 
+    @Override
     public long getEventLength() {
         return eventLength;
     }
@@ -69,6 +70,7 @@ public class EventHeaderV4 implements EventHeader {
         return nextPosition - eventLength;
     }
 
+    @Override
     public long getNextPosition() {
         return nextPosition;
     }
