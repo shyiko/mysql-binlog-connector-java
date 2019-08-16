@@ -417,7 +417,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         if (year == 0 || month == 0 || day == 0) {
             return invalidDateAndTimeRepresentation;
         }
-        return UnixTime.from(year, month, day, hour, minute, second, millis);
+        return convertLocalTimestamp(UnixTime.from(year, month, day, hour, minute, second, millis));
     }
 
     protected int deserializeFractionalSeconds(int meta, ByteArrayInputStream inputStream) throws IOException {
@@ -427,6 +427,33 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             return fraction * (int) Math.pow(100, 3 - length);
         }
         return 0;
+    }
+    
+    private long convertLocalTimestamp(long millis) {
+        TimeZone tz = TimeZone.getDefault();
+        Calendar c = Calendar.getInstance(tz);
+        long localMillis = millis;
+        int offset, time;
+
+        c.set(1970, Calendar.JANUARY, 1, 0, 0, 0);
+
+        // Add milliseconds
+        while (localMillis > Integer.MAX_VALUE)
+        {
+            c.add(Calendar.MILLISECOND, Integer.MAX_VALUE);
+            localMillis -= Integer.MAX_VALUE;
+        }
+        c.add(Calendar.MILLISECOND, (int)localMillis);
+
+        // Stupidly, the Calendar will give us the wrong result if we use getTime() directly.
+        // Instead, we calculate the offset and do the math ourselves.
+        time = c.get(Calendar.MILLISECOND);
+        time += c.get(Calendar.SECOND) * 1000;
+        time += c.get(Calendar.MINUTE) * 60 * 1000;
+        time += c.get(Calendar.HOUR_OF_DAY) * 60 * 60 * 1000;
+        offset = tz.getOffset(c.get(Calendar.ERA), c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH), c.get(Calendar.DAY_OF_WEEK), time);
+
+        return (millis - offset);
     }
 
     private static int bitSlice(long value, int bitOffset, int numberOfBits, int payloadSize) {
