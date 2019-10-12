@@ -25,7 +25,7 @@ import java.security.NoSuchAlgorithmException;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class AuthenticateCommand implements Command {
+public class AuthenticateSecurityPasswordCommand implements Command {
 
     private String schema;
     private String username;
@@ -34,11 +34,12 @@ public class AuthenticateCommand implements Command {
     private int clientCapabilities;
     private int collation;
 
-    public AuthenticateCommand(String schema, String username, String password, String salt) {
+    public AuthenticateSecurityPasswordCommand(String schema, String username, String password, String salt, int collation) {
         this.schema = schema;
         this.username = username;
         this.password = password;
         this.salt = salt;
+        this.collation = collation;
     }
 
     public void setClientCapabilities(int clientCapabilities) {

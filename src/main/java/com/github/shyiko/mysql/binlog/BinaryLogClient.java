@@ -45,8 +45,9 @@ import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.Packet;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
 import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateNativePasswordCommand;
+import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateSHA2Command;
+import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateSecurityPasswordCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.Command;
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogGtidCommand;
@@ -715,9 +716,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 usingSSLSocket = true;
             }
         }
-        AuthenticateCommand authenticateCommand = new AuthenticateCommand(schema, username, password,
-            greetingPacket.getScramble());
-        authenticateCommand.setCollation(collation);
+
+        Command authenticateCommand = "caching_sha2_password".equals(greetingPacket.getPluginProvidedData()) ?
+            new AuthenticateSHA2Command(schema, username, password, greetingPacket.getScramble(), collation) :
+            new AuthenticateSecurityPasswordCommand(schema, username, password, greetingPacket.getScramble(), collation);
+
         channel.write(authenticateCommand, packetNumber);
         byte[] authenticationResult = channel.read();
         if (authenticationResult[0] != (byte) 0x00 /* ok */) {
@@ -728,6 +731,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     errorPacket.getSqlState());
             } else if (authenticationResult[0] == (byte) 0xFE) {
                 switchAuthentication(authenticationResult, usingSSLSocket);
+            } else if (authenticationResult[0] == (byte) 0x01) {
+                if (authenticationResult.length >= 2 && (authenticationResult[1] == 3) || (authenticationResult[1] == 4)) {
+                    // 8.0 auth ok
+                    byte[] authenticationResultSha2 = channel.read();
+                    logger.log(Level.FINEST, "SHA2 auth result {0}", authenticationResultSha2);
+                } else {
+                    throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + "&" + authenticationResult[1] + ")");
+                }
             } else {
                 throw new AuthenticationException("Unexpected authentication result (" + authenticationResult[0] + ")");
             }

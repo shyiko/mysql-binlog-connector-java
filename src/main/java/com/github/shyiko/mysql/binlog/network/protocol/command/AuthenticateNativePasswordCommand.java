@@ -29,6 +29,6 @@ public class AuthenticateNativePasswordCommand implements Command {
     }
     @Override
     public byte[] toByteArray() throws IOException {
-        return AuthenticateCommand.passwordCompatibleWithMySQL411(password, scramble);
+        return AuthenticateSecurityPasswordCommand.passwordCompatibleWithMySQL411(password, scramble);
     }
 }
