@@ -358,7 +358,8 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     }
 
     protected Serializable deserializeYear(ByteArrayInputStream inputStream) throws IOException {
-        return 1900 + inputStream.readInteger(1);
+        int year = inputStream.readInteger(1);
+        return year == 0 ? 0 : 1900 + year;
     }
 
     protected Serializable deserializeString(int length, ByteArrayInputStream inputStream) throws IOException {
