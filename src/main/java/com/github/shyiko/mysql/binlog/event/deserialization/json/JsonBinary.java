@@ -15,14 +15,14 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
-import com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.ColumnType;
-import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
+
+import com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.ColumnType;
+import com.github.shyiko.mysql.binlog.io.JsonByteArrayInputStream;
 
 /**
  * Utility to parse the binary-encoded value of a MySQL {@code JSON} type, translating the encoded representation into
@@ -181,14 +181,10 @@ public class JsonBinary {
         new JsonBinary(bytes).parse(formatter);
     }
 
-    private final ByteArrayInputStream reader;
+    private final JsonByteArrayInputStream reader;
 
     public JsonBinary(byte[] bytes) {
-        this(new ByteArrayInputStream(bytes));
-    }
-
-    public JsonBinary(ByteArrayInputStream contents) {
-        this.reader = contents;
+        this.reader = new JsonByteArrayInputStream(bytes);
     }
 
     public String getString() {
@@ -202,10 +198,12 @@ public class JsonBinary {
     }
 
     public void parse(JsonFormatter formatter) throws IOException {
-        parse(readValueType(), formatter);
+        parse(new ValueEntry(readValueType()), formatter);
     }
 
-    protected void parse(ValueType type, JsonFormatter formatter) throws IOException {
+    protected void parse(ValueEntry entry, JsonFormatter formatter) throws IOException {
+        ensureOffset(entry.index);
+        ValueType type = entry.type;
         switch (type) {
             case SMALL_DOCUMENT:
                 parseObject(true, formatter);
@@ -252,6 +250,22 @@ public class JsonBinary {
             default:
                 throw new IOException("Unknown type value '" + asHex(type.getCode()) +
                     "' in first byte of a JSON value");
+        }
+    }
+
+    /**
+     * ensure parse position equals entry-offset
+     * @param ensureOffset parse offset
+     */
+    private void ensureOffset(int ensureOffset) {
+        // ensure reader's position equals parse offset
+        int pos = reader.getPosition();
+        if (pos != ensureOffset) {
+            if (ensureOffset < pos) {
+                String msg = String.format("wrong offset. pos:%d, ensureOffset:%d", pos, ensureOffset);
+                throw new RuntimeException(msg);
+            }
+            reader.skip(ensureOffset - pos);
         }
     }
 
@@ -326,8 +340,9 @@ public class JsonBinary {
 
         // Read each key-entry, consisting of the offset and length of each key ...
         int[] keyLengths = new int[numElements];
+        int[] keyOffsets = new int[numElements];
         for (int i = 0; i != numElements; ++i) {
-            readUnsignedIndex(numBytes, small, "key offset in"); // unused
+            keyOffsets[i] = readUnsignedIndex(numBytes, small, "key offset in");
             keyLengths[i] = readUInt16();
         }
 
@@ -375,6 +390,7 @@ public class JsonBinary {
         // Read each key ...
         String[] keys = new String[numElements];
         for (int i = 0; i != numElements; ++i) {
+            ensureOffset(keyOffsets[i]);
             keys[i] = reader.readString(keyLengths[i]);
         }
 
@@ -397,7 +413,7 @@ public class JsonBinary {
                 }
             } else {
                 // Parse the value ...
-                parse(entry.type, formatter);
+                parse(entry, formatter);
             }
         }
         formatter.endObject();
@@ -527,7 +543,7 @@ public class JsonBinary {
                 }
             } else {
                 // Parse the value ...
-                parse(entry.type, formatter);
+                parse(entry, formatter);
             }
         }
         formatter.endArray();
