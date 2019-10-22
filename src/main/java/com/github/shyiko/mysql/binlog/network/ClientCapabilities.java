@@ -42,6 +42,7 @@ public final class ClientCapabilities {
     public static final int MULTI_RESULTS = 1 << 17; /* enable/disable multi-results */
     public static final int PS_MULTI_RESULTS = 1 << 18; /* multi-results in ps-protocol */
     public static final int PLUGIN_AUTH = 1 << 19; /* client supports plugin authentication */
+    public static final int PLUGIN_AUTH_LENENC_CLIENT_DATA = 1 << 21;
     public static final int SSL_VERIFY_SERVER_CERT = 1 << 30;
     public static final int REMEMBER_OPTIONS = 1 << 31;
 
