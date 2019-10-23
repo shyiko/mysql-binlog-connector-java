@@ -15,22 +15,8 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
-import com.github.shyiko.mysql.binlog.BinaryLogClient;
-import com.github.shyiko.mysql.binlog.BinaryLogClientIntegrationTest;
-import com.github.shyiko.mysql.binlog.CapturingEventListener;
-import com.github.shyiko.mysql.binlog.CountDownEventListener;
-import com.github.shyiko.mysql.binlog.TraceEventListener;
-import com.github.shyiko.mysql.binlog.TraceLifecycleListener;
-import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventData;
-import com.github.shyiko.mysql.binlog.event.EventType;
-import com.github.shyiko.mysql.binlog.event.QueryEventData;
-import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
-import org.skyscreamer.jsonassert.JSONAssert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 import java.io.Serializable;
 import java.sql.SQLException;
@@ -44,8 +30,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import org.skyscreamer.jsonassert.JSONAssert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.github.shyiko.mysql.binlog.BinaryLogClientIntegrationTest;
+import com.github.shyiko.mysql.binlog.CapturingEventListener;
+import com.github.shyiko.mysql.binlog.CountDownEventListener;
+import com.github.shyiko.mysql.binlog.TraceEventListener;
+import com.github.shyiko.mysql.binlog.TraceLifecycleListener;
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventData;
+import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
+import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
+import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 
 /**
  * @author <a href="mailto:rhauch@gmail.com">Randall Hauch</a>
@@ -102,6 +104,72 @@ public class JsonBinaryValueIntegrationTest {
         }
         eventListener.waitFor(EventType.QUERY, 3, DEFAULT_TIMEOUT);
         eventListener.reset();
+    }
+
+    @Test
+    public void testMysql8JsonSetPartialUpdateWithHoles() throws Exception {
+        CountDownEventListener eventListener = new CountDownEventListener();
+        client.registerEventListener(eventListener);
+        CapturingEventListener capturingEventListener = new CapturingEventListener();
+        client.registerEventListener(capturingEventListener);
+        String json = "{\"age\":22,\"addr\":{\"code\":100,\"detail\":{\"ab\":\"970785C8-C299\"}},\"name\":\"Alice\"}";
+        master.execute("DROP TABLE IF EXISTS json_test", "create table json_test (j JSON)",
+            "INSERT INTO json_test VALUES ('" + json + "')",
+            "UPDATE json_test SET j = JSON_SET(j, '$.addr.detail.ab', '970785C8')");
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(UpdateRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        List<WriteRowsEventData> events = capturingEventListener.getEvents(WriteRowsEventData.class);
+        Serializable[] insertData = events.iterator().next().getRows().get(0);
+        assertEquals(JsonBinary.parseAsString((byte[]) insertData[0]), json);
+
+        List<UpdateRowsEventData> updateEvents = capturingEventListener.getEvents(UpdateRowsEventData.class);
+        Serializable[] updateData = updateEvents.iterator().next().getRows().get(0).getValue();
+        assertEquals(JsonBinary.parseAsString((byte[]) updateData[0]), json.replace("970785C8-C299", "970785C8"));
+        assertEquals(((byte[]) updateData[0]).length, ((byte[]) insertData[0]).length);
+    }
+
+    @Test
+    public void testMysql8JsonRemovePartialUpdateWithHoles() throws Exception {
+        CountDownEventListener eventListener = new CountDownEventListener();
+        client.registerEventListener(eventListener);
+        CapturingEventListener capturingEventListener = new CapturingEventListener();
+        client.registerEventListener(capturingEventListener);
+        String json = "{\"age\":22,\"addr\":{\"code\":100,\"detail\":{\"ab\":\"970785C8-C299\"}},\"name\":\"Alice\"}";
+        master.execute("DROP TABLE IF EXISTS json_test", "create table json_test (j JSON)",
+            "INSERT INTO json_test VALUES ('" + json + "')",
+            "UPDATE json_test SET j = JSON_REMOVE(j, '$.addr.detail.ab')");
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(UpdateRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        List<WriteRowsEventData> events = capturingEventListener.getEvents(WriteRowsEventData.class);
+        Serializable[] insertData = events.iterator().next().getRows().get(0);
+        assertEquals(JsonBinary.parseAsString((byte[]) insertData[0]), json);
+
+        List<UpdateRowsEventData> updateEvents = capturingEventListener.getEvents(UpdateRowsEventData.class);
+        Serializable[] updateData = updateEvents.iterator().next().getRows().get(0).getValue();
+        assertEquals(JsonBinary.parseAsString((byte[]) updateData[0]), json.replace("\"ab\":\"970785C8-C299\"", ""));
+        assertEquals(((byte[]) updateData[0]).length, ((byte[]) insertData[0]).length);
+    }
+
+    @Test
+    public void testMysql8JsonReplacePartialUpdateWithHoles() throws Exception {
+        CountDownEventListener eventListener = new CountDownEventListener();
+        client.registerEventListener(eventListener);
+        CapturingEventListener capturingEventListener = new CapturingEventListener();
+        client.registerEventListener(capturingEventListener);
+        String json = "{\"age\":22,\"addr\":{\"code\":100,\"detail\":{\"ab\":\"970785C8-C299\"}},\"name\":\"Alice\"}";
+        master.execute("DROP TABLE IF EXISTS json_test", "create table json_test (j JSON)",
+            "INSERT INTO json_test VALUES ('" + json + "')",
+            "UPDATE json_test SET j = JSON_REPLACE(j, '$.addr.detail.ab', '9707')");
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        eventListener.waitFor(UpdateRowsEventData.class, 1, DEFAULT_TIMEOUT);
+        List<WriteRowsEventData> events = capturingEventListener.getEvents(WriteRowsEventData.class);
+        Serializable[] insertData = events.iterator().next().getRows().get(0);
+        assertEquals(JsonBinary.parseAsString((byte[]) insertData[0]), json);
+
+        List<UpdateRowsEventData> updateEvents = capturingEventListener.getEvents(UpdateRowsEventData.class);
+        Serializable[] updateData = updateEvents.iterator().next().getRows().get(0).getValue();
+        assertEquals(JsonBinary.parseAsString((byte[]) updateData[0]), json.replace("970785C8-C299", "9707"));
+        assertEquals(((byte[]) updateData[0]).length, ((byte[]) insertData[0]).length);
     }
 
     @Test
@@ -433,8 +501,11 @@ public class JsonBinaryValueIntegrationTest {
             public void onEvent(Event event) {
                 if (event.getHeader().getEventType() == EventType.QUERY) {
                     EventData data = event.getData();
-                    if (data != null && ((QueryEventData) data).getSql().contains("_EOS_marker")) {
-                        latch.countDown();
+                    if (data != null) {
+                        String sql = ((QueryEventData) data).getSql().toLowerCase();
+                        if (sql.contains("_EOS_marker".toLowerCase())) {
+                            latch.countDown();
+                        }
                     }
                 }
             }

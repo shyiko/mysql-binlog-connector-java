@@ -36,7 +36,6 @@ public class JsonByteArrayInputStream extends ByteArrayInputStream {
         return new String(read(length));
     }
 
-
     public byte[] read(int length) throws IOException {
         byte[] bytes = new byte[length];
         fill(bytes, 0, length);
