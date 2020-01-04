@@ -206,6 +206,7 @@ Some of the OSS using / built on top of mysql-binlog-conector-java:
 * [zendesk/maxwell](https://github.com/zendesk/maxwell) A MySQL-to-JSON Kafka producer.
 * [zzt93/syncer](https://github.com/zzt93/syncer) A tool sync & manipulate data from MySQL/MongoDB to ES/Kafka/MySQL, which make 'Eventual Consistency' promise.
 * [rusuly/MySqlCdc](https://github.com/rusuly/MySqlCdc) MySQL binlog Change Data Capture (CDC) connector for .NET Core.
+
 It's also used [on a large scale](https://twitter.com/atwinmutt/status/626816601078300672) in MailChimp. You can read about it [here](http://devs.mailchimp.com/blog/powering-mailchimp-pro-reporting/).  
 
 ## Development
