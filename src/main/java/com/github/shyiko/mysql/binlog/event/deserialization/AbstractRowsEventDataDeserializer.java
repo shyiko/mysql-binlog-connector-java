@@ -24,7 +24,6 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.BitSet;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
 
@@ -312,7 +311,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, fsp);
         }
-        return new java.sql.Timestamp(timestamp);
+        return convertLongTimestamptWithFSP(timestamp, fsp);
     }
 
     protected Serializable deserializeDatetime(ByteArrayInputStream inputStream) throws IOException {
@@ -321,7 +320,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, 0);
         }
-        return timestamp != null ? new java.util.Date(timestamp) : null;
+        return timestamp != null ? new java.sql.Timestamp(timestamp) : null;
     }
 
     protected Serializable deserializeDatetimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
@@ -354,7 +353,14 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, fsp);
         }
-        return timestamp != null ? new java.util.Date(timestamp) : null;
+
+        return timestamp != null ? convertLongTimestamptWithFSP(timestamp, fsp) : null;
+    }
+
+    private java.sql.Timestamp convertLongTimestamptWithFSP(Long timestamp, int fsp) {
+        java.sql.Timestamp ts = new java.sql.Timestamp(timestamp);
+        ts.setNanos(fsp * 1000);
+        return ts;
     }
 
     protected Serializable deserializeYear(ByteArrayInputStream inputStream) throws IOException {
