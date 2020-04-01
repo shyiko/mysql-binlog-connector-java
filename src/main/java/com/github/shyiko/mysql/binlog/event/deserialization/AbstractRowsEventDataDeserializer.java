@@ -22,6 +22,7 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.sql.Time;
 import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Map;
@@ -265,7 +266,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, 0);
         }
-        return timestamp != null ? new java.sql.Time(timestamp) : null;
+        return timestamp != null ? new java.sql.Timestamp(timestamp) : null;
     }
 
     protected Serializable deserializeTimeV2(int meta, ByteArrayInputStream inputStream) throws IOException {
@@ -293,7 +294,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
         if (deserializeDateAndTimeAsLong) {
             return castTimestamp(timestamp, fsp);
         }
-        return timestamp != null ? new java.sql.Time(timestamp) : null;
+        return timestamp != null ? convertLongTimestamptWithFSP(timestamp, fsp) : null;
     }
 
     protected Serializable deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
