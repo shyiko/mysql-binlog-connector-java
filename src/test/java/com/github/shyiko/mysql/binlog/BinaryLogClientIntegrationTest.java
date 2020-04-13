@@ -1002,6 +1002,17 @@ public class BinaryLogClientIntegrationTest {
         eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
     }
 
+    @Test
+    public void testSetMasterServerId() throws Exception {
+        slave.query("SELECT @@server_id", new Callback<ResultSet>() {
+            @Override
+            public void execute(final ResultSet rs) throws SQLException {
+                rs.next();
+                assertEquals(client.getMasterServerId(), rs.getLong("@@server_id"));
+            }
+        });
+    }
+
     @AfterMethod
     public void afterEachTest() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
