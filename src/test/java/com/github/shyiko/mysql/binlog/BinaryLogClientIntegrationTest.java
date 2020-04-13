@@ -994,11 +994,23 @@ public class BinaryLogClientIntegrationTest {
 
     @Test
     public void testMySQL8TableMetadata() throws Exception {
+        master.execute("drop table if exists test_metameta");
         master.execute("create table test_metameta ( " +
                 "a date, b date, c date, d date, e date, f date, g date, " +
                 "h date, i date, j int)");
         master.execute("insert into test_metameta set j = 5");
         eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
+    }
+
+    @Test
+    public void testSetMasterServerId() throws Exception {
+        slave.query("SELECT @@server_id", new Callback<ResultSet>() {
+            @Override
+            public void execute(final ResultSet rs) throws SQLException {
+                rs.next();
+                assertEquals(client.getMasterServerId(), rs.getLong("@@server_id"));
+            }
+        });
     }
 
     @AfterMethod
