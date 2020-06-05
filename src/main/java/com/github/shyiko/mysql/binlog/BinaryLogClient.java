@@ -164,7 +164,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private volatile ExecutorService keepAliveThreadExecutor;
 
     private final Lock connectLock = new ReentrantLock();
-    private final Lock keepAliveThreadExecutorLock = new ReentrantLock();
 
     /**
      * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
@@ -771,51 +770,46 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                     return newNamedThread(runnable, "blc-keepalive-" + hostname + ":" + port);
                 }
             });
-        try {
-            keepAliveThreadExecutorLock.lock();
-            threadExecutor.submit(new Runnable() {
-                @Override
-                public void run() {
-                    while (!threadExecutor.isShutdown()) {
+        threadExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                while (!threadExecutor.isShutdown()) {
+                    try {
+                        Thread.sleep(keepAliveInterval);
+                    } catch (InterruptedException e) {
+                        // expected in case of disconnect
+                    }
+                    if (threadExecutor.isShutdown()) {
+                        return;
+                    }
+                    boolean connectionLost = false;
+                    if (heartbeatInterval > 0) {
+                        connectionLost = System.currentTimeMillis() - eventLastSeen > keepAliveInterval;
+                    } else {
                         try {
-                            Thread.sleep(keepAliveInterval);
-                        } catch (InterruptedException e) {
-                            // expected in case of disconnect
+                            channel.write(new PingCommand());
+                        } catch (IOException e) {
+                            connectionLost = true;
                         }
-                        if (threadExecutor.isShutdown()) {
-                            return;
+                    }
+                    if (connectionLost) {
+                        if (logger.isLoggable(Level.INFO)) {
+                            logger.info("Trying to restore lost connection to " + hostname + ":" + port);
                         }
-                        boolean connectionLost = false;
-                        if (heartbeatInterval > 0) {
-                            connectionLost = System.currentTimeMillis() - eventLastSeen > keepAliveInterval;
-                        } else {
-                            try {
-                                channel.write(new PingCommand());
-                            } catch (IOException e) {
-                                connectionLost = true;
-                            }
-                        }
-                        if (connectionLost) {
-                            if (logger.isLoggable(Level.INFO)) {
-                                logger.info("Trying to restore lost connection to " + hostname + ":" + port);
-                            }
-                            try {
-                                terminateConnect();
-                                connect(connectTimeout);
-                            } catch (Exception ce) {
-                                if (logger.isLoggable(Level.WARNING)) {
-                                    logger.warning("Failed to restore connection to " + hostname + ":" + port +
-                                        ". Next attempt in " + keepAliveInterval + "ms");
-                                }
+                        try {
+                            terminateConnect();
+                            connect(connectTimeout);
+                        } catch (Exception ce) {
+                            if (logger.isLoggable(Level.WARNING)) {
+                                logger.warning("Failed to restore connection to " + hostname + ":" + port +
+                                    ". Next attempt in " + keepAliveInterval + "ms");
                             }
                         }
                     }
                 }
-            });
-            keepAliveThreadExecutor = threadExecutor;
-        } finally {
-            keepAliveThreadExecutorLock.unlock();
-        }
+            }
+        });
+        keepAliveThreadExecutor = threadExecutor;
     }
 
     private Thread newNamedThread(Runnable runnable, String threadName) {
@@ -825,12 +819,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     boolean isKeepAliveThreadRunning() {
-        try {
-            keepAliveThreadExecutorLock.lock();
-            return keepAliveThreadExecutor != null && !keepAliveThreadExecutor.isShutdown();
-        } finally {
-            keepAliveThreadExecutorLock.unlock();
-        }
+        return keepAliveThreadExecutor != null && !keepAliveThreadExecutor.isShutdown();
     }
 
     /**
@@ -1180,19 +1169,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     private void terminateKeepAliveThread() {
-        try {
-            keepAliveThreadExecutorLock.lock();
-            ExecutorService keepAliveThreadExecutor = this.keepAliveThreadExecutor;
-            if (keepAliveThreadExecutor == null) {
-                return;
-            }
-            keepAliveThreadExecutor.shutdownNow();
-            while (!awaitTerminationInterruptibly(keepAliveThreadExecutor,
-                Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
-                // ignore
-            }
-        } finally {
-            keepAliveThreadExecutorLock.unlock();
+        ExecutorService keepAliveThreadExecutor = this.keepAliveThreadExecutor;
+        if (keepAliveThreadExecutor == null) {
+            return;
+        }
+        keepAliveThreadExecutor.shutdownNow();
+        while (!awaitTerminationInterruptibly(keepAliveThreadExecutor,
+            Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
+            // ignore
         }
     }
 
