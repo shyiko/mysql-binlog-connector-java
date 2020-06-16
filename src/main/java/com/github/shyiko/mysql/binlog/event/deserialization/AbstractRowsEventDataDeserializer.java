@@ -75,6 +75,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
     private Long invalidDateAndTimeRepresentation;
     private boolean microsecondsPrecision;
     private boolean deserializeCharAndBinaryAsByteArray;
+    private static int serverTimezoneDiff;
 
     public AbstractRowsEventDataDeserializer(Map<Long, TableMapEventData> tableMapEventByTableId) {
         this.tableMapEventByTableId = tableMapEventByTableId;
@@ -95,6 +96,10 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
     void setDeserializeCharAndBinaryAsByteArray(boolean value) {
         this.deserializeCharAndBinaryAsByteArray = value;
+    }
+
+    void setServerTimezoneDiff(int serverTimezoneDiff) {
+        this.serverTimezoneDiff = serverTimezoneDiff;
     }
 
     protected Serializable[] deserializeRow(long tableId, BitSet includedColumns, ByteArrayInputStream inputStream)
@@ -544,7 +549,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             long daysUpToMonth = isLeapYear(year) ? LEAP_YEAR_DAYS_BY_MONTH[month - 1] : YEAR_DAYS_BY_MONTH[month - 1];
             timestamp += ((daysUpToMonth + day - 1) * 24 * 60 * 60) +
                 (hour * 60 * 60) + (minute * 60) + (second);
-            timestamp = timestamp * 1000 + millis;
+            timestamp = timestamp * 1000 + millis - serverTimezoneDiff;
             return timestamp;
         }
 
@@ -559,7 +564,7 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
             c.set(Calendar.MINUTE, minute);
             c.set(Calendar.SECOND, second);
             c.set(Calendar.MILLISECOND, millis);
-            return c.getTimeInMillis();
+            return c.getTimeInMillis() - serverTimezoneDiff;
         }
 
         private static int leapYears(int from, int end) {
