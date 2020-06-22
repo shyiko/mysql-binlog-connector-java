@@ -189,6 +189,7 @@ public class JsonBinary {
 
     public JsonBinary(ByteArrayInputStream contents) {
         this.reader = contents;
+        this.reader.mark(Integer.MAX_VALUE);
     }
 
     public String getString() {
@@ -397,6 +398,8 @@ public class JsonBinary {
                 }
             } else {
                 // Parse the value ...
+                this.reader.reset();
+                this.reader.skip(entry.index + 1);
                 parse(entry.type, formatter);
             }
         }

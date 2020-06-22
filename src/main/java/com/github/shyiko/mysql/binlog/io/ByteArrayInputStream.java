@@ -218,4 +218,18 @@ public class ByteArrayInputStream extends InputStream {
         }
     }
 
+    @Override
+    public synchronized void mark(int readlimit) {
+        inputStream.mark(readlimit);
+    }
+
+    @Override
+    public boolean markSupported() {
+        return inputStream.markSupported();
+    }
+
+    @Override
+    public synchronized void reset() throws IOException {
+        inputStream.reset();
+    }
 }
