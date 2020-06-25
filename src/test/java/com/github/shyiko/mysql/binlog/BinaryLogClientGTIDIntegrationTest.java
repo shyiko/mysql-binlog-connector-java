@@ -15,25 +15,26 @@
  */
 package com.github.shyiko.mysql.binlog;
 
-import com.github.shyiko.mysql.binlog.event.QueryEventData;
-import com.github.shyiko.mysql.binlog.event.XidEventData;
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.AssertJUnit.assertNotNull;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.concurrent.TimeUnit;
 
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.AssertJUnit.assertNotNull;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import com.github.shyiko.mysql.binlog.event.QueryEventData;
+import com.github.shyiko.mysql.binlog.event.XidEventData;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 
 /**
  * @author <a href="https://github.com/osheroff">Ben Osheroff</a>
  */
-public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrationTest {
+public class BinaryLogClientGTIDIntegrationTest extends BinaryLogClientIntegrationTestBase {
 
     @BeforeClass
     private void enableGTID() throws SQLException {
