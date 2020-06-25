@@ -68,6 +68,11 @@ public class ByteArrayOutputStream extends OutputStream {
         outputStream.write(b);
     }
 
+    @Override
+    public void write(byte[] bytes) throws IOException {
+        outputStream.write(bytes);
+    }
+
     public byte[] toByteArray() {
         // todo: whole approach feels wrong
         if (outputStream instanceof java.io.ByteArrayOutputStream) {
