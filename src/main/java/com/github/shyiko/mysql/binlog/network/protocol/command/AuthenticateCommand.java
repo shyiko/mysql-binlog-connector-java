@@ -82,6 +82,9 @@ public class AuthenticateCommand implements Command {
     public static byte[] passwordCompatibleWithMySQL411(String password, String salt) {
         MessageDigest sha;
         try {
+            /** 
+            * recommend sha = MessageDigest.getInstance("SHA-512");
+            */
             sha = MessageDigest.getInstance("SHA-1");
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
