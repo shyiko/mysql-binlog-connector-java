@@ -15,14 +15,14 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization.json;
 
-import com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer;
-import com.github.shyiko.mysql.binlog.event.deserialization.ColumnType;
-import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
+
+import com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.ColumnType;
+import com.github.shyiko.mysql.binlog.io.JsonByteArrayInputStream;
 
 /**
  * Utility to parse the binary-encoded value of a MySQL {@code JSON} type, translating the encoded representation into
@@ -181,14 +181,10 @@ public class JsonBinary {
         new JsonBinary(bytes).parse(formatter);
     }
 
-    private final ByteArrayInputStream reader;
+    private final JsonByteArrayInputStream reader;
 
     public JsonBinary(byte[] bytes) {
-        this(new ByteArrayInputStream(bytes));
-    }
-
-    public JsonBinary(ByteArrayInputStream contents) {
-        this.reader = contents;
+        this.reader = new JsonByteArrayInputStream(bytes);
     }
 
     public String getString() {
@@ -202,10 +198,12 @@ public class JsonBinary {
     }
 
     public void parse(JsonFormatter formatter) throws IOException {
-        parse(readValueType(), formatter);
+        parse(new ValueEntry(readValueType(), reader.getPosition(), 0), formatter);
     }
 
-    protected void parse(ValueType type, JsonFormatter formatter) throws IOException {
+    protected void parse(ValueEntry entry, JsonFormatter formatter) throws IOException {
+        ensureOffset(entry.absoluteOffset());
+        ValueType type = entry.type;
         switch (type) {
             case SMALL_DOCUMENT:
                 parseObject(true, formatter);
@@ -252,6 +250,22 @@ public class JsonBinary {
             default:
                 throw new IOException("Unknown type value '" + asHex(type.getCode()) +
                     "' in first byte of a JSON value");
+        }
+    }
+
+    /**
+     * ensure parse position equals entry-offset
+     * @param ensureOffset parse offset
+     */
+    private void ensureOffset(int ensureOffset) {
+        // ensure reader's position equals parse offset
+        int pos = reader.getPosition();
+        if (pos != ensureOffset) {
+            if (ensureOffset < pos) {
+                String msg = String.format("wrong offset. pos:%d, ensureOffset:%d", pos, ensureOffset);
+                throw new RuntimeException(msg);
+            }
+            reader.skip(ensureOffset - pos);
         }
     }
 
@@ -319,6 +333,8 @@ public class JsonBinary {
      */
     protected void parseObject(boolean small, JsonFormatter formatter)
             throws IOException {
+        int objectPosition = reader.getPosition(); // object start position
+
         // Read the header ...
         int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
         int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
@@ -326,8 +342,9 @@ public class JsonBinary {
 
         // Read each key-entry, consisting of the offset and length of each key ...
         int[] keyLengths = new int[numElements];
+        int[] keyOffsets = new int[numElements];
         for (int i = 0; i != numElements; ++i) {
-            readUnsignedIndex(numBytes, small, "key offset in"); // unused
+            keyOffsets[i] = readUnsignedIndex(numBytes, small, "key offset in");
             keyLengths[i] = readUInt16();
         }
 
@@ -368,13 +385,14 @@ public class JsonBinary {
                                 ", which is larger than the binary form of the JSON document (" +
                                 numBytes + " bytes)");
                     }
-                    entries[i] = new ValueEntry(type, offset);
+                    entries[i] = new ValueEntry(type, objectPosition, offset);
             }
         }
 
         // Read each key ...
         String[] keys = new String[numElements];
         for (int i = 0; i != numElements; ++i) {
+            ensureOffset(objectPosition + keyOffsets[i]);
             keys[i] = reader.readString(keyLengths[i]);
         }
 
@@ -397,7 +415,7 @@ public class JsonBinary {
                 }
             } else {
                 // Parse the value ...
-                parse(entry.type, formatter);
+                parse(entry, formatter);
             }
         }
         formatter.endObject();
@@ -462,7 +480,9 @@ public class JsonBinary {
      */
     // checkstyle, please ignore MethodLength for the next line
     protected void parseArray(boolean small, JsonFormatter formatter)
-            throws IOException {
+        throws IOException {
+        int objectPosition = reader.getPosition(); // array object start position
+
         // Read the header ...
         int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
         int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
@@ -505,7 +525,7 @@ public class JsonBinary {
                                 ", which is larger than the binary form of the JSON document (" +
                                 numBytes + " bytes)");
                     }
-                    entries[i] = new ValueEntry(type, offset);
+                    entries[i] = new ValueEntry(type, objectPosition, offset);
             }
         }
 
@@ -527,7 +547,7 @@ public class JsonBinary {
                 }
             } else {
                 // Parse the value ...
-                parse(entry.type, formatter);
+                parse(entry, formatter);
             }
         }
         formatter.endArray();
@@ -995,23 +1015,30 @@ public class JsonBinary {
 
         protected final ValueType type;
         protected final int index;
+        protected final int objectIndex;
         protected Object value;
         protected boolean resolved;
 
         public ValueEntry(ValueType type) {
             this.type = type;
             this.index = 0;
+            this.objectIndex = 0;
         }
 
-        public ValueEntry(ValueType type, int index) {
+        public ValueEntry(ValueType type, int objectIndex, int index) {
             this.type = type;
             this.index = index;
+            this.objectIndex = objectIndex;
         }
 
         public ValueEntry setValue(Object value) {
             this.value = value;
             this.resolved = true;
             return this;
+        }
+
+        public int absoluteOffset() {
+            return this.objectIndex + this.index;
         }
     }
 }
