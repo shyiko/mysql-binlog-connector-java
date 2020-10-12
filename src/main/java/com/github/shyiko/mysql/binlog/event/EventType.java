@@ -195,7 +195,7 @@ public enum EventType {
     XA_PREPARE(38),
     AURORA_PADDING(100);
 
-    int eventId;
+    private final int eventId;
 
     EventType(int eventId) {
         this.eventId = eventId;
