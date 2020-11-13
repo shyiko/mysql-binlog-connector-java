@@ -192,8 +192,7 @@ public enum EventType {
     /**
      * Prepared XA transaction terminal event similar to XID except that it is specific to XA transaction.
      */
-    XA_PREPARE(38),
-    AURORA_PADDING(100);
+    XA_PREPARE(38);
 
     private final int eventId;
 
