@@ -46,7 +46,7 @@ public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventH
         EventType eventType = EventType.forId(ordinal);
 
         if (eventType == null) {
-            return EventType.forId(0);
+            return EventType.UNKNOWN;
         }
         return eventType;
     }
