@@ -201,9 +201,9 @@ public enum EventType {
     }
 
     /**
-     * Creates EventType based on the id.
+     * Parses the event type based on the ordinal.
      * 
-     * <p>If id passed is out of the range of the standard event types, EventType.UNKNOWN is returned.
+     * <p>If an invalid or proprietary ordinal is passed, EventType.UNKNOWN is returned.
      */
     public static EventType forId(int eventId) {
         for (EventType type : EventType.values()) {

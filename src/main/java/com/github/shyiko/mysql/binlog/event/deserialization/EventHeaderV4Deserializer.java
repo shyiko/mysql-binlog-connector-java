@@ -30,19 +30,11 @@ public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventH
     public EventHeaderV4 deserialize(ByteArrayInputStream inputStream) throws IOException {
         EventHeaderV4 header = new EventHeaderV4();
         header.setTimestamp(inputStream.readLong(4) * 1000L);
-        header.setEventType(getEventType(inputStream.readInteger(1)));
+        header.setEventType(EventType.forId(inputStream.readInteger(1)));
         header.setServerId(inputStream.readLong(4));
         header.setEventLength(inputStream.readLong(4));
         header.setNextPosition(inputStream.readLong(4));
         header.setFlags(inputStream.readInteger(2));
         return header;
-    }
-
-    /**
-     * Parses the event type based on the ordinal.
-     * If an invalid or proprietary ordinal is passed, an unknown event is returned.
-     */
-    private static EventType getEventType(int ordinal) throws IOException {
-        return EventType.forId(ordinal);
     }
 }
