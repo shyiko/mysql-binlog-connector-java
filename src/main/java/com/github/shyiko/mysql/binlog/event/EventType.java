@@ -192,8 +192,7 @@ public enum EventType {
     /**
      * Prepared XA transaction terminal event similar to XID except that it is specific to XA transaction.
      */
-    XA_PREPARE(38),
-    AURORA_PADDING(100);
+    XA_PREPARE(38);
 
     private final int eventId;
 
@@ -201,12 +200,17 @@ public enum EventType {
         this.eventId = eventId;
     }
 
+    /**
+     * Parses the event type based on the ordinal.
+     * 
+     * <p>If an invalid or proprietary ordinal is passed, EventType.UNKNOWN is returned.
+     */
     public static EventType forId(int eventId) {
         for (EventType type : EventType.values()) {
             if (type.eventId == eventId) return type;
         }
 
-        return null;
+        return EventType.UNKNOWN;
     }
 
     public static boolean isRowMutation(EventType eventType) {
