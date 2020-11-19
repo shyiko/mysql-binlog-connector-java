@@ -43,11 +43,6 @@ public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventH
      * If an invalid or proprietary ordinal is passed, an unknown event is returned.
      */
     private static EventType getEventType(int ordinal) throws IOException {
-        EventType eventType = EventType.forId(ordinal);
-
-        if (eventType == null) {
-            return EventType.UNKNOWN;
-        }
-        return eventType;
+        return EventType.forId(ordinal);
     }
 }

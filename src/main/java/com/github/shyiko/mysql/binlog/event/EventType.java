@@ -200,12 +200,17 @@ public enum EventType {
         this.eventId = eventId;
     }
 
+    /**
+     * Creates EventType based on the id.
+     * 
+     * <p>If id passed is out of the range of the standard event types, EventType.UNKNOWN is returned.
+     */
     public static EventType forId(int eventId) {
         for (EventType type : EventType.values()) {
             if (type.eventId == eventId) return type;
         }
 
-        return null;
+        return EventType.UNKNOWN;
     }
 
     public static boolean isRowMutation(EventType eventType) {
