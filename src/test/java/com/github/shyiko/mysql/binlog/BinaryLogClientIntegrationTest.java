@@ -986,6 +986,7 @@ public class BinaryLogClientIntegrationTest {
 
     @Test
     public void testMySQL8TableMetadata() throws Exception {
+        master.execute("drop table if exists test_metameta");
         master.execute("create table test_metameta ( " +
                 "a date, b date, c date, d date, e date, f date, g date, " +
                 "h date, i date, j int)");
