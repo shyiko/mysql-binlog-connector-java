@@ -95,9 +95,7 @@ public class TableMapEventMetadataDeserializer {
                     result.setVisibility(readBooleanList(inputStream, nColumns));
                     break;
                 case UNKNOWN_METADATA_FIELD_TYPE:
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Received metadata field of unknown type");
-                    }
+                    logger.warning("Received metadata field of unknown type");
                     break;
                 default:
                     inputStream.enterBlock(remainingBytes);
