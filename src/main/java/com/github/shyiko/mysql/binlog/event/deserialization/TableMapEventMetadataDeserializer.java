@@ -26,13 +26,17 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * @author <a href="mailto:ahmedahamid@yahoo.com">Ahmed Abdul Hamid</a>
  */
 public class TableMapEventMetadataDeserializer {
 
-    public TableMapEventMetadata deserialize(ByteArrayInputStream inputStream, int nIntColumns) throws IOException {
+    private final Logger logger = Logger.getLogger(getClass().getName());
+
+    public TableMapEventMetadata deserialize(ByteArrayInputStream inputStream, int nColumns, int nNumericColumns) throws IOException {
         int remainingBytes = inputStream.available();
         if (remainingBytes <= 0) {
             return null;
@@ -41,7 +45,13 @@ public class TableMapEventMetadataDeserializer {
         TableMapEventMetadata result = new TableMapEventMetadata();
 
         for (; remainingBytes > 0; inputStream.enterBlock(remainingBytes)) {
-            MetadataFieldType fieldType = MetadataFieldType.byCode(inputStream.readInteger(1));
+            int code = inputStream.readInteger(1);
+
+            MetadataFieldType fieldType = MetadataFieldType.byCode(code);
+
+            if(fieldType == null)
+                throw new IOException("Unsupported table metadata field type " + code);
+
             int fieldLength = inputStream.readPackedInteger();
 
             remainingBytes = inputStream.available();
@@ -49,7 +59,7 @@ public class TableMapEventMetadataDeserializer {
 
             switch (fieldType) {
                 case SIGNEDNESS:
-                    result.setSignedness(readSignedness(inputStream, nIntColumns));
+                    result.setSignedness(readBooleanList(inputStream, nNumericColumns));
                     break;
                 case DEFAULT_CHARSET:
                     result.setDefaultCharset(readDefaultCharset(inputStream));
@@ -81,16 +91,24 @@ public class TableMapEventMetadataDeserializer {
                 case ENUM_AND_SET_COLUMN_CHARSET:
                     result.setEnumAndSetColumnCharsets(readIntegers(inputStream));
                     break;
+                case VISIBILITY:
+                    result.setVisibility(readBooleanList(inputStream, nColumns));
+                    break;
+                case UNKNOWN_METADATA_FIELD_TYPE:
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Received metadata field of unknown type");
+                    }
+                    break;
                 default:
                     inputStream.enterBlock(remainingBytes);
-                    throw new IOException("Unsupported table metadata field type " + fieldType);
+                    throw new IOException("Unsupported table metadata field type " + code);
             }
             remainingBytes -= fieldLength;
         }
         return result;
     }
 
-    private static BitSet readSignedness(ByteArrayInputStream inputStream, int length) throws IOException {
+    private static BitSet readBooleanList(ByteArrayInputStream inputStream, int length) throws IOException {
         BitSet result = new BitSet();
         // according to MySQL internals the amount of storage required for N columns is INT((N+7)/8) bytes
         byte[] bytes = inputStream.read((length + 7) >> 3);
@@ -162,7 +180,9 @@ public class TableMapEventMetadataDeserializer {
         SIMPLE_PRIMARY_KEY(8),              // The primary key without any prefix
         PRIMARY_KEY_WITH_PREFIX(9),         // The primary key with some prefix
         ENUM_AND_SET_DEFAULT_CHARSET(10),   // Charsets of ENUM and SET columns
-        ENUM_AND_SET_COLUMN_CHARSET(11);    // Charsets of ENUM and SET columns
+        ENUM_AND_SET_COLUMN_CHARSET(11),    // Charsets of ENUM and SET columns
+        VISIBILITY(12),                     // Column visibility (8.0.23 and newer)
+        UNKNOWN_METADATA_FIELD_TYPE(128);   // Returned from MySQL 8.0 in some cases
 
         private final int code;
 

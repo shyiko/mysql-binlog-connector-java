@@ -36,6 +36,7 @@ public class TableMapEventMetadata implements EventData {
     private Map<Integer, Integer> primaryKeysWithPrefix;
     private DefaultCharset enumAndSetDefaultCharset;
     private List<Integer> enumAndSetColumnCharsets;
+    private BitSet visibility;
 
     public BitSet getSignedness() {
         return signedness;
@@ -125,6 +126,14 @@ public class TableMapEventMetadata implements EventData {
         this.enumAndSetColumnCharsets = enumAndSetColumnCharsets;
     }
 
+    public BitSet getVisibility() {
+        return visibility;
+    }
+
+    public void setVisibility(BitSet visibility) {
+        this.visibility = visibility;
+    }
+
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
@@ -162,6 +171,8 @@ public class TableMapEventMetadata implements EventData {
 
         sb.append(", enumAndSetColumnCharsets=").append(enumAndSetColumnCharsets == null ? "null" : "");
         appendList(sb, enumAndSetColumnCharsets);
+
+        sb.append(",visibility=").append(visibility);
 
         sb.append('}');
         return sb.toString();
