@@ -52,6 +52,9 @@ public class TableMapEventMetadataDeserializer {
             if(fieldType == null)
                 throw new IOException("Unsupported table metadata field type " + code);
 
+            //for some reasons, the UNKNOWN_METADATA_FIELD_TYPE will mess up the stream
+            if(inputStream.available() == 0) return result;
+
             int fieldLength = inputStream.readPackedInteger();
 
             remainingBytes = inputStream.available();
