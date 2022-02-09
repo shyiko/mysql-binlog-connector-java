@@ -178,12 +178,7 @@ public class JsonBinary {
      * @throws IOException if there is a problem reading or processing the binary representation
      */
     public static void parse(byte[] bytes, JsonFormatter formatter) throws IOException {
-        if (bytes.length == 0) {
-            // When the top-level value is a JSON "null", the value in java shows up as a non-null, empty byte array
-            formatter.valueNull();
-        } else {
-            new JsonBinary(bytes).parse(formatter);
-        }
+        new JsonBinary(bytes).parse(formatter);
     }
 
     private final ByteArrayInputStream reader;
@@ -194,6 +189,7 @@ public class JsonBinary {
 
     public JsonBinary(ByteArrayInputStream contents) {
         this.reader = contents;
+        this.reader.mark(Integer.MAX_VALUE);
     }
 
     public String getString() {
@@ -323,17 +319,22 @@ public class JsonBinary {
      * @throws IOException if there is a problem reading the JSON value
      */
     protected void parseObject(boolean small, JsonFormatter formatter)
-            throws IOException {
+        throws IOException {
+        // this is terrible, but without a decent seekable InputStream the other way seemed like
+        // a full-on rewrite
+        int objectOffset = this.reader.getPosition();
+
         // Read the header ...
         int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
         int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
         int valueSize = small ? 2 : 4;
 
         // Read each key-entry, consisting of the offset and length of each key ...
-        int[] keyLengths = new int[numElements];
+        KeyEntry[] keys = new KeyEntry[numElements];
         for (int i = 0; i != numElements; ++i) {
-            readUnsignedIndex(numBytes, small, "key offset in"); // unused
-            keyLengths[i] = readUInt16();
+            keys[i] = new KeyEntry(
+                readUnsignedIndex(numBytes, small, "key offset in"),
+                readUInt16());
         }
 
         // Read each key value value-entry
@@ -369,18 +370,23 @@ public class JsonBinary {
                     int offset = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                     if (offset >= numBytes) {
                         throw new IOException("The offset for the value in the JSON binary document is " +
-                                offset +
-                                ", which is larger than the binary form of the JSON document (" +
-                                numBytes + " bytes)");
+                            offset +
+                            ", which is larger than the binary form of the JSON document (" +
+                            numBytes + " bytes)");
                     }
                     entries[i] = new ValueEntry(type, offset);
             }
         }
 
         // Read each key ...
-        String[] keys = new String[numElements];
         for (int i = 0; i != numElements; ++i) {
-            keys[i] = reader.readString(keyLengths[i]);
+            final int skipBytes = keys[i].index + objectOffset - reader.getPosition();
+            // Skip to a start of a field name if the current position does not point to it
+            // This can happen for MySQL 8
+            if (skipBytes != 0) {
+                reader.fastSkip(skipBytes);
+            }
+            keys[i].name = reader.readString(keys[i].length);
         }
 
         // Now parse the values ...
@@ -389,7 +395,7 @@ public class JsonBinary {
             if (i != 0) {
                 formatter.nextEntry();
             }
-            formatter.name(keys[i]);
+            formatter.name(keys[i].name);
             ValueEntry entry = entries[i];
             if (entry.resolved) {
                 Object value = entry.value;
@@ -402,6 +408,8 @@ public class JsonBinary {
                 }
             } else {
                 // Parse the value ...
+                this.reader.reset();
+                this.reader.fastSkip(objectOffset + entry.index);
                 parse(entry.type, formatter);
             }
         }
@@ -467,7 +475,9 @@ public class JsonBinary {
      */
     // checkstyle, please ignore MethodLength for the next line
     protected void parseArray(boolean small, JsonFormatter formatter)
-            throws IOException {
+        throws IOException {
+        int arrayOffset = this.reader.getPosition();
+
         // Read the header ...
         int numElements = readUnsignedIndex(Integer.MAX_VALUE, small, "number of elements in");
         int numBytes = readUnsignedIndex(Integer.MAX_VALUE, small, "size of");
@@ -506,9 +516,9 @@ public class JsonBinary {
                     int offset = readUnsignedIndex(Integer.MAX_VALUE, small, "value offset in");
                     if (offset >= numBytes) {
                         throw new IOException("The offset for the value in the JSON binary document is " +
-                                offset +
-                                ", which is larger than the binary form of the JSON document (" +
-                                numBytes + " bytes)");
+                            offset +
+                            ", which is larger than the binary form of the JSON document (" +
+                            numBytes + " bytes)");
                     }
                     entries[i] = new ValueEntry(type, offset);
             }
@@ -532,6 +542,9 @@ public class JsonBinary {
                 }
             } else {
                 // Parse the value ...
+                this.reader.reset();
+                this.reader.fastSkip(arrayOffset + entry.index);
+
                 parse(entry.type, formatter);
             }
         }
@@ -655,7 +668,6 @@ public class JsonBinary {
      * See the <a href=
      * "https://github.com/mysql/mysql-server/blob/e0e0ae2ea27c9bb76577664845507ef224d362e4/sql/json_binary.cc#L1034">
      * MySQL source code</a> for the logic used in this method.
-     * <p>
      * <h3>Grammar</h3>
      *
      * <pre>
@@ -680,7 +692,7 @@ public class JsonBinary {
         ColumnType type = ColumnType.byCode(customType);
         if (type == null) {
             throw new IOException("Unknown type '" + asHex(customType) +
-                    "' in first byte of a JSON opaque value");
+                "' in first byte of a JSON opaque value");
         }
         // Read the data length ...
         int length = readVariableInt();
@@ -857,7 +869,7 @@ public class JsonBinary {
     }
 
     protected void parseOpaqueValue(ColumnType type, int length, JsonFormatter formatter)
-            throws IOException {
+        throws IOException {
         formatter.valueOpaque(type, reader.read(length));
     }
 
@@ -879,7 +891,7 @@ public class JsonBinary {
         long result = isSmall ? readUInt16() : readUInt32();
         if (result > maxValue) {
             throw new IOException("The " + desc + " the JSON document is " + result +
-                    " and is too big for the binary form of the document (" + maxValue + ")");
+                " and is too big for the binary form of the document (" + maxValue + ")");
         }
         if (result > Integer.MAX_VALUE) {
             throw new IOException("The " + desc + " the JSON document is " + result + " and is too big to be used");
@@ -932,7 +944,7 @@ public class JsonBinary {
         long b7 = reader.read() & 0xFF;
         long b8 = reader.read();
         return b8 << 56 | (b7 << 48) | (b6 << 40) | (b5 << 32) |
-                (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
+            (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
     }
 
     protected BigInteger readUInt64() throws IOException {
@@ -951,6 +963,7 @@ public class JsonBinary {
      * to 16383, and so on...
      *
      * @return the integer value
+     * @throws IOException if we don't encounter an end-of-int marker
      */
     protected int readVariableInt() throws IOException {
         int length = 0;
@@ -991,6 +1004,26 @@ public class JsonBinary {
 
     protected static String asHex(int value) {
         return Integer.toHexString(value);
+    }
+
+    /**
+     * Class used internally to hold key entry information.
+     */
+    protected static final class KeyEntry {
+
+        protected final int index;
+        protected final int length;
+        protected String name;
+
+        public KeyEntry(int index, int length) {
+            this.index = index;
+            this.length = length;
+        }
+
+        public KeyEntry setKey(String key) {
+            this.name = key;
+            return this;
+        }
     }
 
     /**
