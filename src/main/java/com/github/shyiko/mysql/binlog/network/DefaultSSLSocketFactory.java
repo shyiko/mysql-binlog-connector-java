@@ -30,7 +30,7 @@ public class DefaultSSLSocketFactory implements SSLSocketFactory {
     private final String protocol;
 
     public DefaultSSLSocketFactory() {
-        this("TLSv1");
+        this("TLSv1.2");
     }
 
     /**
