@@ -905,7 +905,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     protected ChecksumType fetchBinlogChecksum(final PacketChannel channel) throws IOException {
-        channel.write(new QueryCommand("show global variables like 'binlog_checksum'"));
+        channel.write(new QueryCommand("show variables like 'binlog_checksum'"));
         ResultSetRowPacket[] resultSet = readResultSet(channel);
         if (resultSet.length == 0) {
             return ChecksumType.NONE;
