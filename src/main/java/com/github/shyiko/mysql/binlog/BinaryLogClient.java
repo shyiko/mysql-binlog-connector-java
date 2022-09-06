@@ -168,6 +168,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.password = password;
     }
 
+    public String fivetranClientIdentity() {
+        return "mysql-binlog-connector-java";
+    }
+
     public boolean isBlocking() {
         return blocking;
     }
