@@ -15,10 +15,13 @@
  */
 package com.github.shyiko.mysql.binlog.event;
 
+import java.util.logging.Logger;
+
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class RotateEventData implements EventData {
+    private final Logger logger = Logger.getLogger("donkey");
 
     private String binlogFilename;
     private long binlogPosition;
@@ -36,6 +39,7 @@ public class RotateEventData implements EventData {
     }
 
     public void setBinlogPosition(long binlogPosition) {
+        logger.info(String.format("updating rotate event data binlog position from %s to %s", this.binlogPosition, binlogPosition));
         this.binlogPosition = binlogPosition;
     }
 

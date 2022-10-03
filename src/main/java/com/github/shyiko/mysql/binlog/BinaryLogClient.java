@@ -250,6 +250,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * @see #getBinlogPosition()
      */
     public void setBinlogPosition(long binlogPosition) {
+        logger.info(String.format("updating internal binlog position from %s to %s", this.binlogPosition, binlogPosition));
         this.binlogPosition = binlogPosition;
     }
 
@@ -905,7 +906,11 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
         ResultSetRowPacket resultSetRow = resultSet[0];
         binlogFilename = resultSetRow.getValue(0);
-        binlogPosition = Long.parseLong(resultSetRow.getValue(1));
+
+        long nextPos = Long.parseLong(resultSetRow.getValue(1));
+        logger.info(String.format("updating internal binlog position from %s to %s", binlogPosition, nextPos));
+
+        binlogPosition = nextPos;
     }
 
     protected ChecksumType fetchBinlogChecksum(final PacketChannel channel) throws IOException {
@@ -1012,7 +1017,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (eventType == EventType.ROTATE) {
             RotateEventData rotateEventData = (RotateEventData) EventDataWrapper.internal(event.getData());
             binlogFilename = rotateEventData.getBinlogFilename();
-            binlogPosition = rotateEventData.getBinlogPosition();
+
+            long nextPos = rotateEventData.getBinlogPosition();
+            logger.info(String.format("updating internal binlog position from %s to %s", binlogPosition, nextPos));
+            binlogPosition = nextPos;
         } else
         // do not update binlogPosition on TABLE_MAP so that in case of reconnect (using a different instance of
         // client) table mapping cache could be reconstructed before hitting row mutation event
@@ -1020,6 +1028,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             EventHeaderV4 trackableEventHeader = (EventHeaderV4) eventHeader;
             long nextBinlogPosition = trackableEventHeader.getNextPosition();
             if (nextBinlogPosition > 0) {
+                logger.info(String.format("updating internal binlog position from %s to %s", binlogPosition, nextBinlogPosition));
                 binlogPosition = nextBinlogPosition;
             }
         }
