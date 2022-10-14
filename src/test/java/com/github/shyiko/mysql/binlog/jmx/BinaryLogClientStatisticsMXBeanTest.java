@@ -15,7 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog.jmx;
 
-import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.github.shyiko.mysql.binlog.BinaryLogClientShyiko;
 import org.junit.Test;
 
 import javax.management.MBeanServer;
@@ -32,7 +32,7 @@ public class BinaryLogClientStatisticsMXBeanTest {
     @Test
     public void testRegistration() throws Exception {
         MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
-        BinaryLogClient binaryLogClient = new BinaryLogClient("localhost", 3306, "root", "mysql");
+        BinaryLogClientShyiko binaryLogClient = new BinaryLogClientShyiko("localhost", 3306, "root", "mysql");
         BinaryLogClientStatistics binaryLogClientStats = new BinaryLogClientStatistics(binaryLogClient);
         ObjectName objectName = new ObjectName("mysql.binlog:type=BinaryLogClientStatistics");
         mBeanServer.registerMBean(binaryLogClientStats, objectName);

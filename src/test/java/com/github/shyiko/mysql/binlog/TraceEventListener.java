@@ -23,7 +23,7 @@ import java.util.logging.Logger;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class TraceEventListener implements BinaryLogClient.EventListener {
+public class TraceEventListener implements BinaryLogClientShyiko.EventListener {
 
     private final Logger logger = Logger.getLogger("donkey");
 

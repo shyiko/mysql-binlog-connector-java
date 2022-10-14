@@ -25,7 +25,7 @@ import java.util.List;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class CapturingEventListener implements BinaryLogClient.EventListener {
+public class CapturingEventListener implements BinaryLogClientShyiko.EventListener {
 
     private final List<Event> events = new LinkedList<Event>();
 

@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class CountDownEventListener implements BinaryLogClient.EventListener {
+public class CountDownEventListener implements BinaryLogClientShyiko.EventListener {
 
     private final Map<EventType, AtomicInteger> countersByType = new HashMap<EventType, AtomicInteger>();
     private final Map<Class<? extends EventData>, AtomicInteger> countersByDataClass =

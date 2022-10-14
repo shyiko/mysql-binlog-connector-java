@@ -51,7 +51,7 @@ import java.util.logging.Logger;
  *
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class BinaryLogClient implements BinaryLogClientMXBean {
+public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
 
     private static final SSLSocketFactory DEFAULT_REQUIRED_SSL_MODE_SOCKET_FACTORY = new DefaultSSLSocketFactory() {
 
@@ -130,25 +130,25 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     /**
      * Alias for BinaryLogClient("localhost", 3306, &lt;no schema&gt; = null, username, password).
-     * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
+     * @see BinaryLogClientShyiko#BinaryLogClientShyiko(String, int, String, String, String)
      */
-    public BinaryLogClient(String username, String password) {
+    public BinaryLogClientShyiko(String username, String password) {
         this("localhost", 3306, null, username, password);
     }
 
     /**
      * Alias for BinaryLogClient("localhost", 3306, schema, username, password).
-     * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
+     * @see BinaryLogClientShyiko#BinaryLogClientShyiko(String, int, String, String, String)
      */
-    public BinaryLogClient(String schema, String username, String password) {
+    public BinaryLogClientShyiko(String schema, String username, String password) {
         this("localhost", 3306, schema, username, password);
     }
 
     /**
      * Alias for BinaryLogClient(hostname, port, &lt;no schema&gt; = null, username, password).
-     * @see BinaryLogClient#BinaryLogClient(String, int, String, String, String)
+     * @see BinaryLogClientShyiko#BinaryLogClientShyiko(String, int, String, String, String)
      */
-    public BinaryLogClient(String hostname, int port, String username, String password) {
+    public BinaryLogClientShyiko(String hostname, int port, String username, String password) {
         this(hostname, port, null, username, password);
     }
 
@@ -160,7 +160,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      * @param username login name
      * @param password password
      */
-    public BinaryLogClient(String hostname, int port, String schema, String username, String password) {
+    public BinaryLogClientShyiko(String hostname, int port, String schema, String username, String password) {
         this.hostname = hostname;
         this.port = port;
         this.schema = schema;
@@ -835,7 +835,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
         AbstractLifecycleListener connectListener = new AbstractLifecycleListener() {
             @Override
-            public void onConnect(BinaryLogClient client) {
+            public void onConnect(BinaryLogClientShyiko client) {
                 countDownLatch.countDown();
             }
         };
@@ -1239,7 +1239,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
-     * {@link BinaryLogClient}'s event listener.
+     * {@link BinaryLogClientShyiko}'s event listener.
      */
     public interface EventListener {
 
@@ -1247,31 +1247,31 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
-     * {@link BinaryLogClient}'s lifecycle listener.
+     * {@link BinaryLogClientShyiko}'s lifecycle listener.
      */
     public interface LifecycleListener {
 
         /**
          * Called once client has successfully logged in but before started to receive binlog events.
          */
-        void onConnect(BinaryLogClient client);
+        void onConnect(BinaryLogClientShyiko client);
 
         /**
-         * It's guarantied to be called before {@link #onDisconnect(BinaryLogClient)}) in case of
+         * It's guarantied to be called before {@link #onDisconnect(BinaryLogClientShyiko)}) in case of
          * communication failure.
          */
-        void onCommunicationFailure(BinaryLogClient client, Exception ex);
+        void onCommunicationFailure(BinaryLogClientShyiko client, Exception ex);
 
         /**
          * Called in case of failed event deserialization. Note this type of error does NOT cause client to
          * disconnect. If you wish to stop receiving events you'll need to fire client.disconnect() manually.
          */
-        void onEventDeserializationFailure(BinaryLogClient client, Exception ex);
+        void onEventDeserializationFailure(BinaryLogClientShyiko client, Exception ex);
 
         /**
          * Called upon disconnect (regardless of the reason).
          */
-        void onDisconnect(BinaryLogClient client);
+        void onDisconnect(BinaryLogClientShyiko client);
     }
 
     /**
@@ -1279,13 +1279,13 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
      */
     public static abstract class AbstractLifecycleListener implements LifecycleListener {
 
-        public void onConnect(BinaryLogClient client) { }
+        public void onConnect(BinaryLogClientShyiko client) { }
 
-        public void onCommunicationFailure(BinaryLogClient client, Exception ex) { }
+        public void onCommunicationFailure(BinaryLogClientShyiko client, Exception ex) { }
 
-        public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) { }
+        public void onEventDeserializationFailure(BinaryLogClientShyiko client, Exception ex) { }
 
-        public void onDisconnect(BinaryLogClient client) { }
+        public void onDisconnect(BinaryLogClientShyiko client) { }
 
     }
 

@@ -15,7 +15,7 @@
  */
 package com.github.shyiko.mysql.binlog.jmx;
 
-import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.github.shyiko.mysql.binlog.BinaryLogClientShyiko;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
 
@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
 public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBean,
-        BinaryLogClient.EventListener, BinaryLogClient.LifecycleListener {
+        BinaryLogClientShyiko.EventListener, BinaryLogClientShyiko.LifecycleListener {
 
     private AtomicReference<EventHeader> lastEventHeader = new AtomicReference<EventHeader>();
     private AtomicLong timestampOfLastEvent = new AtomicLong();
@@ -38,7 +38,7 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     public BinaryLogClientStatistics() {
     }
 
-    public BinaryLogClientStatistics(BinaryLogClient binaryLogClient) {
+    public BinaryLogClientStatistics(BinaryLogClientShyiko binaryLogClient) {
         binaryLogClient.registerEventListener(this);
         binaryLogClient.registerLifecycleListener(this);
     }
@@ -108,7 +108,7 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     }
 
     @Override
-    public void onEventDeserializationFailure(BinaryLogClient client, Exception ex) {
+    public void onEventDeserializationFailure(BinaryLogClientShyiko client, Exception ex) {
         numberOfSkippedEvents.getAndIncrement();
         lastEventHeader.set(null);
         timestampOfLastEvent.set(getCurrentTimeMillis());
@@ -116,16 +116,16 @@ public class BinaryLogClientStatistics implements BinaryLogClientStatisticsMXBea
     }
 
     @Override
-    public void onDisconnect(BinaryLogClient client) {
+    public void onDisconnect(BinaryLogClientShyiko client) {
         numberOfDisconnects.getAndIncrement();
     }
 
     @Override
-    public void onConnect(BinaryLogClient client) {
+    public void onConnect(BinaryLogClientShyiko client) {
     }
 
     @Override
-    public void onCommunicationFailure(BinaryLogClient client, Exception ex) {
+    public void onCommunicationFailure(BinaryLogClientShyiko client, Exception ex) {
     }
 
     protected long getCurrentTimeMillis() {
